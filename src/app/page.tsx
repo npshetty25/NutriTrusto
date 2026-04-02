@@ -14,7 +14,7 @@ import { ProfileDropdown } from "@/components/profile-dropdown";
 import BarcodeScanner from "@/components/barcode-scanner";
 import {
   Camera, BrainCircuit, Loader2, TrendingUp, ScanLine,
-  ExternalLink, Clock, X, Trash2, Home as HomeIcon
+  ExternalLink, Clock, X, Trash2, Home as HomeIcon, Info, Activity, Zap, AlertTriangle, CheckCircle2, Search, FileText
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -43,7 +43,11 @@ export default function Home() {
   const [scannedResult, setScannedResult] = useState<any | null>(null);
 
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showReceiptMenu, setShowReceiptMenu] = useState(false);
+
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
+  const invoiceInputRef = useRef<HTMLInputElement>(null);
   const displayedItems = isVegMode ? items.filter(i => isVegItem(i.name)) : items;
   const highRiskItems = displayedItems.filter(i => i.risk === "high");
 
@@ -156,6 +160,7 @@ export default function Home() {
 
   // ─── Receipt upload → Supabase insert ──────────────────────────
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    setShowReceiptMenu(false);
     const file = e.target.files?.[0];
     if (!file) return;
     setIsUploading(true);
@@ -198,7 +203,8 @@ export default function Home() {
       toast("Error", { description: "Failed to parse document." });
     } finally {
       setIsUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
+      if (cameraInputRef.current) cameraInputRef.current.value = "";
+      if (galleryInputRef.current) galleryInputRef.current.value = "";
     }
   };
 
@@ -405,7 +411,7 @@ export default function Home() {
               {items.length > 0 ? "No items match the current filter." : "Scan a grocery receipt or barcode to start tracking food waste."}
             </p>
             <button
-              onClick={() => fileInputRef.current?.click()}
+              onClick={() => setShowReceiptMenu(true)}
               className="flex items-center gap-2 bg-foreground text-background text-sm font-semibold px-5 py-2.5 rounded-xl hover:opacity-90 transition-opacity"
             >
               <Camera size={16} /> Scan Receipt
@@ -441,10 +447,47 @@ export default function Home() {
         )}
       </main>
 
-      <input type="file" accept="image/*" ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
+      <input type="file" accept="image/*" capture="environment" ref={cameraInputRef} onChange={handleFileUpload} className="hidden" />
+      <input type="file" accept="image/*" ref={galleryInputRef} onChange={handleFileUpload} className="hidden" />
+      <input type="file" accept="image/*,application/pdf" ref={invoiceInputRef} onChange={handleFileUpload} className="hidden" />
 
       {/* Bottom Nav Bar */}
-      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
+      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center">
+        {/* Receipt Action Menu */}
+        {showReceiptMenu && (
+          <div className="mb-4 bg-card border border-border shadow-2xl rounded-2xl p-2 flex flex-col gap-2 w-48 animate-in slide-in-from-bottom-2 fade-in duration-200">
+            <button 
+              onClick={() => cameraInputRef.current?.click()}
+              className="flex items-center gap-3 p-3 rounded-xl hover:bg-foreground/5 text-foreground font-semibold text-sm transition-colors"
+            >
+              <div className="w-8 h-8 rounded-full bg-blue-500/10 text-blue-500 flex items-center justify-center shrink-0">
+                <Camera size={16} />
+              </div>
+              Take Photo
+            </button>
+            <div className="h-px w-full bg-border" />
+            <button 
+              onClick={() => galleryInputRef.current?.click()}
+              className="flex items-center gap-3 p-3 rounded-xl hover:bg-foreground/5 text-foreground font-semibold text-sm transition-colors"
+            >
+              <div className="w-8 h-8 rounded-full bg-green-500/10 text-green-500 flex items-center justify-center shrink-0">
+                <Search size={16} />
+              </div>
+              Upload Gallery
+            </button>
+            <div className="h-px w-full bg-border" />
+            <button 
+              onClick={() => invoiceInputRef.current?.click()}
+              className="flex items-center gap-3 p-3 rounded-xl hover:bg-foreground/5 text-foreground font-semibold text-sm transition-colors"
+            >
+              <div className="w-8 h-8 rounded-full bg-purple-500/10 text-purple-500 flex items-center justify-center shrink-0">
+                <FileText size={16} />
+              </div>
+              Add Invoice
+            </button>
+          </div>
+        )}
+
         <div className="flex items-center bg-card border border-border shadow-2xl rounded-2xl p-2 gap-2 backdrop-blur-md">
           <button onClick={() => setShowBarcodeScanner(true)} className="flex flex-col items-center justify-center gap-1 hover:bg-foreground/5 text-foreground/80 hover:text-foreground w-16 h-16 rounded-xl transition-all">
             <ScanLine size={18} /><span className="text-[10px] tracking-wide">Barcode</span>
@@ -458,7 +501,11 @@ export default function Home() {
 
           <div className="w-px h-8 bg-border" />
 
-          <button onClick={() => fileInputRef.current?.click()} disabled={isUploading} className="flex flex-col items-center justify-center gap-1 hover:bg-foreground/5 text-foreground/80 hover:text-foreground w-16 h-16 rounded-xl transition-all disabled:opacity-50">
+          <button 
+            onClick={() => setShowReceiptMenu(!showReceiptMenu)} 
+            disabled={isUploading} 
+            className={`flex flex-col items-center justify-center gap-1 hover:bg-foreground/5 w-16 h-16 rounded-xl transition-all disabled:opacity-50 ${showReceiptMenu ? 'bg-foreground/10 text-foreground' : 'text-foreground/80 hover:text-foreground'}`}
+          >
             {isUploading ? <Loader2 size={18} className="animate-spin" /> : <Camera size={18} />}
             <span className="text-[10px] tracking-wide">{isUploading ? "Reading" : "Receipt"}</span>
           </button>
