@@ -482,68 +482,138 @@ export default function Home() {
       )}
 
       {scannedResult && (
-        <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in zoom-in-95 duration-200">
-          <div className="bg-card w-full max-w-sm rounded-3xl border border-border shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-            <div className="p-5 border-b border-border flex justify-between items-start bg-foreground/5 relative">
-              <div className="pr-8">
-                <h3 className="font-bold text-lg leading-tight text-foreground">{scannedResult.name}</h3>
-                <span className="inline-block mt-2 px-2.5 py-1 bg-foreground text-background text-xs font-bold rounded-lg uppercase tracking-widest">
-                  Health Grade: {scannedResult.analysis.health_rating}
-                </span>
-              </div>
-              <button onClick={() => setScannedResult(null)} className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-foreground/5 text-foreground hover:bg-foreground/20 transition-colors">
-                <X size={16} />
+        <div className="fixed inset-0 z-50 bg-background/90 backdrop-blur-sm flex items-center justify-center p-0 sm:p-4 animate-in fade-in zoom-in-95 duration-200">
+          <div className="bg-card w-full h-full sm:h-auto sm:max-h-[90vh] sm:max-w-md sm:rounded-3xl border-0 sm:border border-border shadow-2xl overflow-y-auto flex flex-col relative">
+            {/* Header */}
+            <div className="sticky top-0 bg-card/80 backdrop-blur-md z-10 border-b border-border px-5 py-4 flex justify-between items-center">
+              <h3 className="font-bold text-lg text-foreground truncate pr-4">{scannedResult.name}</h3>
+              <button onClick={() => setScannedResult(null)} className="w-8 h-8 flex items-center justify-center rounded-full bg-foreground/10 hover:bg-foreground/20 text-foreground transition-colors shrink-0">
+                <X size={18} />
               </button>
             </div>
             
-            <div className="p-5 overflow-y-auto flex-1 space-y-6">
-              {scannedResult.analysis.banned_ingredients?.length > 0 && (
-                <div className="bg-danger/10 border border-danger/20 rounded-xl p-4">
-                  <h4 className="text-xs uppercase font-bold tracking-widest text-danger mb-2 flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-danger"></span> Harmful Ingredients
-                  </h4>
-                  <ul className="space-y-2">
-                    {scannedResult.analysis.banned_ingredients.map((item: any, i: number) => (
-                      <li key={i} className="text-sm">
-                        <strong className="text-foreground">{item.name}</strong>
-                        <p className="text-xs text-foreground/70 mt-0.5">Banned in {item.banned_in}: {item.reason}</p>
-                      </li>
-                    ))}
-                  </ul>
+            <div className="p-5 flex-1 space-y-6 pb-24">
+              {/* TruthIn Style Rating Card */}
+              <div className="bg-foreground/5 rounded-2xl p-4 flex items-center justify-between border border-border/50 sleek-shadow">
+                <div className="flex flex-col">
+                  <span className="text-xs font-bold uppercase tracking-widest text-foreground/50 mb-1">NutriTrusto Rating</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl font-black">{scannedResult.analysis.health_score || "N/A"}</span>
+                    <span className="text-sm font-semibold text-foreground/60">/ 5.0</span>
+                  </div>
+                </div>
+                <div className={`px-4 py-2 rounded-xl border flex flex-col items-center justify-center min-w[80px] ${
+                  parseFloat(scannedResult.analysis.health_score) >= 4 ? "bg-green-500/10 border-green-500/20 text-green-600 dark:text-green-400" :
+                  parseFloat(scannedResult.analysis.health_score) >= 2.5 ? "bg-yellow-500/10 border-yellow-500/20 text-yellow-600 dark:text-yellow-400" :
+                  "bg-danger/10 border-danger/20 text-danger"
+                }`}>
+                  <span className="text-[10px] uppercase font-bold tracking-widest opacity-80 mb-0.5">Grade</span>
+                  <span className="font-bold text-sm leading-none">{scannedResult.analysis.health_grade_text || "Unknown"}</span>
+                </div>
+              </div>
+
+              {/* Data Accuracy Disclaimer */}
+              {scannedResult.analysis.data_accuracy_warning && (
+                <div className="flex gap-2 items-start bg-blue-500/5 p-3 rounded-lg border border-blue-500/20 text-blue-600 dark:text-blue-400">
+                  <Info size={14} className="mt-0.5 shrink-0" />
+                  <p className="text-[10px] leading-relaxed uppercase tracking-wider font-semibold">
+                    {scannedResult.analysis.data_accuracy_warning}
+                  </p>
                 </div>
               )}
 
-              {scannedResult.analysis.coloring_agents?.length > 0 && (
-                <div>
-                  <h4 className="text-[10px] uppercase font-bold tracking-widest text-foreground/50 mb-2">Coloring Agents</h4>
-                  <div className="flex flex-wrap gap-2">
-                    {scannedResult.analysis.coloring_agents.map((agent: string, i: number) => (
-                      <span key={i} className="px-2.5 py-1 bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border border-yellow-500/20 text-xs rounded-md shadow-sm">
-                        {agent}
-                      </span>
+              {/* What Should Concern You */}
+              {(scannedResult.analysis.concerns?.length > 0 || scannedResult.analysis.processing_level || scannedResult.analysis.macronutrients) && (
+                <div className="space-y-3">
+                  <h4 className="font-bold flex items-center gap-2 text-foreground">
+                    What Should Concern You <span className="text-xl">😲</span>
+                  </h4>
+                  <div className="bg-foreground/5 rounded-2xl border border-border/50 divide-y divide-border/50 overflow-hidden">
+                    
+                    {scannedResult.analysis.processing_level && (
+                       <div className="p-3.5 flex justify-between items-center bg-danger/5">
+                         <div className="flex items-center gap-2.5">
+                           <Activity size={16} className="text-danger" />
+                           <span className="text-sm font-medium text-foreground/80">Processing Level</span>
+                         </div>
+                         <span className="text-xs font-bold text-danger uppercase tracking-wider">{scannedResult.analysis.processing_level}</span>
+                       </div>
+                    )}
+                    
+                    {scannedResult.analysis.macronutrients && Object.entries(scannedResult.analysis.macronutrients).map(([key, value]) => (
+                       <div key={key} className="p-3.5 flex justify-between items-center">
+                         <div className="flex items-center gap-2.5">
+                           <Zap size={16} className="text-orange-500" />
+                           <span className="text-sm font-medium text-foreground/80 capitalize">{key.replace(/_/g, ' ')}</span>
+                         </div>
+                         <span className="text-xs font-bold text-foreground">{String(value)}</span>
+                       </div>
+                    ))}
+
+                    {scannedResult.analysis.concerns?.map((concern: any, i: number) => (
+                       <div key={i} className="p-3.5 flex flex-col gap-1.5">
+                         <div className="flex justify-between items-center">
+                           <div className="flex items-center gap-2.5">
+                             <AlertTriangle size={16} className="text-danger" />
+                             <span className="text-sm font-bold text-foreground">{concern.title}</span>
+                           </div>
+                           <span className="text-[10px] font-bold text-danger px-2 py-0.5 rounded-full bg-danger/10 uppercase tracking-widest">{concern.level}</span>
+                         </div>
+                         {concern.details && <p className="text-[11px] text-foreground/60 pl-6 leading-relaxed">{concern.details}</p>}
+                       </div>
                     ))}
                   </div>
                 </div>
               )}
 
-              {scannedResult.analysis.alternatives?.length > 0 && (
-                <div>
-                  <h4 className="text-[10px] uppercase font-bold tracking-widest text-foreground/50 mb-2">Healthier Alternatives</h4>
-                  <ul className="list-disc pl-4 space-y-1">
-                    {scannedResult.analysis.alternatives.map((alt: string, i: number) => (
-                      <li key={i} className="text-sm text-foreground/80">{alt}</li>
+              {/* What You'll Like */}
+              {scannedResult.analysis.positives?.length > 0 && (
+                <div className="space-y-3">
+                  <h4 className="font-bold flex items-center gap-2 text-foreground">
+                    What You'll Like <span className="text-xl">🙂</span>
+                  </h4>
+                  <div className="bg-green-500/5 rounded-2xl border border-green-500/20 divide-y divide-green-500/20 overflow-hidden">
+                    {scannedResult.analysis.positives.map((pos: any, i: number) => (
+                       <div key={i} className="p-3.5 flex flex-col gap-1.5 bg-green-500/5">
+                         <div className="flex justify-between items-center">
+                           <div className="flex items-center gap-2.5">
+                             <CheckCircle2 size={16} className="text-green-600 dark:text-green-400" />
+                             <span className="text-sm font-bold text-green-700 dark:text-green-300">{pos.title}</span>
+                           </div>
+                           <span className="text-[10px] font-bold text-green-700 dark:text-green-300 px-2 py-0.5 rounded-full bg-green-500/20 uppercase tracking-widest">{pos.level}</span>
+                         </div>
+                         {pos.details && <p className="text-[11px] text-green-700/70 dark:text-green-300/70 pl-6 leading-relaxed">{pos.details}</p>}
+                       </div>
                     ))}
-                  </ul>
+                  </div>
+                </div>
+              )}
+
+              {/* Better Rated Options */}
+              {scannedResult.analysis.alternatives?.length > 0 && (
+                <div className="space-y-3">
+                  <h4 className="font-bold text-foreground/80 text-sm">Better Rated Options</h4>
+                  <div className="flex gap-3 overflow-x-auto pb-4 snap-x hide-scrollbar">
+                    {scannedResult.analysis.alternatives.map((alt: any, i: number) => (
+                      <div key={i} className="min-w-[140px] snap-center bg-card border border-border p-3 rounded-2xl shrink-0 flex flex-col sleek-shadow">
+                        <div className="w-8 h-8 rounded-full bg-green-500/10 text-green-600 dark:text-green-400 flex items-center justify-center font-black text-xs mb-2">
+                           {alt.score}
+                        </div>
+                        <span className="text-xs font-bold text-foreground leading-tight">{alt.name}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
             
-            <div className="p-4 border-t border-border bg-background">
+            {/* Sticky Action Button */}
+            <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-card via-card to-transparent pt-12">
               <button 
-                onClick={addScannedItemToPantry} 
-                className="w-full bg-foreground text-background font-semibold py-3 rounded-xl hover:opacity-90 transition-opacity"
+                onClick={() => { addScannedItemToPantry(); setScannedResult(null); }} 
+                className="w-full bg-foreground text-background font-bold text-sm py-4 rounded-2xl hover:opacity-90 active:scale-[0.98] transition-all shadow-xl"
               >
-                Add to Pantry
+                Add to Hub Inventory
               </button>
             </div>
           </div>

@@ -33,22 +33,31 @@ If the ingredients list says "None provided", "Not specified", or relies purely 
 - It is MANDATORY to return completely empty arrays for "coloring_agents" and "banned_ingredients" if you are not strictly certain. Stick ONLY to universally known macro-ingredients (e.g. alcohol in vodka, high sugar in chocolate).
 
 Determine if this is actually a legitimate food or beverage item. If it is NOT edible/drinkable, set "is_food" to false and return empty arrays for the rest.
-NOTE: Absolutely ANY item that is edible or consumable by humans (including all sodas, soft drinks, water, juices, condiments, snacks, packaged goods, and liquid drinks) MUST be considered a valid food item ("is_food": true).
 If it is a valid food/beverage item, analyze the precise ingredients to determine:
-1. Health rating (A short metric like "Poor", "Moderate", "Good")
-2. A list of any coloring agents explicitly found (e.g. Red 40, Tartrazine, E150d). Do NOT guess.
-3. Any harmful ingredients explicitly found that are historically or currently BANNED in other countries (like the EU, Japan, California) but still used/legal in India. Do NOT guess.
-4. Generic healthier alternatives to this type of product.
 
 Respond ONLY with valid JSON in the exact structure below:
 {
   "is_food": true,
-  "health_rating": "...",
-  "coloring_agents": ["agent 1", "agent 2"],
-  "banned_ingredients": [
-    { "name": "Ingredient Name", "banned_in": "EU/California", "reason": "Why it's bad" }
+  "health_score": "1.0", // A score strictly out of 5.0 (e.g. 1.0, 3.5, 4.2). 1.0 is terrible, 5.0 is healthy.
+  "health_grade_text": "Very Poor", // E.g., Very Poor, Poor, Fair, Good, Excellent
+  "processing_level": "Ultra-Processed", // E.g., Unprocessed, Processed, Ultra-Processed
+  "data_accuracy_warning": "Based on generic category estimates", // OR "Based on verified physical label" - depending on if you are guessing.
+  "macronutrients": {
+     "energy_kcal": "438.0 kcal",
+     "total_sugars_g": "35.1 g",
+     "added_sugars_g": "28.9 g",
+     "sodium_mg": "97.4 mg"
+  },
+  "concerns": [
+    { "title": "Hydrogenated Vegetable Fat", "level": "High Risk", "details": "Raises LDL cholesterol and risk of heart disease." }
   ],
-  "alternatives": ["Alternative 1", "Alternative 2"]
+  "positives": [
+    { "title": "Trans Fat", "level": "Safe", "details": "not more than 0.04 g" }
+  ],
+  "alternatives": [
+     { "name": "Dark Chocolate (70%+)", "score": "3.8" },
+     { "name": "Fresh Fruit", "score": "5.0" }
+  ]
 }`;
 
     const result = await model.generateContent(prompt);
