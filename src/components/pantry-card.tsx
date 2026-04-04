@@ -115,6 +115,12 @@ export function PantryCard({ name, daysLeft, risk, purchaseDate, healthRating = 
             />
           </div>
         </div>
+
+        {daysLeft === 0 && (
+          <p className="mt-2 text-[11px] leading-relaxed font-semibold text-danger">
+            has likely spoiled. Remove it or use immediately if still safe.
+          </p>
+        )}
       </div>
 
       <div className="flex flex-wrap gap-2">
