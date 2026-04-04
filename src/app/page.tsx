@@ -209,6 +209,52 @@ export default function Home() {
     }
   }, [currentPage, totalPages]);
 
+  useEffect(() => {
+    if (!user) return;
+
+    const refreshItemAgingFromDb = async () => {
+      const { data, error } = await supabase
+        .from("pantry_items")
+        .select("*")
+        .order("days_left", { ascending: true });
+
+      if (error || !data) return;
+
+      setItems(
+        data.map((row) => {
+          const daysLeft = calculateCurrentDaysLeft(row.days_left, row.purchase_date);
+          return {
+            id: row.id,
+            name: row.name,
+            daysLeft,
+            risk: deriveRisk(daysLeft),
+            purchaseDate: row.purchase_date,
+          };
+        })
+      );
+    };
+
+    const now = new Date();
+    const nextMidnight = new Date(now);
+    nextMidnight.setHours(24, 0, 0, 0);
+    const firstDelay = Math.max(1000, nextMidnight.getTime() - now.getTime());
+
+    let intervalId: ReturnType<typeof setInterval> | undefined;
+
+    const timeoutId = setTimeout(() => {
+      void refreshItemAgingFromDb();
+
+      intervalId = setInterval(() => {
+        void refreshItemAgingFromDb();
+      }, 24 * 60 * 60 * 1000);
+    }, firstDelay);
+
+    return () => {
+      clearTimeout(timeoutId);
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [user]);
+
   const notificationIconMap = {
     vegetable: Carrot,
     fruit: Apple,
