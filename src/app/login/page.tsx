@@ -74,14 +74,14 @@ export default function LoginPage() {
 
       <div className="relative z-10 w-full max-w-lg rounded-3xl border border-white/15 bg-[#0B1222]/92 p-8 shadow-[0_20px_80px_rgba(20,40,120,0.35)] backdrop-blur-xl">
         <div className="flex flex-col items-center text-center mb-8">
-          <div className="relative mb-3 rounded-2xl border border-cyan-300/30 bg-linear-to-br from-cyan-400/25 via-blue-400/10 to-indigo-500/20 p-3 shadow-[0_0_30px_rgba(56,189,248,0.35)]">
+          <div className="relative mb-4 rounded-3xl border border-cyan-200/40 bg-white/90 p-4 shadow-[0_0_35px_rgba(56,189,248,0.35)]">
             <Image
               src="/logo.svg"
               alt="Nutri-Trust"
-              width={200}
-              height={200}
+              width={360}
+              height={280}
               priority
-              className="h-20 w-20 rounded-xl"
+              className="h-32 w-auto max-w-[320px]"
             />
           </div>
           <h1 className="mt-1 text-3xl font-bold tracking-tight text-white">Nutri-Trust</h1>
