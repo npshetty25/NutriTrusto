@@ -68,24 +68,6 @@ export default function LoginPage() {
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute -top-24 -left-8 h-64 w-64 rounded-full bg-blue-500/14 blur-3xl" />
         <div className="absolute -bottom-28 -right-10 h-72 w-72 rounded-full bg-indigo-500/14 blur-3xl" />
-      </div>
-
-      <div className="relative z-10 w-full max-w-md rounded-3xl border border-white/10 bg-[#0B1222]/88 backdrop-blur-xl shadow-[0_24px_70px_-20px_rgba(0,0,0,0.8)] p-6 sm:p-7">
-        <div className="mb-7 flex flex-col items-center text-center">
-          <div className="relative mb-4 w-full flex justify-center">
-            <div className="absolute -top-3 left-1/2 -translate-x-1/2 h-38 w-38 rounded-full border border-blue-300/20 animate-spin [animation-duration:24s]" />
-            <div className="absolute -top-0.5 left-1/2 -translate-x-1/2 h-33 w-33 rounded-full border border-indigo-300/20 animate-spin [animation-duration:14s] [animation-direction:reverse]" />
-            <span className="absolute top-0 left-1/2 -translate-x-1/2 h-3 w-3 rounded-full bg-blue-300 shadow-[0_0_16px_rgba(147,197,253,0.8)]" />
-            <div className="relative z-10 p-0">
-              <img
-                src="/logo.svg"
-                alt="Nutri-Trust logo"
-                className="w-36 h-36 object-contain drop-shadow-[0_8px_20px_rgba(96,165,250,0.35)]"
-              />
-            </div>
-          </div>
-          <h1 className="text-2xl font-extrabold tracking-tight text-white">Nutri-Trust</h1>
-          <p className="text-xs uppercase tracking-[0.2em] text-white/50 mt-1">Smart Pantry Intelligence</p>
         </div>
 
       {/* Email confirmation sent screen */}
