@@ -2,9 +2,53 @@
 
 import { useState, useRef, useEffect } from "react";
 
+type DietPreference = "veg" | "eggtarian" | "non-veg" | "none";
+type ItemDietType = "veg" | "egg" | "non-veg";
+
+const NON_VEG_ANIMAL_KEYWORDS = [
+  "chicken", "meat", "beef", "pork", "fish", "salmon", "tuna", "mutton", "prawn", "shrimp", "crab", "bacon", "ham", "sausage", "turkey",
+  "anchovy", "gelatin", "gelatine", "lard", "pepperoni", "broth", "stock", "oyster", "sardine", "bonito", "worcestershire"
+];
+const EGG_KEYWORDS = ["egg", "eggs", "albumen", "mayonnaise"];
+const NON_VEG_KEYWORDS = [...NON_VEG_ANIMAL_KEYWORDS, ...EGG_KEYWORDS];
+
+const containsEggKeyword = (value: string) => {
+  const text = value.toLowerCase();
+  return EGG_KEYWORDS.some((kw) => text.includes(kw));
+};
+
+const containsAnimalNonVegKeyword = (value: string) => {
+  const text = value.toLowerCase();
+  return NON_VEG_ANIMAL_KEYWORDS.some((kw) => text.includes(kw));
+};
+
+const containsNonVegKeyword = (value: string) => {
+  const text = value.toLowerCase();
+  return NON_VEG_KEYWORDS.some((kw) => text.includes(kw));
+};
+
+const getItemDietType = (value: string): ItemDietType => {
+  if (containsAnimalNonVegKeyword(value)) return "non-veg";
+  if (containsEggKeyword(value)) return "egg";
+  return "veg";
+};
+
+const normalizeDietPreference = (value: string): DietPreference => {
+  const diet = value.toLowerCase().trim();
+  if (diet === "veg" || diet === "vegetarian") return "veg";
+  if (diet === "eggtarian" || diet === "eggitarian") return "eggtarian";
+  if (diet === "non-veg" || diet === "nonveg") return "non-veg";
+  return "none";
+};
+
+const isDietConflict = (userDiet: DietPreference, itemDiet: ItemDietType) => {
+  if (userDiet === "veg") return itemDiet !== "veg";
+  if (userDiet === "eggtarian") return itemDiet === "non-veg";
+  return false;
+};
+
 const isVegItem = (name: string) => {
-  const nonVegKeywords = ['chicken', 'meat', 'beef', 'pork', 'fish', 'salmon', 'tuna', 'egg', 'mutton', 'prawn', 'shrimp', 'crab', 'bacon', 'ham', 'sausage', 'turkey'];
-  return !nonVegKeywords.some(kw => name.toLowerCase().includes(kw));
+  return !containsNonVegKeyword(name);
 };
 
 const parsePurchaseDate = (purchaseDate: string) => {
@@ -25,6 +69,33 @@ const deriveRisk = (daysLeft: number): RiskLevel => {
   if (daysLeft <= 4) return "high";
   if (daysLeft <= 13) return "medium";
   return "low";
+};
+
+const normalizeLabel = (value: string) => value.replace(/\s+/g, " ").trim();
+
+const buildDisplayProductName = ({
+  baseName,
+  brand,
+  quantity,
+}: {
+  baseName: string;
+  brand?: string;
+  quantity?: string;
+}) => {
+  const cleanBase = normalizeLabel(baseName || "");
+  const cleanBrand = normalizeLabel(brand || "");
+  const cleanQty = normalizeLabel(quantity || "");
+
+  if (!cleanBase) return "";
+
+  const includeBrand =
+    cleanBrand && !cleanBase.toLowerCase().includes(cleanBrand.toLowerCase());
+
+  return normalizeLabel(
+    [includeBrand ? cleanBrand : "", cleanBase, cleanQty]
+      .filter(Boolean)
+      .join(" ")
+  );
 };
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
@@ -56,6 +127,12 @@ interface NotificationEntry {
   category: ItemCategory;
 }
 
+interface ScannedResultEntry {
+  name: string;
+  analysis: any;
+  itemDiet: ItemDietType;
+}
+
 const NOTIFICATIONS_PAGE_SIZE = 8;
 const INVENTORY_PAGE_SIZE = 6;
 
@@ -75,8 +152,12 @@ export default function Home() {
   const [isVegMode, setIsVegMode] = useState(false);
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
   const [isAnalyzingFood, setIsAnalyzingFood] = useState(false);
-  const [scannedResult, setScannedResult] = useState<any | null>(null);
+  const [scannedResult, setScannedResult] = useState<ScannedResultEntry | null>(null);
+  const [barcodeRetryPrompt, setBarcodeRetryPrompt] = useState<{ code: string } | null>(null);
+  const [showBarcodeRetryOptions, setShowBarcodeRetryOptions] = useState(false);
+  const [manualRetryBarcode, setManualRetryBarcode] = useState("");
   const [inlineError, setInlineError] = useState<string | null>(null);
+  const [dietConflictPrompt, setDietConflictPrompt] = useState<{ userDiet: DietPreference; itemDiet: ItemDietType; itemName: string } | null>(null);
   const [manualBarcodeEntry, setManualBarcodeEntry] = useState<{ code: string; ingredients: string; categories: string } | null>(null);
   const [manualBarcodeName, setManualBarcodeName] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -94,6 +175,7 @@ export default function Home() {
 
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
+  const invoiceInputRef = useRef<HTMLInputElement>(null);
   const displayedItems = isVegMode ? items.filter(i => isVegItem(i.name)) : items;
   const inventoryFilteredItems = displayedItems.filter((item) => {
     const matchesSearch = item.name.toLowerCase().includes(searchQuery.trim().toLowerCase());
@@ -458,10 +540,16 @@ export default function Home() {
         }));
 
         const failedLocalItems: Item[] = [];
+        const successfulInsertedItems: Item[] = [];
         let insertedCount = 0;
 
         for (const row of rows) {
-          const { error } = await supabase.from("pantry_items").insert([row]);
+          const { data: insertedRow, error } = await supabase
+            .from("pantry_items")
+            .insert([row])
+            .select("id, name, days_left, purchase_date")
+            .single();
+
           if (error) {
             failedLocalItems.push({
               id: `local-${Math.random().toString(36).slice(2, 10)}`,
@@ -472,23 +560,29 @@ export default function Home() {
             });
           } else {
             insertedCount += 1;
+            if (insertedRow) {
+              const daysLeft = calculateCurrentDaysLeft(insertedRow.days_left, insertedRow.purchase_date);
+              successfulInsertedItems.push({
+                id: insertedRow.id,
+                name: insertedRow.name,
+                daysLeft,
+                risk: deriveRisk(daysLeft),
+                purchaseDate: insertedRow.purchase_date,
+              });
+            }
           }
+        }
+
+        if (successfulInsertedItems.length > 0) {
+          setItems(prev => {
+            const existingIds = new Set(prev.map((item) => item.id));
+            const fresh = successfulInsertedItems.filter((item) => !existingIds.has(item.id));
+            return [...fresh, ...prev];
+          });
         }
 
         if (failedLocalItems.length > 0) {
           setItems(prev => [...failedLocalItems, ...prev]);
-        }
-
-        if (insertedCount === 0 && failedLocalItems.length > 0) {
-          // Supabase unreachable/config issue fallback
-          const newItems: Item[] = normalizedItems.map((apiItem) => ({
-            id: Math.random().toString(36).substring(7),
-            name: apiItem.name,
-            daysLeft: apiItem.days_left,
-            risk: apiItem.risk,
-            purchaseDate: "Today",
-          }));
-          setItems(prev => [...newItems, ...prev]);
         }
 
         toast("Receipt Parsed", {
@@ -505,12 +599,15 @@ export default function Home() {
       setIsUploading(false);
       if (cameraInputRef.current) cameraInputRef.current.value = "";
       if (galleryInputRef.current) galleryInputRef.current.value = "";
+      if (invoiceInputRef.current) invoiceInputRef.current.value = "";
     }
   };
 
   // ─── Barcode Processing ─────────────────────────────────────────
   const handleBarcodeScan = async (decodedText: string) => {
     setInlineError(null);
+    setBarcodeRetryPrompt(null);
+    setShowBarcodeRetryOptions(false);
     setShowBarcodeScanner(false);
     setIsAnalyzingFood(true);
     try {
@@ -528,28 +625,70 @@ export default function Home() {
       let productCategories = "Unknown";
 
       if (data.status === 1 && data.product) {
-         productName = data.product.product_name || "Unknown Product";
-         productIngredients = data.product.ingredients_text || productIngredients;
-         productCategories = data.product.categories || productCategories;
+        const product = data.product as {
+         product_name?: string;
+         product_name_en?: string;
+         product_name_in?: string;
+         generic_name?: string;
+         brands?: string;
+         brand_owner?: string;
+         quantity?: string;
+         ingredients_text?: string;
+         categories?: string;
+        };
+
+        const baseName =
+         product.product_name ||
+         product.product_name_en ||
+         product.product_name_in ||
+         product.generic_name ||
+         "Unknown Product";
+        const brand = product.brands?.split(",")?.[0] || product.brand_owner || "";
+        productName = buildDisplayProductName({
+         baseName,
+         brand,
+         quantity: product.quantity || "",
+        });
+        productIngredients = product.ingredients_text || productIngredients;
+        productCategories = product.categories || productCategories;
       } else {
          // Auto fallback to server-side UPCItemDB proxy (Fixes CORS block)
          try {
             const fallbackRes = await fetch(`/api/lookup-upc?upc=${decodedText}`);
             const fallbackData = await fallbackRes.json();
             if (fallbackData.items && fallbackData.items.length > 0) {
-               productName = fallbackData.items[0].title;
-               productCategories = fallbackData.items[0].category || "Unknown";
+            const upcItem = fallbackData.items[0] as {
+             title?: string;
+             brand?: string;
+             size?: string;
+             category?: string;
+            };
+            productName = buildDisplayProductName({
+             baseName: upcItem.title || "",
+             brand: upcItem.brand || "",
+             quantity: upcItem.size || "",
+            });
+            productCategories = upcItem.category || "Unknown";
             }
          } catch(e) {
             console.error("UPC proxy fallback failed:", e);
          }
       }
 
-      // Final fallback: request manual name entry in-app
+      // Final fallback: unknown product metadata
       if (!productName || productName.trim() === "") {
          setIsAnalyzingFood(false);
-        setManualBarcodeEntry({ code: decodedText, ingredients: productIngredients, categories: productCategories });
+        setBarcodeRetryPrompt({ code: decodedText });
+        setManualRetryBarcode(decodedText);
         return;
+      }
+
+      const detectedItemDiet = getItemDietType(`${productName} ${productIngredients} ${productCategories}`);
+
+      if (detectedItemDiet === "non-veg" && !containsAnimalNonVegKeyword(productName)) {
+        productName = `${productName} (Non-Veg)`;
+      } else if (detectedItemDiet === "egg" && !containsEggKeyword(productName)) {
+        productName = `${productName} (Contains Egg)`;
       }
 
       const aiRes = await fetch("/api/analyze-food", {
@@ -564,7 +703,8 @@ export default function Home() {
       } else {
         setScannedResult({
           name: productName,
-          analysis
+          analysis,
+          itemDiet: detectedItemDiet,
         });
       }
     } catch (e) {
@@ -601,7 +741,8 @@ export default function Home() {
       if (!analysis.is_food) {
         setInlineError("This barcode appears to be a non-food item, so it wasn't added.");
       } else {
-        setScannedResult({ name: typedName, analysis });
+        const detectedItemDiet = getItemDietType(`${typedName} ${manualBarcodeEntry.ingredients} ${manualBarcodeEntry.categories}`);
+        setScannedResult({ name: typedName, analysis, itemDiet: detectedItemDiet });
       }
     } catch {
       setInlineError("Unable to analyze this item right now. Please try again in a moment.");
@@ -612,8 +753,16 @@ export default function Home() {
     }
   };
 
-  const addScannedItemToPantry = async () => {
+  const addScannedItemToPantry = async (forceAdd = false) => {
     if (!scannedResult || !user) return;
+
+    const userDiet = normalizeDietPreference(String(user.user_metadata?.dietary_preference || "none"));
+    const itemDiet = scannedResult.itemDiet || getItemDietType(scannedResult.name);
+    if (!forceAdd && isDietConflict(userDiet, itemDiet)) {
+      setDietConflictPrompt({ userDiet, itemDiet, itemName: scannedResult.name });
+      return;
+    }
+
     const newItem = {
       user_id: user.id,
       name: scannedResult.name,
@@ -622,10 +771,29 @@ export default function Home() {
       purchase_date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
     };
 
-    const { error } = await supabase.from("pantry_items").insert([newItem]);
-    if (!error) {
+    const { data: insertedRow, error } = await supabase
+      .from("pantry_items")
+      .insert([newItem])
+      .select("id, name, days_left, purchase_date")
+      .single();
+
+    if (!error && insertedRow) {
+       const daysLeft = calculateCurrentDaysLeft(insertedRow.days_left, insertedRow.purchase_date);
+       setItems(prev => {
+         if (prev.some((item) => item.id === insertedRow.id)) return prev;
+         return [{
+           id: insertedRow.id,
+           name: insertedRow.name,
+           daysLeft,
+           risk: deriveRisk(daysLeft),
+           purchaseDate: insertedRow.purchase_date,
+         }, ...prev];
+       });
        toast("Added to Pantry");
+    } else if (error) {
+       setInlineError("Item was analyzed, but could not be saved to cloud inventory.");
     }
+     setDietConflictPrompt(null);
     setScannedResult(null);
   };
 
@@ -940,7 +1108,8 @@ export default function Home() {
       </main>
 
       <input type="file" accept="image/*" ref={cameraInputRef} onChange={handleFileUpload} className="hidden" title="Upload receipt photo" />
-      <input type="file" accept="image/*" ref={galleryInputRef} onChange={handleFileUpload} className="hidden" title="Upload receipt from gallery" />
+      <input type="file" accept="image/*,.pdf,application/pdf" ref={galleryInputRef} onChange={handleFileUpload} className="hidden" title="Upload receipt from gallery" />
+      <input type="file" accept=".pdf,application/pdf,image/*" ref={invoiceInputRef} onChange={handleFileUpload} className="hidden" title="Upload invoice file" />
 
       {/* Bottom Nav Bar */}
       <div className="fixed bottom-4 left-3 right-3 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-50 flex flex-col items-center">
@@ -965,6 +1134,16 @@ export default function Home() {
                 <Search size={16} />
               </div>
               Upload Gallery
+            </button>
+            <div className="h-px w-full bg-border" />
+            <button
+              onClick={() => invoiceInputRef.current?.click()}
+              className="flex items-center gap-3 p-3 rounded-xl hover:bg-foreground/5 text-foreground font-semibold text-sm transition-colors"
+            >
+              <div className="w-8 h-8 rounded-full bg-orange-500/10 text-orange-500 flex items-center justify-center shrink-0">
+                <Info size={16} />
+              </div>
+              Upload Invoice / PDF
             </button>
           </div>
         )}
@@ -1138,7 +1317,7 @@ export default function Home() {
             {/* Sticky Action Button */}
             <div className="sticky bottom-0 left-0 right-0 p-4 bg-linear-to-t from-card via-card to-transparent pt-10 border-t border-border/60">
               <button 
-                onClick={() => { addScannedItemToPantry(); setScannedResult(null); }} 
+                onClick={() => { void addScannedItemToPantry(); }} 
                 className="w-full bg-foreground text-background font-bold text-sm py-4 rounded-2xl hover:opacity-90 active:scale-[0.98] transition-all shadow-xl"
               >
                 Add to Hub Inventory
@@ -1179,6 +1358,136 @@ export default function Home() {
                 Analyze Item
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {dietConflictPrompt && (
+        <div className="fixed inset-0 z-60 bg-black/40 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-md rounded-3xl p-px bg-linear-to-br from-red-500/60 via-red-400/20 to-white/30 shadow-[0_20px_50px_-12px_rgba(239,68,68,0.45)]">
+            <div className="relative overflow-hidden rounded-3xl border border-red-300/30 bg-linear-to-b from-red-500/12 via-card/95 to-card/95 p-5 backdrop-blur-xl">
+              <div className="pointer-events-none absolute inset-0 bg-linear-to-b from-white/20 via-transparent to-transparent" />
+
+              <div className="relative flex items-start gap-3 mb-3">
+                <div className="w-10 h-10 rounded-2xl bg-red-500/15 border border-red-400/40 text-red-500 flex items-center justify-center shadow-inner shadow-red-500/20">
+                  <AlertTriangle size={18} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-extrabold tracking-tight text-red-500">Diet Warning</h3>
+                  <p className="text-xs uppercase tracking-widest font-semibold text-red-500/80">Potential mismatch</p>
+                </div>
+              </div>
+
+              <p className="relative text-sm text-foreground/80 mb-4 leading-relaxed">
+                <span className="font-semibold text-foreground">{dietConflictPrompt.itemName}</span> may not match your diet.
+                Add anyway?
+              </p>
+
+              <div className="mt-1 flex flex-col sm:flex-row gap-2">
+              <button
+                onClick={() => setDietConflictPrompt(null)}
+                  className="flex-1 border border-red-300/35 bg-white/40 rounded-xl py-2.5 text-sm font-bold hover:bg-white/60 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  setDietConflictPrompt(null);
+                  void addScannedItemToPantry(true);
+                }}
+                  className="flex-1 bg-linear-to-r from-red-500 to-red-600 text-white rounded-xl py-2.5 text-sm font-bold hover:brightness-105 active:scale-[0.99] transition-all shadow-lg shadow-red-500/35"
+              >
+                Yes, add anyway
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      )}
+
+      {barcodeRetryPrompt && (
+        <div className="fixed inset-0 z-50 bg-background/85 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-card border border-border rounded-2xl shadow-2xl p-5">
+            <h3 className="text-lg font-bold tracking-tight mb-1">Couldn&apos;t verify barcode</h3>
+            <p className="text-sm text-foreground/60 mb-4">
+              We couldn&apos;t identify barcode {barcodeRetryPrompt.code} from public food databases.
+              Is this a food item?
+            </p>
+
+            {!showBarcodeRetryOptions ? (
+              <div className="mt-2 flex flex-col sm:flex-row gap-2">
+                <button
+                  onClick={() => {
+                    setBarcodeRetryPrompt(null);
+                    setInlineError("Item skipped. If this is food, you can scan again anytime.");
+                  }}
+                  className="flex-1 border border-border rounded-xl py-2.5 text-sm font-semibold hover:bg-foreground/5 transition-colors"
+                >
+                  No
+                </button>
+                <button
+                  onClick={() => setShowBarcodeRetryOptions(true)}
+                  className="flex-1 bg-foreground text-background rounded-xl py-2.5 text-sm font-semibold hover:opacity-90 transition-opacity"
+                >
+                  Yes, it&apos;s food
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <button
+                    onClick={() => {
+                      setBarcodeRetryPrompt(null);
+                      setShowBarcodeRetryOptions(false);
+                      setShowBarcodeScanner(true);
+                    }}
+                    className="flex-1 border border-border rounded-xl py-2.5 text-sm font-semibold hover:bg-foreground/5 transition-colors"
+                  >
+                    Scan again
+                  </button>
+                  <button
+                    onClick={() => {
+                      const code = manualRetryBarcode.trim();
+                      if (code.length < 8) {
+                        setInlineError("Enter a valid barcode (at least 8 digits).");
+                        return;
+                      }
+                      setBarcodeRetryPrompt(null);
+                      setShowBarcodeRetryOptions(false);
+                      void handleBarcodeScan(code);
+                    }}
+                    className="flex-1 bg-foreground text-background rounded-xl py-2.5 text-sm font-semibold hover:opacity-90 transition-opacity"
+                  >
+                    Check typed barcode
+                  </button>
+                </div>
+
+                <button
+                  onClick={() => {
+                    const code = manualRetryBarcode.trim() || barcodeRetryPrompt.code;
+                    setBarcodeRetryPrompt(null);
+                    setShowBarcodeRetryOptions(false);
+                    setManualBarcodeEntry({
+                      code,
+                      ingredients: "None provided, rely purely on AI general knowledge",
+                      categories: "Unknown",
+                    });
+                  }}
+                  className="w-full border border-border rounded-xl py-2.5 text-sm font-semibold hover:bg-foreground/5 transition-colors"
+                >
+                  Type item name instead
+                </button>
+
+                <input
+                  type="text"
+                  value={manualRetryBarcode}
+                  onChange={(e) => setManualRetryBarcode(e.target.value.replace(/\D/g, ""))}
+                  inputMode="numeric"
+                  placeholder="Type barcode digits"
+                  className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-foreground/20"
+                />
+              </div>
+            )}
           </div>
         </div>
       )}
