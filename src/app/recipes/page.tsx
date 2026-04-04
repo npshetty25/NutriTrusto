@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
 import { ProfileDropdown } from "@/components/profile-dropdown";
@@ -97,10 +97,10 @@ export default function RecipesPage() {
   return (
     <div className="flex flex-col min-h-screen bg-background pb-8">
       {/* Header */}
-      <header className="px-6 pt-10 pb-5 border-b border-border bg-card sticky top-0 z-30">
+        <header className="px-4 sm:px-6 pt-8 sm:pt-10 pb-5 border-b border-border bg-card/90 backdrop-blur-sm sticky top-0 z-30">
         <div className="flex justify-between items-center mb-1">
           <div className="flex items-center gap-3">
-            <button onClick={() => router.push("/")} className="text-foreground/50 hover:text-foreground transition-colors p-1 -ml-1">
+            <button title="Back to pantry" aria-label="Back to pantry" onClick={() => router.push("/")} className="text-foreground/50 hover:text-foreground transition-colors p-1 -ml-1">
               <ArrowLeft size={20} />
             </button>
             <div>
@@ -124,7 +124,7 @@ export default function RecipesPage() {
 
           <div className="relative h-56 w-full bg-foreground/5">
             <img src={selectedMeal.strMealThumb} alt={selectedMeal.strMeal} className="w-full h-full object-cover" />
-            <div className="absolute inset-0 bg-gradient-to-t from-background to-transparent" />
+            <div className="absolute inset-0 bg-linear-to-t from-background to-transparent" />
           </div>
 
           <div className="px-6 py-5 flex-1">
@@ -154,7 +154,7 @@ export default function RecipesPage() {
                 </p>
 
                 {/* Links */}
-                <div className="flex gap-3">
+                <div className="flex flex-col sm:flex-row gap-3">
                   {mealDetail.strYoutube && (
                     <a href={mealDetail.strYoutube} target="_blank" rel="noopener noreferrer"
                       className="flex-1 flex items-center justify-center gap-2 bg-danger text-white text-sm font-semibold py-3 rounded-xl hover:opacity-90 transition-opacity">
@@ -172,7 +172,7 @@ export default function RecipesPage() {
         </div>
       )}
 
-      <main className="px-6 py-5 flex-1">
+      <main className="px-4 sm:px-6 py-5 flex-1">
         {/* Country list */}
         {!selectedCountry ? (
           <>
@@ -206,7 +206,7 @@ export default function RecipesPage() {
         ) : (
           /* Meal list for selected country */
           <>
-            <div className="flex items-center justify-between mb-5">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
               <div>
                 <h2 className="font-bold text-lg tracking-tight">{selectedCountry} Recipes</h2>
                 <p className="text-xs text-foreground/50">{meals.length} dishes available</p>

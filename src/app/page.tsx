@@ -6,15 +6,36 @@ const isVegItem = (name: string) => {
   const nonVegKeywords = ['chicken', 'meat', 'beef', 'pork', 'fish', 'salmon', 'tuna', 'egg', 'mutton', 'prawn', 'shrimp', 'crab', 'bacon', 'ham', 'sausage', 'turkey'];
   return !nonVegKeywords.some(kw => name.toLowerCase().includes(kw));
 };
+
+const parsePurchaseDate = (purchaseDate: string) => {
+  const parsed = new Date(purchaseDate);
+  if (!Number.isNaN(parsed.getTime())) return parsed;
+  return new Date();
+};
+
+const calculateCurrentDaysLeft = (initialDaysLeft: number, purchaseDate: string) => {
+  const boughtOn = parsePurchaseDate(purchaseDate);
+  const now = new Date();
+  const msDiff = now.getTime() - boughtOn.getTime();
+  const daysElapsed = Math.max(0, Math.floor(msDiff / (1000 * 60 * 60 * 24)));
+  return Math.max(0, initialDaysLeft - daysElapsed);
+};
+
+const deriveRisk = (daysLeft: number): RiskLevel => {
+  if (daysLeft <= 4) return "high";
+  if (daysLeft <= 13) return "medium";
+  return "low";
+};
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
 import { supabase } from "@/lib/supabase";
+import { inferItemCategory, type ItemCategory } from "@/lib/item-category";
 import { PantryCard, RiskLevel } from "@/components/pantry-card";
 import { ProfileDropdown } from "@/components/profile-dropdown";
 import BarcodeScanner from "@/components/barcode-scanner";
 import {
   Camera, BrainCircuit, Loader2, TrendingUp, ScanLine,
-  ExternalLink, Clock, X, Trash2, Home as HomeIcon, Info, Activity, Zap, AlertTriangle, CheckCircle2, Search, FileText
+  ExternalLink, Clock, X, Trash2, Home as HomeIcon, Info, Activity, Zap, AlertTriangle, CheckCircle2, Search, CircleAlert, Bell, Carrot, Apple, Milk, Drumstick, Wheat, CupSoda, Croissant, Snowflake, Candy, Package, ChevronLeft, ChevronRight
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -25,6 +46,18 @@ interface Item {
   risk: RiskLevel;
   purchaseDate: string;
 }
+
+interface NotificationEntry {
+  id: string;
+  title: string;
+  message: string;
+  severity: "high" | "medium" | "low" | "info";
+  createdAt: string;
+  category: ItemCategory;
+}
+
+const NOTIFICATIONS_PAGE_SIZE = 8;
+const INVENTORY_PAGE_SIZE = 6;
 
 // No fallback items — real users start with an empty pantry.
 
@@ -37,19 +70,161 @@ export default function Home() {
   const [isUploading, setIsUploading] = useState(false);
   const [isGeneratingRecipe, setIsGeneratingRecipe] = useState(false);
   const [generatedRecipe, setGeneratedRecipe] = useState<{ title: string; time: string; image: string; link: string } | null>(null);
+  const [recipeSourceItem, setRecipeSourceItem] = useState<string>("");
+  const [recipeItemIndex, setRecipeItemIndex] = useState(0);
   const [isVegMode, setIsVegMode] = useState(false);
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
   const [isAnalyzingFood, setIsAnalyzingFood] = useState(false);
   const [scannedResult, setScannedResult] = useState<any | null>(null);
+  const [inlineError, setInlineError] = useState<string | null>(null);
+  const [manualBarcodeEntry, setManualBarcodeEntry] = useState<{ code: string; ingredients: string; categories: string } | null>(null);
+  const [manualBarcodeName, setManualBarcodeName] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [riskFilter, setRiskFilter] = useState<"all" | RiskLevel>("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [showNotificationsPanel, setShowNotificationsPanel] = useState(false);
+  const [notifications, setNotifications] = useState<NotificationEntry[]>([]);
+  const [notificationPage, setNotificationPage] = useState(0);
+  const [notificationsLoading, setNotificationsLoading] = useState(false);
+  const [hasMoreNotifications, setHasMoreNotifications] = useState(true);
+  const [notificationsInitialized, setNotificationsInitialized] = useState(false);
 
 
   const [showReceiptMenu, setShowReceiptMenu] = useState(false);
 
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
-  const invoiceInputRef = useRef<HTMLInputElement>(null);
   const displayedItems = isVegMode ? items.filter(i => isVegItem(i.name)) : items;
+  const inventoryFilteredItems = displayedItems.filter((item) => {
+    const matchesSearch = item.name.toLowerCase().includes(searchQuery.trim().toLowerCase());
+    const matchesRisk = riskFilter === "all" ? true : item.risk === riskFilter;
+    return matchesSearch && matchesRisk;
+  });
+  const sortedInventoryItems = [...inventoryFilteredItems].sort((a, b) => a.daysLeft - b.daysLeft);
+  const totalPages = Math.max(1, Math.ceil(sortedInventoryItems.length / INVENTORY_PAGE_SIZE));
+  const paginatedItems = sortedInventoryItems.slice((currentPage - 1) * INVENTORY_PAGE_SIZE, currentPage * INVENTORY_PAGE_SIZE);
   const highRiskItems = displayedItems.filter(i => i.risk === "high");
+  const urgentNotificationCount = items.filter(i => i.daysLeft > 0 && i.daysLeft <= 3).length;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, riskFilter, isVegMode]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  const notificationIconMap = {
+    vegetable: Carrot,
+    fruit: Apple,
+    dairy: Milk,
+    meat: Drumstick,
+    grain: Wheat,
+    beverage: CupSoda,
+    bakery: Croissant,
+    frozen: Snowflake,
+    snack: Candy,
+    pantry: Package,
+    unknown: Package,
+  } as const;
+
+  const buildNotificationFromRow = (row: any): NotificationEntry => {
+    const currentDays = calculateCurrentDaysLeft(row.days_left, row.purchase_date);
+    const createdAt = row.created_at || new Date().toISOString();
+    const category = inferItemCategory(String(row.name || ""));
+
+    if (currentDays <= 0) {
+      return {
+        id: `${row.id}-${createdAt}`,
+        title: "Item expired",
+        message: `${row.name} has likely spoiled. Remove it or use immediately if still safe.`,
+        severity: "high",
+        createdAt,
+        category,
+      };
+    }
+
+    if (currentDays <= 3) {
+      return {
+        id: `${row.id}-${createdAt}`,
+        title: "Spoilage warning",
+        message: `${row.name} may spoil in ${currentDays} day(s).`,
+        severity: "high",
+        createdAt,
+        category,
+      };
+    }
+
+    if (currentDays <= 7) {
+      return {
+        id: `${row.id}-${createdAt}`,
+        title: "Use soon",
+        message: `${row.name} is still fresh but should be used within ${currentDays} day(s).`,
+        severity: "medium",
+        createdAt,
+        category,
+      };
+    }
+
+    return {
+      id: `${row.id}-${createdAt}`,
+      title: "Inventory update",
+      message: `${row.name} is in good condition with ${currentDays} day(s) left.`,
+      severity: "info",
+      createdAt,
+      category,
+    };
+  };
+
+  const loadNotifications = async (reset = false) => {
+    if (!user || notificationsLoading) return;
+
+    const targetPage = reset ? 0 : notificationPage;
+    const from = targetPage * NOTIFICATIONS_PAGE_SIZE;
+    const to = from + NOTIFICATIONS_PAGE_SIZE - 1;
+
+    setNotificationsLoading(true);
+    const { data, error } = await supabase
+      .from("pantry_items")
+      .select("id, name, days_left, purchase_date, created_at")
+      .order("created_at", { ascending: false })
+      .range(from, to);
+
+    if (error) {
+      setInlineError("Could not fetch notifications. Please refresh and try again.");
+      setNotificationsLoading(false);
+      return;
+    }
+
+    const mapped = (data || []).map(buildNotificationFromRow);
+    setNotifications(prev => (reset ? mapped : [...prev, ...mapped]));
+    setHasMoreNotifications((data || []).length === NOTIFICATIONS_PAGE_SIZE);
+    setNotificationPage(reset ? 1 : targetPage + 1);
+    setNotificationsLoading(false);
+  };
+
+  const handleNotificationPanelToggle = async () => {
+    if (showNotificationsPanel) {
+      setShowNotificationsPanel(false);
+      return;
+    }
+
+    setShowNotificationsPanel(true);
+    if (!notificationsInitialized) {
+      setNotificationsInitialized(true);
+      await loadNotifications(true);
+    }
+  };
+
+  const handleNotificationsScroll = async (e: React.UIEvent<HTMLDivElement>) => {
+    const el = e.currentTarget;
+    const nearBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 64;
+    if (nearBottom && hasMoreNotifications && !notificationsLoading) {
+      await loadNotifications(false);
+    }
+  };
 
   // ─── Guard + redirect ──────────────────────────────────────────
   useEffect(() => {
@@ -74,8 +249,8 @@ export default function Home() {
         setItems(data.map(row => ({
           id: row.id,
           name: row.name,
-          daysLeft: row.days_left,
-          risk: row.risk as RiskLevel,
+          daysLeft: calculateCurrentDaysLeft(row.days_left, row.purchase_date),
+          risk: deriveRisk(calculateCurrentDaysLeft(row.days_left, row.purchase_date)),
           purchaseDate: row.purchase_date,
         })));
       } else {
@@ -101,19 +276,27 @@ export default function Home() {
   useEffect(() => {
     if (!user) return;
     const t = setTimeout(() => {
-      const critical = items.find(i => i.risk === "high");
-      if (critical) {
-        toast("System Alert", {
-          description: `${critical.name} is expiring in ${critical.daysLeft} day(s).`,
-          action: { label: "Dismiss", onClick: () => {} },
+      const soonToSpoil = items.filter(i => i.daysLeft > 0 && i.daysLeft <= 3);
+      soonToSpoil.forEach((item) => {
+        const key = `expiry-notify-${user.id}-${item.id}-${new Date().toDateString()}`;
+        if (typeof window !== "undefined" && localStorage.getItem(key)) return;
+
+        toast("Expiry Reminder", {
+          description: `${item.name} may spoil in ${item.daysLeft} day(s). Use it soon.`,
+          action: { label: "Got it", onClick: () => {} },
         });
-      }
+
+        if (typeof window !== "undefined") {
+          localStorage.setItem(key, "1");
+        }
+      });
     }, 4000);
     return () => clearTimeout(t);
   }, [user, items]);
 
   // ─── Delete item ────────────────────────────────────────────────
   const deleteItem = async (id: string) => {
+    setInlineError(null);
     const itemToUndo = items.find(i => i.id === id);
     if (!itemToUndo) return;
 
@@ -145,21 +328,97 @@ export default function Home() {
   };
 
   // ─── Recipe generation ──────────────────────────────────────────
-  const generateRecipe = () => {
+  const generateRecipe = async (preferredItem?: string) => {
+    const fallbackRecipes = [
+      {
+        title: "Veggie Stir-Fry Bowl",
+        time: "20m prep",
+        image: "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=900&q=80",
+        link: "https://www.bbcgoodfood.com/recipes/collection/stir-fry-recipes"
+      },
+      {
+        title: "Quick Pantry Pasta",
+        time: "18m prep",
+        image: "https://images.unsplash.com/photo-1621996346565-e3dbc646d9a9?auto=format&fit=crop&w=900&q=80",
+        link: "https://www.simplyrecipes.com/quick-pasta-recipes-4799018"
+      },
+      {
+        title: "One-Pot Rice & Beans",
+        time: "25m prep",
+        image: "https://images.unsplash.com/photo-1512058564366-18510be2db19?auto=format&fit=crop&w=900&q=80",
+        link: "https://www.loveandlemons.com/rice-and-beans/"
+      }
+    ];
+
+    const preferredItemName = preferredItem || highRiskItems[0]?.name || displayedItems[0]?.name || "";
+    const primaryToken = preferredItemName
+      .toLowerCase()
+      .replace(/[^a-z\s]/g, " ")
+      .split(/\s+/)
+      .find((w) => w.length > 2) || "chicken";
+
     setIsGeneratingRecipe(true);
-    setTimeout(() => {
+    setInlineError(null);
+
+    try {
+      const searchByIngredient = async (ingredient: string) => {
+        const filterRes = await fetch(`https://www.themealdb.com/api/json/v1/1/filter.php?i=${encodeURIComponent(ingredient)}`);
+        const filterData = await filterRes.json();
+        const meals = Array.isArray(filterData?.meals) ? filterData.meals : [];
+        if (meals.length === 0) return null;
+
+        const pickedMeal = meals[Math.floor(Math.random() * Math.min(meals.length, 8))];
+        const detailRes = await fetch(`https://www.themealdb.com/api/json/v1/1/lookup.php?i=${pickedMeal.idMeal}`);
+        const detailData = await detailRes.json();
+        const meal = detailData?.meals?.[0] || pickedMeal;
+
+        return {
+          title: meal.strMeal || "Smart Pantry Recipe",
+          time: "20m prep",
+          image: meal.strMealThumb || fallbackRecipes[0].image,
+          link: meal.strSource || meal.strYoutube || `https://www.themealdb.com/meal/${meal.idMeal}`
+        };
+      };
+
+      let recipe = await searchByIngredient(primaryToken);
+
+      if (!recipe && preferredItemName) {
+        recipe = await searchByIngredient(preferredItemName);
+      }
+
+      if (!recipe) {
+        recipe = fallbackRecipes[Math.floor(Math.random() * fallbackRecipes.length)];
+      }
+
+      setGeneratedRecipe(recipe);
+      setRecipeSourceItem(preferredItemName);
+      toast("Recipe Ready", { description: `Generated a recipe using ${preferredItemName || "pantry"} ingredients.` });
+    } catch {
+      const recipe = fallbackRecipes[Math.floor(Math.random() * fallbackRecipes.length)];
+      setGeneratedRecipe(recipe);
+      setInlineError("Live recipe provider was unavailable, so we loaded a curated fallback recipe.");
+    } finally {
       setIsGeneratingRecipe(false);
-      setGeneratedRecipe({
-        title: "Spinach & Cheese Omelet",
-        time: "10m prep",
-        image: "https://images.unsplash.com/photo-1510693042784-0e31db621ab7?auto=format&fit=crop&w=600&q=80",
-        link: "https://www.bonappetit.com/recipe/spinach-and-cheese-omelet"
-      });
-    }, 2000);
+    }
+  };
+
+  const tryAnotherRecipe = async () => {
+    if (isGeneratingRecipe) return;
+
+    const sourceItems = highRiskItems.length > 0 ? highRiskItems : displayedItems;
+    if (sourceItems.length === 0) {
+      await generateRecipe();
+      return;
+    }
+
+    const nextIndex = (recipeItemIndex + 1) % sourceItems.length;
+    setRecipeItemIndex(nextIndex);
+    await generateRecipe(sourceItems[nextIndex].name);
   };
 
   // ─── Receipt upload → Supabase insert ──────────────────────────
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    setInlineError(null);
     setShowReceiptMenu(false);
     const file = e.target.files?.[0];
     if (!file) return;
@@ -174,33 +433,74 @@ export default function Home() {
       });
       const data = await res.json();
       if (data.success && data.items && user) {
-        const rows = data.items.map((apiItem: any) => ({
+        const normalizedItems = (data.items as any[])
+          .map((apiItem) => {
+            const name = String(apiItem?.name || "").trim();
+            const daysLeft = Number.isFinite(Number(apiItem?.days_left))
+              ? Math.max(1, Math.min(3650, Math.round(Number(apiItem.days_left))))
+              : 7;
+            if (!name) return null;
+
+            return {
+              name,
+              days_left: daysLeft,
+              risk: deriveRisk(daysLeft),
+            };
+          })
+          .filter((item): item is { name: string; days_left: number; risk: RiskLevel } => Boolean(item));
+
+        const rows = normalizedItems.map((apiItem) => ({
           user_id: user.id,
           name: apiItem.name,
-          days_left: apiItem.days_left || 7,
-          risk: apiItem.risk || "medium",
+          days_left: apiItem.days_left,
+          risk: apiItem.risk,
           purchase_date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
         }));
 
-        const { data: inserted, error } = await supabase.from("pantry_items").insert(rows).select();
+        const failedLocalItems: Item[] = [];
+        let insertedCount = 0;
 
-        if (error) {
-          // Supabase not configured yet — add optimistically to UI
-          const newItems: Item[] = data.items.map((apiItem: any) => ({
+        for (const row of rows) {
+          const { error } = await supabase.from("pantry_items").insert([row]);
+          if (error) {
+            failedLocalItems.push({
+              id: `local-${Math.random().toString(36).slice(2, 10)}`,
+              name: row.name,
+              daysLeft: row.days_left,
+              risk: row.risk as RiskLevel,
+              purchaseDate: row.purchase_date,
+            });
+          } else {
+            insertedCount += 1;
+          }
+        }
+
+        if (failedLocalItems.length > 0) {
+          setItems(prev => [...failedLocalItems, ...prev]);
+        }
+
+        if (insertedCount === 0 && failedLocalItems.length > 0) {
+          // Supabase unreachable/config issue fallback
+          const newItems: Item[] = normalizedItems.map((apiItem) => ({
             id: Math.random().toString(36).substring(7),
             name: apiItem.name,
-            daysLeft: apiItem.days_left || 7,
-            risk: (apiItem.risk || "medium") as RiskLevel,
+            daysLeft: apiItem.days_left,
+            risk: apiItem.risk,
             purchaseDate: "Today",
           }));
           setItems(prev => [...newItems, ...prev]);
         }
-        toast("Receipt Parsed", { description: `Cataloged ${data.items.length} items.` });
+
+        toast("Receipt Parsed", {
+          description: insertedCount === rows.length
+            ? `Added all ${rows.length} items to your inventory.`
+            : `Added ${insertedCount}/${rows.length} items to cloud inventory. Remaining items were added locally.`,
+        });
       } else {
-        toast("Error", { description: data.error || "Failed to parse document." });
+        setInlineError(data.error || "We couldn't parse this receipt. Try a clearer image in good lighting.");
       }
     } catch {
-      toast("Error", { description: "Failed to parse document." });
+      setInlineError("Something went wrong while parsing the receipt. Please try again.");
     } finally {
       setIsUploading(false);
       if (cameraInputRef.current) cameraInputRef.current.value = "";
@@ -210,6 +510,7 @@ export default function Home() {
 
   // ─── Barcode Processing ─────────────────────────────────────────
   const handleBarcodeScan = async (decodedText: string) => {
+    setInlineError(null);
     setShowBarcodeScanner(false);
     setIsAnalyzingFood(true);
     try {
@@ -244,15 +545,11 @@ export default function Home() {
          }
       }
 
-      // Final ultimate fallback: Just ask the user to type it if BOTH global DBs fail
+      // Final fallback: request manual name entry in-app
       if (!productName || productName.trim() === "") {
          setIsAnalyzingFood(false);
-         const manualName = window.prompt(`Barcode ${decodedText} isn't globally registered yet.\n\nPlease type the name of the item to grade it:`);
-         if (!manualName || manualName.trim() === "") {
-            return; // User canceled
-         }
-         productName = manualName.trim();
-         setIsAnalyzingFood(true);
+        setManualBarcodeEntry({ code: decodedText, ingredients: productIngredients, categories: productCategories });
+        return;
       }
 
       const aiRes = await fetch("/api/analyze-food", {
@@ -263,7 +560,7 @@ export default function Home() {
       const analysis = await aiRes.json();
 
       if (!analysis.is_food) {
-        toast("Not a Food Item", { description: "AI determined this is not an edible item." });
+        setInlineError("This barcode appears to be a non-food item, so it wasn't added.");
       } else {
         setScannedResult({
           name: productName,
@@ -271,9 +568,47 @@ export default function Home() {
         });
       }
     } catch (e) {
-      toast("Error", { description: "Failed to analyze barcode." });
+      setInlineError("Barcode analysis failed. Please scan again or type item details manually.");
     } finally {
       setIsAnalyzingFood(false);
+    }
+  };
+
+  const submitManualBarcodeName = async () => {
+    if (!manualBarcodeEntry) return;
+    const typedName = manualBarcodeName.trim();
+    if (!typedName) {
+      setInlineError("Please enter an item name to continue barcode analysis.");
+      return;
+    }
+
+    setInlineError(null);
+    setIsAnalyzingFood(true);
+
+    try {
+      const aiRes = await fetch("/api/analyze-food", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: typedName,
+          ingredients: manualBarcodeEntry.ingredients,
+          categories: manualBarcodeEntry.categories,
+        }),
+      });
+
+      const analysis = await aiRes.json();
+
+      if (!analysis.is_food) {
+        setInlineError("This barcode appears to be a non-food item, so it wasn't added.");
+      } else {
+        setScannedResult({ name: typedName, analysis });
+      }
+    } catch {
+      setInlineError("Unable to analyze this item right now. Please try again in a moment.");
+    } finally {
+      setIsAnalyzingFood(false);
+      setManualBarcodeEntry(null);
+      setManualBarcodeName("");
     }
   };
 
@@ -305,19 +640,34 @@ export default function Home() {
   }
 
   return (
-    <div className="flex flex-col min-h-screen pb-28 bg-background">
+    <div className="flex flex-col min-h-screen pb-32 sm:pb-28 bg-background">
       {/* Header */}
-      <header className="px-6 pt-10 pb-6 border-b border-border bg-card">
+      <header className="px-4 sm:px-6 pt-8 sm:pt-10 pb-6 border-b border-border bg-card/90 backdrop-blur-sm">
         <div className="flex justify-between items-center mb-8">
           <div className="flex items-center gap-2">
             <div className="w-5 h-5 bg-foreground rounded-sm" />
             <h1 className="text-xl font-bold tracking-tight">NutriTrusto</h1>
           </div>
-          <ProfileDropdown />
+          <div className="flex items-center gap-2">
+            <button
+              title="Open notifications"
+              aria-label="Open notifications"
+              onClick={handleNotificationPanelToggle}
+              className="relative w-9 h-9 rounded-full border border-border bg-card hover:bg-foreground/5 transition-colors flex items-center justify-center"
+            >
+              <Bell size={16} className="text-foreground/80" />
+              {urgentNotificationCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-danger text-white text-[10px] font-bold flex items-center justify-center leading-none">
+                  {urgentNotificationCount > 9 ? "9+" : urgentNotificationCount}
+                </span>
+              )}
+            </button>
+            <ProfileDropdown />
+          </div>
         </div>
 
         {/* KPI Widgets */}
-        <div className="flex gap-4 mb-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-4">
           <div className="flex-1 rounded-xl border border-border bg-background p-4 sleek-shadow">
             <div className="flex items-center gap-2 mb-2 opacity-70">
               <TrendingUp size={14} className="text-safe" />
@@ -340,19 +690,20 @@ export default function Home() {
         {highRiskItems.length > 0 && (
           <div className="rounded-xl border border-border bg-foreground text-background overflow-hidden">
             {!generatedRecipe ? (
-              <div className="p-4 flex justify-between items-center gap-4">
+              <div className="p-4 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
                 <div>
                   <h4 className="font-semibold text-sm flex items-center gap-2"><BrainCircuit size={14} /> AI Optimization</h4>
                   <p className="text-xs text-background/70 mt-1">Generate a recipe to utilize critical items.</p>
                 </div>
-                <button onClick={generateRecipe} disabled={isGeneratingRecipe} className="flex items-center gap-2 bg-background text-foreground text-xs font-semibold px-4 py-2.5 rounded-lg hover:opacity-90 transition-opacity whitespace-nowrap">
+                <button onClick={() => generateRecipe()} disabled={isGeneratingRecipe} className="w-full sm:w-auto justify-center flex items-center gap-2 bg-background text-foreground text-xs font-semibold px-4 py-2.5 rounded-lg hover:opacity-90 transition-opacity whitespace-nowrap">
                   {isGeneratingRecipe ? <Loader2 size={14} className="animate-spin" /> : "Generate"}
                 </button>
               </div>
             ) : (
               <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
-                <div className="h-32 w-full bg-cover bg-center relative" style={{ backgroundImage: `url('${generatedRecipe.image}')` }}>
-                  <div className="absolute inset-0 bg-gradient-to-t from-foreground/90 to-transparent" />
+                <div className="h-32 w-full bg-cover bg-center relative">
+                  <img src={generatedRecipe.image} alt={generatedRecipe.title} className="absolute inset-0 w-full h-full object-cover" />
+                  <div className="absolute inset-0 bg-linear-to-t from-foreground/90 to-transparent" />
                   <div className="absolute top-3 right-3 bg-black/30 backdrop-blur-sm px-2 py-1 rounded-lg border border-white/10 flex items-center gap-1.5 text-white">
                     <Clock size={12} /><span className="text-[10px] font-semibold">{generatedRecipe.time}</span>
                   </div>
@@ -361,10 +712,23 @@ export default function Home() {
                   <div>
                     <p className="text-[10px] text-background/60 uppercase font-semibold tracking-widest mb-1">AI Recommendation</p>
                     <h4 className="font-bold text-lg leading-tight">{generatedRecipe.title}</h4>
+                    {recipeSourceItem && (
+                      <p className="text-[11px] text-background/70 mt-1">Using near-expiry item: {recipeSourceItem}</p>
+                    )}
                   </div>
-                  <a href={generatedRecipe.link} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 bg-background text-foreground text-xs font-semibold px-3 py-2 rounded-lg hover:scale-105 active:scale-95 transition-all shrink-0">
-                    Cook this <ExternalLink size={12} />
-                  </a>
+                  <div className="flex flex-col sm:flex-row gap-2 sm:items-center shrink-0">
+                    <button
+                      onClick={tryAnotherRecipe}
+                      disabled={isGeneratingRecipe}
+                      className="flex items-center justify-center gap-1.5 border border-background/30 text-background text-xs font-semibold px-3 py-2 rounded-lg hover:bg-background/10 transition-all disabled:opacity-60"
+                    >
+                      {isGeneratingRecipe ? <Loader2 size={12} className="animate-spin" /> : null}
+                      Try another
+                    </button>
+                    <a href={generatedRecipe.link} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 bg-background text-foreground text-xs font-semibold px-3 py-2 rounded-lg hover:scale-105 active:scale-95 transition-all justify-center">
+                      Cook this <ExternalLink size={12} />
+                    </a>
+                  </div>
                 </div>
               </div>
             )}
@@ -372,11 +736,90 @@ export default function Home() {
         )}
       </header>
 
+      {showNotificationsPanel && (
+        <>
+          <button
+            aria-label="Close notifications"
+            onClick={() => setShowNotificationsPanel(false)}
+            className="fixed inset-0 z-40 bg-black/20 backdrop-blur-[1px]"
+          />
+          <div className="fixed top-20 left-4 right-4 z-50 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:w-105 bg-card border border-border rounded-2xl shadow-2xl overflow-hidden">
+            <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold tracking-tight">Notifications</h3>
+                <p className="text-[11px] text-foreground/50">Scroll to load more</p>
+              </div>
+              <button
+                title="Close notifications"
+                aria-label="Close notifications"
+                onClick={() => setShowNotificationsPanel(false)}
+                className="w-8 h-8 rounded-full hover:bg-foreground/5 flex items-center justify-center"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div onScroll={handleNotificationsScroll} className="max-h-96 overflow-y-auto p-3 space-y-2">
+              {notifications.length === 0 && !notificationsLoading && (
+                <div className="text-center py-8 text-sm text-foreground/60">No notifications yet.</div>
+              )}
+
+              {notifications.map((note) => {
+                const NoteIcon = notificationIconMap[note.category];
+
+                return (
+                  <div key={note.id} className="rounded-xl border border-border bg-background px-3 py-2.5">
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="w-6 h-6 rounded-md bg-foreground/6 border border-border flex items-center justify-center text-foreground/70 shrink-0">
+                          <NoteIcon size={13} />
+                        </div>
+                        <p className="text-xs font-semibold text-foreground truncate">{note.title}</p>
+                      </div>
+                      <span className={`text-[10px] font-bold uppercase tracking-wide ${note.severity === "high" ? "text-danger" : note.severity === "medium" ? "text-warning" : "text-foreground/50"}`}>
+                        {note.severity}
+                      </span>
+                    </div>
+                    <p className="text-xs text-foreground/70 leading-relaxed">{note.message}</p>
+                  </div>
+                );
+              })}
+
+              {notificationsLoading && (
+                <div className="py-4 flex items-center justify-center text-foreground/50">
+                  <Loader2 size={16} className="animate-spin" />
+                </div>
+              )}
+
+              {!notificationsLoading && !hasMoreNotifications && notifications.length > 0 && (
+                <p className="text-center text-[11px] text-foreground/40 py-2">No more notifications</p>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+
       {/* Inventory */}
-      <main className="flex-1 px-6 py-6">
-        <div className="flex justify-between items-center mb-4">
+      <main className="flex-1 px-4 sm:px-6 py-6">
+        {inlineError && (
+          <div className="mb-4 rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 flex items-start justify-between gap-3">
+            <div className="flex items-start gap-2">
+              <CircleAlert size={16} className="text-danger mt-0.5 shrink-0" />
+              <p className="text-sm text-danger font-medium leading-relaxed">{inlineError}</p>
+            </div>
+            <button
+              onClick={() => setInlineError(null)}
+              className="text-danger/70 hover:text-danger transition-colors"
+              aria-label="Dismiss error"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        )}
+
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
           <h2 className="font-semibold text-sm uppercase tracking-widest text-foreground/70">Inventory Log</h2>
-          <div className="flex items-center gap-1 bg-foreground/5 p-1 rounded-full border border-border/50">
+          <div className="flex items-center gap-1 bg-foreground/5 p-1 rounded-full border border-border/50 w-fit">
             <button
               onClick={() => setIsVegMode(true)}
               className={`px-3 py-1.5 text-xs font-bold rounded-full transition-all ${isVegMode ? "bg-green-500/20 text-green-600 dark:text-green-400 shadow-sm" : "text-foreground/50 hover:text-foreground/80"}`}
@@ -391,23 +834,44 @@ export default function Home() {
             </button>
           </div>
         </div>
-        <div className="flex justify-end mb-4">
-          <span className="text-xs font-medium text-foreground/50">
-            {dbLoading ? "Loading..." : `Showing ${displayedItems.length} items`}
-          </span>
+        <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_auto] gap-2 mb-4">
+          <div className="relative">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground/40" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search inventory..."
+              className="w-full bg-card border border-border rounded-xl pl-9 pr-3 py-2.5 text-sm focus:outline-none focus:border-foreground/30"
+            />
+          </div>
+          <select
+            value={riskFilter}
+            onChange={(e) => setRiskFilter(e.target.value as "all" | RiskLevel)}
+            className="bg-card border border-border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-foreground/30"
+            title="Filter by risk"
+          >
+            <option value="all">All Risk</option>
+            <option value="high">High Risk</option>
+            <option value="medium">Medium Risk</option>
+            <option value="low">Low Risk</option>
+          </select>
+          <div className="text-xs font-medium text-foreground/50 flex items-center justify-start sm:justify-end px-1">
+            {dbLoading ? "Loading..." : `Showing ${inventoryFilteredItems.length} items`}
+          </div>
         </div>
 
         {dbLoading ? (
           <div className="flex items-center justify-center py-20">
             <Loader2 size={24} className="animate-spin text-foreground/20" />
           </div>
-        ) : displayedItems.length === 0 ? (
+        ) : inventoryFilteredItems.length === 0 ? (
           <div className="text-center py-16 border border-dashed border-border rounded-3xl bg-foreground/5 sleek-shadow-sm flex flex-col items-center justify-center">
             <div className="w-16 h-16 rounded-full bg-background border border-border flex items-center justify-center mb-4 sleek-shadow">
               <ScanLine size={24} className="text-foreground/40" />
             </div>
             <h3 className="font-semibold text-foreground mb-2">No items found</h3>
-            <p className="text-sm text-foreground/60 max-w-[200px] leading-relaxed mb-6">
+            <p className="text-sm text-foreground/60 max-w-50 leading-relaxed mb-6">
               {items.length > 0 ? "No items match the current filter." : "Scan a grocery receipt or barcode to start tracking food waste."}
             </p>
             <button
@@ -419,7 +883,7 @@ export default function Home() {
           </div>
         ) : (
           <div className="flex flex-col gap-3">
-            {[...displayedItems].sort((a, b) => a.daysLeft - b.daysLeft).map(item => {
+            {paginatedItems.map(item => {
               // Deterministic assignment of mock TruthIn values based on item name character count
               const ratingsLineup = ["A", "B", "C", "D", "E"] as const;
               const healthRating = ratingsLineup[item.name.length % 5];
@@ -443,19 +907,46 @@ export default function Home() {
                 </div>
               );
             })}
+
+            {sortedInventoryItems.length > INVENTORY_PAGE_SIZE && (
+              <div className="mt-2 flex items-center justify-between rounded-xl border border-border bg-card px-3 py-2">
+                <p className="text-xs text-foreground/60">
+                  Page {currentPage} of {totalPages}
+                </p>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="h-8 w-8 rounded-lg border border-border bg-background hover:bg-foreground/5 disabled:opacity-40 flex items-center justify-center"
+                    title="Previous page"
+                    aria-label="Previous page"
+                  >
+                    <ChevronLeft size={14} />
+                  </button>
+                  <button
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    className="h-8 w-8 rounded-lg border border-border bg-background hover:bg-foreground/5 disabled:opacity-40 flex items-center justify-center"
+                    title="Next page"
+                    aria-label="Next page"
+                  >
+                    <ChevronRight size={14} />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </main>
 
-      <input type="file" accept="image/*" capture="environment" ref={cameraInputRef} onChange={handleFileUpload} className="hidden" />
-      <input type="file" accept="image/*" ref={galleryInputRef} onChange={handleFileUpload} className="hidden" />
-      <input type="file" accept="image/*,application/pdf" ref={invoiceInputRef} onChange={handleFileUpload} className="hidden" />
+      <input type="file" accept="image/*" ref={cameraInputRef} onChange={handleFileUpload} className="hidden" title="Upload receipt photo" />
+      <input type="file" accept="image/*" ref={galleryInputRef} onChange={handleFileUpload} className="hidden" title="Upload receipt from gallery" />
 
       {/* Bottom Nav Bar */}
-      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center">
+      <div className="fixed bottom-4 left-3 right-3 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-50 flex flex-col items-center">
         {/* Receipt Action Menu */}
         {showReceiptMenu && (
-          <div className="mb-4 bg-card border border-border shadow-2xl rounded-2xl p-2 flex flex-col gap-2 w-48 animate-in slide-in-from-bottom-2 fade-in duration-200">
+          <div className="mb-4 bg-card border border-border shadow-2xl rounded-2xl p-2 flex flex-col gap-2 w-full max-w-xs animate-in slide-in-from-bottom-2 fade-in duration-200">
             <button 
               onClick={() => cameraInputRef.current?.click()}
               className="flex items-center gap-3 p-3 rounded-xl hover:bg-foreground/5 text-foreground font-semibold text-sm transition-colors"
@@ -475,36 +966,26 @@ export default function Home() {
               </div>
               Upload Gallery
             </button>
-            <div className="h-px w-full bg-border" />
-            <button 
-              onClick={() => invoiceInputRef.current?.click()}
-              className="flex items-center gap-3 p-3 rounded-xl hover:bg-foreground/5 text-foreground font-semibold text-sm transition-colors"
-            >
-              <div className="w-8 h-8 rounded-full bg-purple-500/10 text-purple-500 flex items-center justify-center shrink-0">
-                <FileText size={16} />
-              </div>
-              Add Invoice
-            </button>
           </div>
         )}
 
-        <div className="flex items-center bg-card border border-border shadow-2xl rounded-2xl p-2 gap-2 backdrop-blur-md">
-          <button onClick={() => setShowBarcodeScanner(true)} className="flex flex-col items-center justify-center gap-1 hover:bg-foreground/5 text-foreground/80 hover:text-foreground w-16 h-16 rounded-xl transition-all">
+        <div className="flex items-center justify-between w-full sm:w-auto bg-card/95 border border-border shadow-2xl rounded-2xl p-2 gap-1 sm:gap-2 backdrop-blur-md">
+          <button onClick={() => setShowBarcodeScanner(true)} className="flex-1 sm:flex-none min-w-0 flex flex-col items-center justify-center gap-1 hover:bg-foreground/5 text-foreground/80 hover:text-foreground h-16 px-2 sm:w-16 rounded-xl transition-all">
             <ScanLine size={18} /><span className="text-[10px] tracking-wide">Barcode</span>
           </button>
 
-          <div className="w-px h-8 bg-border" />
+          <div className="w-px h-8 bg-border hidden sm:block" />
 
-          <button onClick={() => window.scrollTo({top: 0, behavior: 'smooth'})} className="flex flex-col items-center justify-center gap-1 hover:bg-foreground/5 text-foreground/80 hover:text-foreground w-16 h-16 rounded-xl transition-all">
+          <button onClick={() => window.scrollTo({top: 0, behavior: 'smooth'})} className="flex-1 sm:flex-none min-w-0 flex flex-col items-center justify-center gap-1 hover:bg-foreground/5 text-foreground/80 hover:text-foreground h-16 px-2 sm:w-16 rounded-xl transition-all">
             <HomeIcon size={18} /><span className="text-[10px] tracking-wide">Home</span>
           </button>
 
-          <div className="w-px h-8 bg-border" />
+          <div className="w-px h-8 bg-border hidden sm:block" />
 
           <button 
             onClick={() => setShowReceiptMenu(!showReceiptMenu)} 
             disabled={isUploading} 
-            className={`flex flex-col items-center justify-center gap-1 hover:bg-foreground/5 w-16 h-16 rounded-xl transition-all disabled:opacity-50 ${showReceiptMenu ? 'bg-foreground/10 text-foreground' : 'text-foreground/80 hover:text-foreground'}`}
+            className={`flex-1 sm:flex-none min-w-0 flex flex-col items-center justify-center gap-1 hover:bg-foreground/5 h-16 px-2 sm:w-16 rounded-xl transition-all disabled:opacity-50 ${showReceiptMenu ? 'bg-foreground/10 text-foreground' : 'text-foreground/80 hover:text-foreground'}`}
           >
             {isUploading ? <Loader2 size={18} className="animate-spin" /> : <Camera size={18} />}
             <span className="text-[10px] tracking-wide">{isUploading ? "Reading" : "Receipt"}</span>
@@ -530,16 +1011,16 @@ export default function Home() {
 
       {scannedResult && (
         <div className="fixed inset-0 z-50 bg-background/90 backdrop-blur-sm flex items-center justify-center p-0 sm:p-4 animate-in fade-in zoom-in-95 duration-200">
-          <div className="bg-card w-full h-full sm:h-auto sm:max-h-[90vh] sm:max-w-md sm:rounded-3xl border-0 sm:border border-border shadow-2xl overflow-y-auto flex flex-col relative">
+          <div className="bg-card w-full h-full sm:h-auto sm:max-h-[90vh] sm:max-w-md sm:rounded-3xl border-0 sm:border border-border shadow-2xl overflow-hidden flex flex-col">
             {/* Header */}
             <div className="sticky top-0 bg-card/80 backdrop-blur-md z-10 border-b border-border px-5 py-4 flex justify-between items-center">
               <h3 className="font-bold text-lg text-foreground truncate pr-4">{scannedResult.name}</h3>
-              <button onClick={() => setScannedResult(null)} className="w-8 h-8 flex items-center justify-center rounded-full bg-foreground/10 hover:bg-foreground/20 text-foreground transition-colors shrink-0">
+              <button onClick={() => setScannedResult(null)} title="Close analysis" aria-label="Close analysis" className="w-8 h-8 flex items-center justify-center rounded-full bg-foreground/10 hover:bg-foreground/20 text-foreground transition-colors shrink-0">
                 <X size={18} />
               </button>
             </div>
             
-            <div className="p-5 flex-1 space-y-6 pb-24">
+            <div className="p-5 flex-1 space-y-6 overflow-y-auto">
               {/* TruthIn Style Rating Card */}
               <div className="bg-foreground/5 rounded-2xl p-4 flex items-center justify-between border border-border/50 sleek-shadow">
                 <div className="flex flex-col">
@@ -642,7 +1123,7 @@ export default function Home() {
                   <h4 className="font-bold text-foreground/80 text-sm">Better Rated Options</h4>
                   <div className="flex gap-3 overflow-x-auto pb-4 snap-x hide-scrollbar">
                     {scannedResult.analysis.alternatives.map((alt: any, i: number) => (
-                      <div key={i} className="min-w-[140px] snap-center bg-card border border-border p-3 rounded-2xl shrink-0 flex flex-col sleek-shadow">
+                      <div key={i} className="min-w-35 snap-center bg-card border border-border p-3 rounded-2xl shrink-0 flex flex-col sleek-shadow">
                         <div className="w-8 h-8 rounded-full bg-green-500/10 text-green-600 dark:text-green-400 flex items-center justify-center font-black text-xs mb-2">
                            {alt.score}
                         </div>
@@ -655,12 +1136,47 @@ export default function Home() {
             </div>
             
             {/* Sticky Action Button */}
-            <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-card via-card to-transparent pt-12">
+            <div className="sticky bottom-0 left-0 right-0 p-4 bg-linear-to-t from-card via-card to-transparent pt-10 border-t border-border/60">
               <button 
                 onClick={() => { addScannedItemToPantry(); setScannedResult(null); }} 
                 className="w-full bg-foreground text-background font-bold text-sm py-4 rounded-2xl hover:opacity-90 active:scale-[0.98] transition-all shadow-xl"
               >
                 Add to Hub Inventory
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {manualBarcodeEntry && (
+        <div className="fixed inset-0 z-50 bg-background/85 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-card border border-border rounded-2xl shadow-2xl p-5">
+            <h3 className="text-lg font-bold tracking-tight mb-1">Item not found in global database</h3>
+            <p className="text-sm text-foreground/60 mb-4">
+              Enter the product name for barcode {manualBarcodeEntry.code} to continue AI analysis.
+            </p>
+            <input
+              type="text"
+              value={manualBarcodeName}
+              onChange={(e) => setManualBarcodeName(e.target.value)}
+              placeholder="e.g., Whole Wheat Pasta"
+              className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-foreground/20"
+            />
+            <div className="mt-4 flex flex-col sm:flex-row gap-2">
+              <button
+                onClick={() => {
+                  setManualBarcodeEntry(null);
+                  setManualBarcodeName("");
+                }}
+                className="flex-1 border border-border rounded-xl py-2.5 text-sm font-semibold hover:bg-foreground/5 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={submitManualBarcodeName}
+                className="flex-1 bg-foreground text-background rounded-xl py-2.5 text-sm font-semibold hover:opacity-90 transition-opacity"
+              >
+                Analyze Item
               </button>
             </div>
           </div>

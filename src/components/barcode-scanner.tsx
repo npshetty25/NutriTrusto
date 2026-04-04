@@ -93,7 +93,7 @@ export default function BarcodeScanner({ onScan, onError, onClose }: BarcodeScan
             </div>
           )}
           
-          <div id="reader" className="w-full overflow-hidden rounded-xl border border-border min-h-[250px] bg-black/5 flex items-center justify-center relative">
+           <div id="reader" className="w-full overflow-hidden rounded-xl border border-border min-h-62.5 bg-black/5 flex items-center justify-center relative">
              <span className="text-xs font-semibold text-foreground/40 uppercase tracking-widest animate-pulse">Requesting Camera...</span>
           </div>
         </div>

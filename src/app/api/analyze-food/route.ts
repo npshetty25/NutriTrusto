@@ -1,15 +1,26 @@
 import { NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { createRequestContext } from "@/lib/server-logger";
 
 const apiKey = process.env.GEMINI_API_KEY;
 const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null;
 
 export async function POST(req: Request) {
+  const log = createRequestContext("api/analyze-food");
+  log.info("Request received");
+
   try {
     const { name, ingredients, categories } = await req.json();
+    log.info("Payload parsed", {
+      hasName: Boolean(name),
+      hasIngredients: Boolean(ingredients),
+      hasCategories: Boolean(categories),
+      productName: String(name || "").slice(0, 80),
+    });
 
     if (!genAI) {
       // Fallback if API key is not present
+      log.warn("GEMINI_API_KEY missing, returning fallback analysis");
       return NextResponse.json({
         is_food: true,
         health_rating: "Requires API Key",
@@ -20,6 +31,7 @@ export async function POST(req: Request) {
     }
 
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    log.info("Calling Gemini model", { model: "gemini-2.5-flash" });
 
     const prompt = `You are a strict, legally-compliant food safety analyst and nutritionist. 
 We have a product named: "${name}"
@@ -64,13 +76,25 @@ Respond ONLY with valid JSON in the exact structure below:
     const text = result.response.text().trim();
     
     // Strip markdown formatting if Gemini added it
-    const jsonStr = text.replace(/^```json/m, '').replace(/```$/m, '').trim();
+    const jsonStr = text
+      .replace(/^```json\s*/im, "")
+      .replace(/^```\s*/im, "")
+      .replace(/```$/m, "")
+      .trim();
     
     const parsedData = JSON.parse(jsonStr);
+    log.info("Analysis generated successfully", {
+      isFood: Boolean(parsedData?.is_food),
+      hasConcerns: Array.isArray(parsedData?.concerns) ? parsedData.concerns.length : 0,
+      hasPositives: Array.isArray(parsedData?.positives) ? parsedData.positives.length : 0,
+    });
 
     return NextResponse.json(parsedData);
   } catch (error: any) {
-    console.error("Food Analysis error:", error);
+    log.error("Unhandled analysis error", {
+      message: error?.message || "Unknown error",
+      stack: error?.stack || null,
+    });
     return NextResponse.json({ error: "Failed to analyze food" }, { status: 500 });
   }
 }
