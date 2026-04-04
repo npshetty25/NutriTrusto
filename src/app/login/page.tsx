@@ -23,6 +23,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [emailSent, setEmailSent] = useState(false);
+  const [logoSrc, setLogoSrc] = useState("/logo.png");
 
   const [dietaryPreference, setDietaryPreference] = useState("None");
 
@@ -65,32 +66,33 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#05070F] text-foreground px-4 py-8">
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-linear-to-b from-[#060913] via-[#090E1A] to-[#0C1220] text-foreground px-4 py-8">
       <div className="pointer-events-none absolute inset-0">
-        <div className="absolute -top-30 -left-24 h-72 w-72 rounded-full bg-blue-500/20 blur-3xl" />
-        <div className="absolute -bottom-20 -right-12 h-72 w-72 rounded-full bg-indigo-500/15 blur-3xl" />
+        <div className="absolute -top-24 -left-16 h-64 w-64 rounded-full bg-blue-500/15 blur-3xl" />
+        <div className="absolute -bottom-24 -right-12 h-64 w-64 rounded-full bg-indigo-500/20 blur-3xl" />
       </div>
 
-      <div className="relative z-10 w-full max-w-md rounded-3xl border border-white/10 bg-card/80 backdrop-blur-xl shadow-2xl shadow-black/50 p-6 sm:p-7">
-        <div className="mb-8 flex flex-col items-center text-center">
-          <div className="relative mb-4 h-32 w-32">
-            <div className="absolute inset-0 rounded-full border border-blue-300/35 animate-spin [animation-duration:14s]" />
-            <div className="absolute inset-2 rounded-full border border-indigo-300/35 animate-spin [animation-duration:9s] [animation-direction:reverse]" />
+      <div className="relative z-10 w-full max-w-md rounded-3xl border border-white/10 bg-card/75 backdrop-blur-xl shadow-[0_20px_60px_-16px_rgba(0,0,0,0.65)] p-6 sm:p-7">
+        <div className="mb-7 flex flex-col items-center text-center">
+          <div className="relative mb-4 h-24 w-24">
+            <div className="absolute inset-0 rounded-full border border-blue-300/35 animate-spin [animation-duration:16s]" />
+            <div className="absolute inset-2 rounded-full border border-indigo-300/35 border-dashed animate-spin [animation-duration:10s] [animation-direction:reverse]" />
             <div className="absolute inset-0 flex items-center justify-center">
               <Image
-                src="/nutri-trust-logo.svg"
+                src={logoSrc}
                 alt="Nutri-Trust logo"
-                width={96}
-                height={96}
-                className="rounded-2xl shadow-lg shadow-blue-500/20"
+                width={72}
+                height={72}
+                className="rounded-2xl shadow-lg shadow-blue-500/20 bg-white/5"
+                onError={() => setLogoSrc("/nutri-trust-logo.svg")}
                 priority
               />
             </div>
-            <span className="absolute -top-1 left-1/2 -translate-x-1/2 h-2.5 w-2.5 rounded-full bg-blue-300 shadow-[0_0_16px_2px_rgba(147,197,253,0.7)]" />
-            <span className="absolute bottom-4 -right-1 h-2 w-2 rounded-full bg-indigo-300 shadow-[0_0_14px_2px_rgba(165,180,252,0.7)]" />
+            <span className="absolute -top-1 left-1/2 -translate-x-1/2 h-2 w-2 rounded-full bg-blue-300 shadow-[0_0_14px_2px_rgba(147,197,253,0.65)]" />
+            <span className="absolute bottom-2 -right-1 h-2 w-2 rounded-full bg-indigo-300 shadow-[0_0_12px_2px_rgba(165,180,252,0.65)]" />
           </div>
           <h1 className="text-2xl font-extrabold tracking-tight text-white">Nutri-Trust</h1>
-          <p className="text-xs uppercase tracking-[0.22em] text-foreground/45 mt-1">Smart Pantry Intelligence</p>
+          <p className="text-xs uppercase tracking-[0.18em] text-foreground/45 mt-1">Smart Pantry Intelligence</p>
         </div>
 
       {/* Email confirmation sent screen */}
