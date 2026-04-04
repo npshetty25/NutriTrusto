@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 import { useAuth } from "@/context/auth-context";
 import { Eye, EyeOff, Loader2, ArrowRight } from "lucide-react";
 
@@ -77,14 +76,11 @@ export default function LoginPage() {
             <div className="absolute -top-3 left-1/2 -translate-x-1/2 h-38 w-38 rounded-full border border-blue-300/20 animate-spin [animation-duration:24s]" />
             <div className="absolute -top-0.5 left-1/2 -translate-x-1/2 h-33 w-33 rounded-full border border-indigo-300/20 animate-spin [animation-duration:14s] [animation-direction:reverse]" />
             <span className="absolute top-0 left-1/2 -translate-x-1/2 h-3 w-3 rounded-full bg-blue-300 shadow-[0_0_16px_rgba(147,197,253,0.8)]" />
-            <div className="relative z-10 rounded-3xl border border-white/20 bg-white/95 p-2 shadow-lg shadow-blue-500/10">
-              <Image
+            <div className="relative z-10 p-0">
+              <img
                 src="/logo.svg"
                 alt="Nutri-Trust logo"
-                width={220}
-                height={220}
-                className="rounded-2xl"
-                priority
+                className="w-36 h-36 object-contain drop-shadow-[0_8px_20px_rgba(96,165,250,0.35)]"
               />
             </div>
           </div>
