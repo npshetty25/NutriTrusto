@@ -624,6 +624,15 @@ export default function Home() {
       let productName = "";
       let productIngredients = "None provided, rely purely on AI general knowledge";
       let productCategories = "Unknown";
+      let nutritionData: {
+        sugars_g_100g?: number;
+        sodium_mg_100g?: number;
+        saturated_fat_g_100g?: number;
+        fibre_g_100g?: number;
+        protein_g_100g?: number;
+      } = {};
+      let additivesCount = 0;
+      let additiveColors: string[] = [];
 
       if (data.status === 1 && data.product) {
         const product = data.product as {
@@ -636,6 +645,15 @@ export default function Home() {
          quantity?: string;
          ingredients_text?: string;
          categories?: string;
+          nutriscore_grade?: string;
+          additives_n?: number;
+          additives_tags?: string[];
+          nutriments?: {
+            sugars_100g?: number;
+            sodium_100g?: number;
+            salt_100g?: number;
+            [key: string]: number | undefined;
+          };
         };
 
         const baseName =
@@ -652,6 +670,27 @@ export default function Home() {
         });
         productIngredients = product.ingredients_text || productIngredients;
         productCategories = product.categories || productCategories;
+        const nutriments = product.nutriments || {};
+        const sodiumFromSodium = typeof nutriments.sodium_100g === "number" ? nutriments.sodium_100g * 1000 : undefined;
+        const sodiumFromSalt = typeof nutriments.salt_100g === "number" ? nutriments.salt_100g * 400 : undefined;
+
+        nutritionData = {
+         sugars_g_100g: typeof nutriments.sugars_100g === "number" ? nutriments.sugars_100g : undefined,
+         sodium_mg_100g: sodiumFromSodium ?? sodiumFromSalt,
+         saturated_fat_g_100g: typeof nutriments["saturated-fat_100g"] === "number" ? nutriments["saturated-fat_100g"] : undefined,
+         fibre_g_100g: typeof nutriments.fiber_100g === "number" ? nutriments.fiber_100g : undefined,
+         protein_g_100g: typeof nutriments.proteins_100g === "number" ? nutriments.proteins_100g : undefined,
+        };
+
+        additivesCount = typeof product.additives_n === "number"
+         ? product.additives_n
+         : Array.isArray(product.additives_tags)
+          ? product.additives_tags.length
+          : 0;
+
+        additiveColors = (product.ingredients_text || "")
+         .toLowerCase()
+         .match(/(tartrazine|sunset yellow|allura red|brilliant blue|erythrosine|carmoisine|ponceau|yellow\s*5|red\s*40|blue\s*1|e1\d\d)/gi) || [];
       } else {
          // Auto fallback to server-side UPCItemDB proxy (Fixes CORS block)
          try {
@@ -695,7 +734,15 @@ export default function Home() {
       const aiRes = await fetch("/api/analyze-food", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: productName, ingredients: productIngredients, categories: productCategories })
+        body: JSON.stringify({
+          name: productName,
+          ingredients: productIngredients,
+          categories: productCategories,
+          nutritionData,
+          additivesCount,
+          additiveColors,
+          nutriScoreGrade: (data?.product?.nutriscore_grade as string | undefined) || undefined,
+        })
       });
       const analysis = await aiRes.json();
 
@@ -734,6 +781,9 @@ export default function Home() {
           name: typedName,
           ingredients: manualBarcodeEntry.ingredients,
           categories: manualBarcodeEntry.categories,
+          nutritionData: {},
+          additivesCount: 0,
+          additiveColors: [],
         }),
       });
 
