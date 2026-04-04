@@ -60,6 +60,7 @@ export async function POST(req: Request) {
       nutriScoreGrade,
       additivesCount,
       additiveColors,
+      isEstimated,
     } = (await req.json()) as {
       name?: string;
       ingredients?: string;
@@ -68,6 +69,7 @@ export async function POST(req: Request) {
       nutriScoreGrade?: string;
       additivesCount?: number;
       additiveColors?: string[];
+      isEstimated?: boolean;
     };
 
     const productName = String(name || "").trim();
@@ -207,15 +209,16 @@ export async function POST(req: Request) {
       "Minimally Processed";
 
     const hasReliableNutrition = [sugars, sodium, satFat, fibre, protein].some((v) => typeof v === "number");
+    const estimated = Boolean(isEstimated) || !hasReliableNutrition;
 
     const response = {
       is_food: true,
       health_score: healthScore,
       health_grade_text: gradeText,
       processing_level: processingLevel,
-      data_accuracy_warning: hasReliableNutrition
-  ? "Score computed from verified nutrition label data."
-  : "⚠️ This product's nutrition data isn't in our database yet. Score is estimated from ingredients only — check the physical label for accurate values.",
+      data_accuracy_warning: estimated
+        ? "⚠️ This product's nutrition data isn't in our database yet. Score is estimated from ingredients only — check the physical label for accurate values."
+        : "Score computed from verified nutrition label data.",
       macronutrients: {
         total_sugars_g: typeof sugars === "number" ? `${sugars.toFixed(1)} g` : "N/A",
         sodium_mg: typeof sodium === "number" ? `${Math.round(sodium)} mg` : "N/A",

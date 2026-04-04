@@ -105,6 +105,7 @@ import { inferItemCategory, type ItemCategory } from "@/lib/item-category";
 import { PantryCard, RiskLevel } from "@/components/pantry-card";
 import { ProfileDropdown } from "@/components/profile-dropdown";
 import BarcodeScanner from "@/components/barcode-scanner";
+import NutritionLabelScanner from "@/components/nutrition-label-scanner";
 import {
   Camera, BrainCircuit, Loader2, TrendingUp, ScanLine,
   ExternalLink, Clock, X, Trash2, Home as HomeIcon, Info, Activity, Zap, AlertTriangle, CheckCircle2, Search, CircleAlert, Bell, Carrot, Apple, Milk, Drumstick, Wheat, CupSoda, Croissant, Snowflake, Candy, Package, ChevronLeft, ChevronRight
@@ -157,6 +158,7 @@ export default function Home() {
   const [barcodeRetryPrompt, setBarcodeRetryPrompt] = useState<{ code: string } | null>(null);
   const [showBarcodeRetryOptions, setShowBarcodeRetryOptions] = useState(false);
   const [manualRetryBarcode, setManualRetryBarcode] = useState("");
+  const [showLabelScanner, setShowLabelScanner] = useState(false);
   const [inlineError, setInlineError] = useState<string | null>(null);
   const [dietConflictPrompt, setDietConflictPrompt] = useState<{ userDiet: DietPreference; itemDiet: ItemDietType; itemName: string } | null>(null);
   const [manualBarcodeEntry, setManualBarcodeEntry] = useState<{ code: string; ingredients: string; categories: string } | null>(null);
@@ -748,10 +750,11 @@ if (nutritionFieldsFilled < 2) {
         productName = `${productName} (Contains Egg)`;
       }
 
+      const isEstimated = !Object.values(nutritionData).some((v) => typeof v === "number");
+
       const aiRes = await fetch("/api/analyze-food", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        const isEstimated = !!(nutritionData as any).__isEstimated;
         body: JSON.stringify({
           name: productName,
           ingredients: productIngredients,
@@ -761,7 +764,7 @@ if (nutritionFieldsFilled < 2) {
           additiveColors,
           nutriScoreGrade: (data?.product?.nutriscore_grade as string | undefined) || undefined,
           isEstimated,
-})
+        })
       });
       const analysis = await aiRes.json();
 
@@ -865,6 +868,52 @@ if (nutritionFieldsFilled < 2) {
     }
      setDietConflictPrompt(null);
     setScannedResult(null);
+  };
+
+  const handleNutritionLabelResult = async (nutrition: {
+    sugars_g?: number | null;
+    sodium_mg?: number | null;
+    saturated_fat_g?: number | null;
+    fibre_g?: number | null;
+    protein_g?: number | null;
+  }) => {
+    setShowLabelScanner(false);
+    if (!scannedResult) return;
+
+    setIsAnalyzingFood(true);
+    try {
+      const nutritionData = {
+        sugars_g_100g: nutrition.sugars_g ?? undefined,
+        sodium_mg_100g: nutrition.sodium_mg ?? undefined,
+        saturated_fat_g_100g: nutrition.saturated_fat_g ?? undefined,
+        fibre_g_100g: nutrition.fibre_g ?? undefined,
+        protein_g_100g: nutrition.protein_g ?? undefined,
+      };
+
+      const aiRes = await fetch("/api/analyze-food", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: scannedResult.name,
+          ingredients: "",
+          categories: "",
+          nutritionData,
+          additivesCount: 0,
+          additiveColors: [],
+          isEstimated: false,
+        }),
+      });
+
+      const analysis = await aiRes.json();
+      setScannedResult((prev) => (prev ? { ...prev, analysis } : null));
+      toast("Label scanned!", {
+        description: "Rating updated with real nutrition data from the label.",
+      });
+    } catch {
+      toast("Error", { description: "Couldn't re-analyze with label data." });
+    } finally {
+      setIsAnalyzingFood(false);
+    }
   };
 
 
@@ -1390,6 +1439,17 @@ if (nutritionFieldsFilled < 2) {
               )}
             </div>
             
+            {scannedResult?.analysis?.data_accuracy_warning?.includes("⚠️") && (
+              <div className="px-4 pb-3">
+                <button
+                  onClick={() => setShowLabelScanner(true)}
+                  className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl border border-orange-400/40 bg-orange-500/10 text-orange-500 text-sm font-semibold hover:bg-orange-500/20 transition-all"
+                >
+                  📷 Data looks wrong? Scan the nutrition label
+                </button>
+              </div>
+            )}
+
             {/* Sticky Action Button */}
             <div className="sticky bottom-0 left-0 right-0 p-4 bg-linear-to-t from-card via-card to-transparent pt-10 border-t border-border/60">
               <button 
@@ -1566,6 +1626,13 @@ if (nutritionFieldsFilled < 2) {
             )}
           </div>
         </div>
+      )}
+
+      {showLabelScanner && (
+        <NutritionLabelScanner
+          onResult={handleNutritionLabelResult}
+          onClose={() => setShowLabelScanner(false)}
+        />
       )}
     </div>
   );
