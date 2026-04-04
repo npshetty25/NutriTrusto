@@ -65,24 +65,27 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#060A14] text-foreground px-4 py-8">
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#050A16] text-foreground px-4 py-8">
       <div className="pointer-events-none absolute inset-0">
-        <div className="absolute -top-24 -left-8 h-64 w-64 rounded-full bg-blue-500/14 blur-3xl" />
-        <div className="absolute -bottom-28 -right-10 h-72 w-72 rounded-full bg-indigo-500/14 blur-3xl" />
+        <div className="absolute -top-24 -left-8 h-72 w-72 rounded-full bg-cyan-500/20 blur-3xl" />
+        <div className="absolute -bottom-28 -right-10 h-80 w-80 rounded-full bg-indigo-500/20 blur-3xl" />
+        <div className="absolute left-1/2 top-1/2 h-80 w-80 -translate-x-1/2 -translate-y-1/2 rounded-full bg-blue-500/10 blur-3xl" />
       </div>
 
-      <div className="relative z-10 w-full max-w-md rounded-2xl border border-white/10 bg-[#0B1222]/90 p-6 backdrop-blur">
-        <div className="flex flex-col items-center text-center mb-6">
-          <Image
-            src="/logo.svg"
-            alt="Nutri-Trust"
-            width={56}
-            height={56}
-            priority
-            className="h-14 w-14 rounded-xl"
-          />
-          <h1 className="mt-3 text-lg font-bold tracking-tight text-white">Nutri-Trust</h1>
-          <p className="text-xs text-white/55">Your smart pantry companion</p>
+      <div className="relative z-10 w-full max-w-lg rounded-3xl border border-white/15 bg-[#0B1222]/92 p-8 shadow-[0_20px_80px_rgba(20,40,120,0.35)] backdrop-blur-xl">
+        <div className="flex flex-col items-center text-center mb-8">
+          <div className="relative mb-3 rounded-2xl border border-cyan-300/30 bg-linear-to-br from-cyan-400/25 via-blue-400/10 to-indigo-500/20 p-3 shadow-[0_0_30px_rgba(56,189,248,0.35)]">
+            <Image
+              src="/logo.svg"
+              alt="Nutri-Trust"
+              width={88}
+              height={88}
+              priority
+              className="h-20 w-20 rounded-xl"
+            />
+          </div>
+          <h1 className="mt-1 text-3xl font-bold tracking-tight text-white">Nutri-Trust</h1>
+          <p className="mt-1 text-sm text-cyan-100/80">Your smart pantry companion</p>
         </div>
 
         {emailSent ? (
@@ -108,14 +111,14 @@ export default function LoginPage() {
           </div>
         ) : (
           <>
-            <div className="flex items-center bg-white/5 rounded-xl p-1 mb-6 border border-white/10">
+            <div className="flex items-center bg-white/5 rounded-2xl p-1.5 mb-7 border border-white/10">
               <button
                 type="button"
                 onClick={() => {
                   setMode("signin");
                   setError(null);
                 }}
-                className={`flex-1 text-sm font-semibold py-2 rounded-lg transition-all ${mode === "signin" ? "bg-white text-black shadow" : "text-white/60 hover:text-white"}`}
+                className={`flex-1 text-base font-semibold py-3 rounded-xl transition-all ${mode === "signin" ? "bg-white text-black shadow" : "text-white/60 hover:text-white"}`}
               >
                 Sign In
               </button>
@@ -125,7 +128,7 @@ export default function LoginPage() {
                   setMode("signup");
                   setError(null);
                 }}
-                className={`flex-1 text-sm font-semibold py-2 rounded-lg transition-all ${mode === "signup" ? "bg-white text-black shadow" : "text-white/60 hover:text-white"}`}
+                className={`flex-1 text-base font-semibold py-3 rounded-xl transition-all ${mode === "signup" ? "bg-white text-black shadow" : "text-white/60 hover:text-white"}`}
               >
                 Sign Up
               </button>
@@ -176,20 +179,20 @@ export default function LoginPage() {
                   </>
                 )}
 
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-semibold uppercase tracking-widest text-foreground/60">Email Address</label>
+                <div className="space-y-2">
+                  <label className="text-[12px] font-semibold uppercase tracking-widest text-foreground/60">Email Address</label>
                   <input
                     type="email"
                     placeholder="name@example.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-300/50 focus:ring-1 focus:ring-blue-300/30 transition-all text-white placeholder:text-white/35"
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3.5 text-base focus:outline-none focus:border-cyan-300/60 focus:ring-2 focus:ring-cyan-300/25 transition-all text-white placeholder:text-white/35"
                   />
                 </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-semibold uppercase tracking-widest text-foreground/60">Password</label>
+                <div className="space-y-2">
+                  <label className="text-[12px] font-semibold uppercase tracking-widest text-foreground/60">Password</label>
                   <div className="relative">
                     <input
                       type={showPassword ? "text" : "password"}
@@ -197,7 +200,7 @@ export default function LoginPage() {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       required
-                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-300/50 focus:ring-1 focus:ring-blue-300/30 transition-all text-white placeholder:text-white/35 pr-12"
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3.5 text-base focus:outline-none focus:border-cyan-300/60 focus:ring-2 focus:ring-cyan-300/25 transition-all text-white placeholder:text-white/35 pr-12"
                     />
                     <button
                       type="button"
@@ -212,7 +215,7 @@ export default function LoginPage() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full bg-white text-black font-bold py-3 rounded-xl hover:opacity-90 transition-all flex items-center justify-center gap-2 mt-4 disabled:opacity-60"
+                  className="w-full bg-linear-to-r from-cyan-300 to-blue-300 text-[#0A1020] font-bold py-3.5 rounded-xl hover:opacity-95 transition-all flex items-center justify-center gap-2 mt-5 disabled:opacity-60 shadow-[0_8px_24px_rgba(103,232,249,0.25)]"
                 >
                   {loading ? <Loader2 size={16} className="animate-spin" /> : <ArrowRight size={16} />}
                   {mode === "signin" ? "Sign In" : "Create Account"}
