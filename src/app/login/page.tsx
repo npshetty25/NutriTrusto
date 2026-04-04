@@ -65,31 +65,31 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#070B14] text-foreground px-4 py-8">
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#060A14] text-foreground px-4 py-8">
       <div className="pointer-events-none absolute inset-0">
-        <div className="absolute -top-24 -left-12 h-56 w-56 rounded-full bg-blue-500/12 blur-3xl" />
-        <div className="absolute -bottom-24 -right-10 h-56 w-56 rounded-full bg-violet-500/14 blur-3xl" />
+        <div className="absolute -top-24 -left-8 h-64 w-64 rounded-full bg-blue-500/14 blur-3xl" />
+        <div className="absolute -bottom-28 -right-10 h-72 w-72 rounded-full bg-indigo-500/14 blur-3xl" />
       </div>
 
-      <div className="relative z-10 w-full max-w-md rounded-3xl border border-white/10 bg-[#0B1222]/90 backdrop-blur-xl shadow-[0_20px_60px_-16px_rgba(0,0,0,0.7)] p-6 sm:p-7">
+      <div className="relative z-10 w-full max-w-md rounded-3xl border border-white/10 bg-[#0B1222]/88 backdrop-blur-xl shadow-[0_24px_70px_-20px_rgba(0,0,0,0.8)] p-6 sm:p-7">
         <div className="mb-7 flex flex-col items-center text-center">
-          <div className="relative mb-4 h-24 w-24">
-            <div className="absolute inset-0 rounded-full border border-blue-300/25 animate-spin [animation-duration:20s]" />
-            <div className="absolute inset-2 rounded-full border border-indigo-300/20" />
-            <div className="absolute inset-0 flex items-center justify-center">
+          <div className="relative mb-4 w-full flex justify-center">
+            <div className="absolute -top-3 left-1/2 -translate-x-1/2 h-38 w-38 rounded-full border border-blue-300/20 animate-spin [animation-duration:24s]" />
+            <div className="absolute -top-0.5 left-1/2 -translate-x-1/2 h-33 w-33 rounded-full border border-indigo-300/20 animate-spin [animation-duration:14s] [animation-direction:reverse]" />
+            <span className="absolute top-0 left-1/2 -translate-x-1/2 h-3 w-3 rounded-full bg-blue-300 shadow-[0_0_16px_rgba(147,197,253,0.8)]" />
+            <div className="relative z-10 rounded-3xl border border-white/20 bg-white/95 p-2 shadow-lg shadow-blue-500/10">
               <Image
-                src="/logo.png"
+                src="/nutri-trust-logo.svg"
                 alt="Nutri-Trust logo"
-                width={72}
-                height={72}
-                className="rounded-2xl shadow-lg shadow-blue-500/20 bg-white"
+                width={220}
+                height={220}
+                className="rounded-2xl"
                 priority
               />
             </div>
-            <span className="absolute -top-1 left-1/2 -translate-x-1/2 h-2 w-2 rounded-full bg-blue-300" />
           </div>
           <h1 className="text-2xl font-extrabold tracking-tight text-white">Nutri-Trust</h1>
-          <p className="text-xs uppercase tracking-[0.18em] text-white/45 mt-1">Smart Pantry Intelligence</p>
+          <p className="text-xs uppercase tracking-[0.2em] text-white/50 mt-1">Smart Pantry Intelligence</p>
         </div>
 
       {/* Email confirmation sent screen */}
@@ -98,14 +98,14 @@ export default function LoginPage() {
           <div className="w-14 h-14 bg-safe/10 border border-safe/20 rounded-2xl flex items-center justify-center mx-auto mb-5">
             <span className="text-2xl">✉️</span>
           </div>
-          <h2 className="text-xl font-bold tracking-tight mb-2">Check your inbox</h2>
+          <h2 className="text-xl font-bold tracking-tight mb-2 text-white">Check your inbox</h2>
           <p className="text-sm text-foreground/50 mb-6 leading-relaxed">
             We sent a confirmation link to <strong className="text-foreground">{email}</strong>.
             Click the link in the email to activate your account, then sign in here.
           </p>
           <button
             onClick={() => { setEmailSent(false); setMode("signin"); setPassword(""); }}
-            className="w-full bg-foreground text-background font-semibold py-3 rounded-xl hover:opacity-90 transition-opacity"
+            className="w-full bg-white text-black font-semibold py-3 rounded-xl hover:opacity-90 transition-opacity"
           >
             Go to Sign In
           </button>
@@ -114,10 +114,10 @@ export default function LoginPage() {
 
       <div className="w-full">
         <div className="mb-7">
-          <h1 className="text-2xl font-bold tracking-tight mb-2">
+          <h2 className="text-2xl font-bold tracking-tight mb-2 text-white">
             {mode === "signin" ? "Welcome back" : "Create your account"}
-          </h1>
-          <p className="text-sm text-foreground/50">
+          </h2>
+          <p className="text-sm text-white/55">
             {mode === "signin" ? "Sign in to sync your household pantry." : "Join Nutri-Trust and start reducing food waste."}
           </p>
         </div>
