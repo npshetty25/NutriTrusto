@@ -214,8 +214,8 @@ export async function POST(req: Request) {
       health_grade_text: gradeText,
       processing_level: processingLevel,
       data_accuracy_warning: hasReliableNutrition
-        ? "Computed from available product nutrition data."
-        : "Limited nutrition data available; score is partially estimated.",
+  ? "Score computed from verified nutrition label data."
+  : "⚠️ This product's nutrition data isn't in our database yet. Score is estimated from ingredients only — check the physical label for accurate values.",
       macronutrients: {
         total_sugars_g: typeof sugars === "number" ? `${sugars.toFixed(1)} g` : "N/A",
         sodium_mg: typeof sodium === "number" ? `${Math.round(sodium)} mg` : "N/A",

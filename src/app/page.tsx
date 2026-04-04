@@ -685,12 +685,19 @@ const sodiumFromSodium = typeof nutriments.sodium_100g === "number" ? nutriments
 const sodiumFromSalt = typeof nutriments.salt_100g === "number" ? nutriments.salt_100g * 393 : undefined;
 
         nutritionData = {
-         sugars_g_100g: typeof nutriments.sugars_100g === "number" ? nutriments.sugars_100g : undefined,
-         sodium_mg_100g: sodiumFromSodium ?? sodiumFromSalt,
-         saturated_fat_g_100g: typeof nutriments["saturated-fat_100g"] === "number" ? nutriments["saturated-fat_100g"] : undefined,
-fibre_g_100g: nutriments["fiber_100g"] ?? nutriments["fibers_100g"] ?? nutriments["fiber-dietary_100g"] ?? undefined,
-         protein_g_100g: typeof nutriments.proteins_100g === "number" ? nutriments.proteins_100g : undefined,
-        };
+  sugars_g_100g: typeof nutriments.sugars_100g === "number" ? nutriments.sugars_100g : undefined,
+  sodium_mg_100g: sodiumFromSodium ?? sodiumFromSalt,
+  saturated_fat_g_100g: typeof nutriments["saturated-fat_100g"] === "number" ? nutriments["saturated-fat_100g"] : undefined,
+  fibre_g_100g: nutriments["fiber_100g"] ?? nutriments["fibers_100g"] ?? nutriments["fiber-dietary_100g"] ?? undefined,
+  protein_g_100g: typeof nutriments.proteins_100g === "number" ? nutriments.proteins_100g : undefined,
+};
+
+// Flag if nutrition data is mostly missing
+const nutritionFieldsFilled = Object.values(nutritionData).filter(v => typeof v === "number").length;
+if (nutritionFieldsFilled < 2) {
+  // Mark so the UI can warn the user clearly
+  (nutritionData as any).__isEstimated = true;
+}
 
         additivesCount = typeof product.additives_n === "number"
          ? product.additives_n
@@ -744,6 +751,7 @@ fibre_g_100g: nutriments["fiber_100g"] ?? nutriments["fibers_100g"] ?? nutriment
       const aiRes = await fetch("/api/analyze-food", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        const isEstimated = !!(nutritionData as any).__isEstimated;
         body: JSON.stringify({
           name: productName,
           ingredients: productIngredients,
@@ -752,7 +760,8 @@ fibre_g_100g: nutriments["fiber_100g"] ?? nutriments["fibers_100g"] ?? nutriment
           additivesCount,
           additiveColors,
           nutriScoreGrade: (data?.product?.nutriscore_grade as string | undefined) || undefined,
-        })
+          isEstimated,
+})
       });
       const analysis = await aiRes.json();
 
