@@ -10,7 +10,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "NutriTrusto | Automated Pantry System",
+  title: "Nutri-Trust | Automated Pantry System",
   description: "Stop wasting food and track your groceries intelligently.",
 };
 

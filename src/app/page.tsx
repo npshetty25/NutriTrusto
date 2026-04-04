@@ -814,7 +814,7 @@ export default function Home() {
         <div className="flex justify-between items-center mb-8">
           <div className="flex items-center gap-2">
             <div className="w-5 h-5 bg-foreground rounded-sm" />
-            <h1 className="text-xl font-bold tracking-tight">NutriTrusto</h1>
+            <h1 className="text-xl font-bold tracking-tight">Nutri-Trust</h1>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -1203,7 +1203,7 @@ export default function Home() {
               {/* TruthIn Style Rating Card */}
               <div className="bg-foreground/5 rounded-2xl p-4 flex items-center justify-between border border-border/50 sleek-shadow">
                 <div className="flex flex-col">
-                  <span className="text-xs font-bold uppercase tracking-widest text-foreground/50 mb-1">NutriTrusto Rating</span>
+                  <span className="text-xs font-bold uppercase tracking-widest text-foreground/50 mb-1">Nutri-Trust Rating</span>
                   <div className="flex items-center gap-2">
                     <span className="text-2xl font-black">{scannedResult.analysis.health_score || "N/A"}</span>
                     <span className="text-sm font-semibold text-foreground/60">/ 5.0</span>

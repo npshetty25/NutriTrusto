@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { useAuth } from "@/context/auth-context";
 import { Eye, EyeOff, Loader2, ArrowRight } from "lucide-react";
 
@@ -22,9 +23,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [emailSent, setEmailSent] = useState(false);
-  
-  // Onboarding state
-  const [signupStep, setSignupStep] = useState<1 | 2>(1);
+
   const [dietaryPreference, setDietaryPreference] = useState("None");
 
   const DIETARY_OPTIONS = [
@@ -66,15 +65,37 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-background text-foreground p-6">
-      <div className="flex items-center gap-2 pt-6 mb-16">
-        <div className="w-5 h-5 bg-foreground rounded-sm"></div>
-        <span className="text-lg font-bold tracking-tight">NutriTrusto</span>
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#05070F] text-foreground px-4 py-8">
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute -top-30 -left-24 h-72 w-72 rounded-full bg-blue-500/20 blur-3xl" />
+        <div className="absolute -bottom-20 -right-12 h-72 w-72 rounded-full bg-indigo-500/15 blur-3xl" />
       </div>
+
+      <div className="relative z-10 w-full max-w-md rounded-3xl border border-white/10 bg-card/80 backdrop-blur-xl shadow-2xl shadow-black/50 p-6 sm:p-7">
+        <div className="mb-8 flex flex-col items-center text-center">
+          <div className="relative mb-4 h-32 w-32">
+            <div className="absolute inset-0 rounded-full border border-blue-300/35 animate-spin [animation-duration:14s]" />
+            <div className="absolute inset-2 rounded-full border border-indigo-300/35 animate-spin [animation-duration:9s] [animation-direction:reverse]" />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <Image
+                src="/nutri-trust-logo.svg"
+                alt="Nutri-Trust logo"
+                width={96}
+                height={96}
+                className="rounded-2xl shadow-lg shadow-blue-500/20"
+                priority
+              />
+            </div>
+            <span className="absolute -top-1 left-1/2 -translate-x-1/2 h-2.5 w-2.5 rounded-full bg-blue-300 shadow-[0_0_16px_2px_rgba(147,197,253,0.7)]" />
+            <span className="absolute bottom-4 -right-1 h-2 w-2 rounded-full bg-indigo-300 shadow-[0_0_14px_2px_rgba(165,180,252,0.7)]" />
+          </div>
+          <h1 className="text-2xl font-extrabold tracking-tight text-white">Nutri-Trust</h1>
+          <p className="text-xs uppercase tracking-[0.22em] text-foreground/45 mt-1">Smart Pantry Intelligence</p>
+        </div>
 
       {/* Email confirmation sent screen */}
       {emailSent ? (
-        <div className="flex-1 flex flex-col justify-center max-w-sm mx-auto w-full text-center">
+        <div className="w-full text-center">
           <div className="w-14 h-14 bg-safe/10 border border-safe/20 rounded-2xl flex items-center justify-center mx-auto mb-5">
             <span className="text-2xl">✉️</span>
           </div>
@@ -92,13 +113,13 @@ export default function LoginPage() {
         </div>
       ) : (
 
-      <div className="flex-1 flex flex-col justify-center max-w-sm mx-auto w-full">
-        <div className="mb-8">
+      <div className="w-full">
+        <div className="mb-7">
           <h1 className="text-2xl font-bold tracking-tight mb-2">
             {mode === "signin" ? "Welcome back" : "Create your account"}
           </h1>
           <p className="text-sm text-foreground/50">
-            {mode === "signin" ? "Sign in to sync your household pantry." : "Join NutriTrusto and start reducing food waste."}
+            {mode === "signin" ? "Sign in to sync your household pantry." : "Join Nutri-Trust and start reducing food waste."}
           </p>
         </div>
 
@@ -113,7 +134,7 @@ export default function LoginPage() {
           </button>
           <button
             type="button"
-            onClick={() => { setMode("signup"); setError(null); setSignupStep(1); }}
+            onClick={() => { setMode("signup"); setError(null); }}
             className={`flex-1 text-sm font-semibold py-2 rounded-lg transition-all ${mode === "signup" ? "bg-card shadow text-foreground" : "text-foreground/50 hover:text-foreground"}`}
           >
             Sign Up
@@ -230,6 +251,7 @@ export default function LoginPage() {
         </button>
       </div>
       )} {/* end emailSent ternary */}
+      </div>
     </div>
   );
 }
