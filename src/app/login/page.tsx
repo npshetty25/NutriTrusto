@@ -23,7 +23,6 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [emailSent, setEmailSent] = useState(false);
-  const [logoSrc, setLogoSrc] = useState("/logo.png");
 
   const [dietaryPreference, setDietaryPreference] = useState("None");
 
@@ -79,12 +78,11 @@ export default function LoginPage() {
             <div className="absolute inset-2 rounded-full border border-indigo-300/20" />
             <div className="absolute inset-0 flex items-center justify-center">
               <Image
-                src={logoSrc}
+                src="/logo.png"
                 alt="Nutri-Trust logo"
                 width={72}
                 height={72}
                 className="rounded-2xl shadow-lg shadow-blue-500/20 bg-white"
-                onError={() => setLogoSrc("/nutri-trust-logo.svg")}
                 priority
               />
             </div>
