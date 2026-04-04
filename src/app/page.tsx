@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import Image from "next/image";
 
 type DietPreference = "veg" | "eggtarian" | "non-veg" | "none";
 type ItemDietType = "veg" | "egg" | "non-veg";
@@ -813,7 +814,13 @@ export default function Home() {
       <header className="px-4 sm:px-6 pt-8 sm:pt-10 pb-6 border-b border-border bg-card/90 backdrop-blur-sm">
         <div className="flex justify-between items-center mb-8">
           <div className="flex items-center gap-2">
-            <div className="w-5 h-5 bg-foreground rounded-sm" />
+            <Image
+              src="/logo.svg"
+              alt="Nutri-Trust logo"
+              width={24}
+              height={24}
+              className="w-6 h-6 rounded-md object-contain"
+            />
             <h1 className="text-xl font-bold tracking-tight">Nutri-Trust</h1>
           </div>
           <div className="flex items-center gap-2">
