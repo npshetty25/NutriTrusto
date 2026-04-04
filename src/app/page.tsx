@@ -172,6 +172,7 @@ export default function Home() {
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [hasMoreNotifications, setHasMoreNotifications] = useState(true);
   const [notificationsInitialized, setNotificationsInitialized] = useState(false);
+  const [isSeedingMockData, setIsSeedingMockData] = useState(false);
 
 
   const [showReceiptMenu, setShowReceiptMenu] = useState(false);
@@ -417,6 +418,72 @@ export default function Home() {
         }
       }
     });
+  };
+
+  const addMockInventoryData = async () => {
+    if (!user || isSeedingMockData) return;
+
+    setInlineError(null);
+    setIsSeedingMockData(true);
+
+    const today = new Date();
+    const getPurchaseDate = (daysAgo: number) => {
+      const d = new Date(today);
+      d.setDate(d.getDate() - daysAgo);
+      return d.toISOString();
+    };
+
+    const mockPlan = [
+      { name: "Milk", shelfLifeDays: 6, purchasedDaysAgo: 5 },
+      { name: "Paneer", shelfLifeDays: 4, purchasedDaysAgo: 4 },
+      { name: "Spinach", shelfLifeDays: 5, purchasedDaysAgo: 2 },
+      { name: "Banana", shelfLifeDays: 7, purchasedDaysAgo: 1 },
+      { name: "Chicken Breast", shelfLifeDays: 3, purchasedDaysAgo: 2 },
+      { name: "Tomatoes", shelfLifeDays: 10, purchasedDaysAgo: 4 },
+      { name: "Curd", shelfLifeDays: 8, purchasedDaysAgo: 6 },
+      { name: "Bread", shelfLifeDays: 5, purchasedDaysAgo: 5 },
+      { name: "Orange Juice", shelfLifeDays: 12, purchasedDaysAgo: 3 },
+      { name: "Frozen Peas", shelfLifeDays: 45, purchasedDaysAgo: 10 },
+    ];
+
+    const rows = mockPlan.map((entry) => {
+      const currentDays = Math.max(0, entry.shelfLifeDays - entry.purchasedDaysAgo);
+      return {
+        user_id: user.id,
+        name: entry.name,
+        days_left: entry.shelfLifeDays,
+        risk: deriveRisk(currentDays),
+        purchase_date: getPurchaseDate(entry.purchasedDaysAgo),
+      };
+    });
+
+    const { data, error } = await supabase
+      .from("pantry_items")
+      .insert(rows)
+      .select("id, name, days_left, purchase_date");
+
+    if (error) {
+      setInlineError("Could not insert demo data. Please try again.");
+      setIsSeedingMockData(false);
+      return;
+    }
+
+    const mapped: Item[] = (data || []).map((row) => {
+      const daysLeft = calculateCurrentDaysLeft(row.days_left, row.purchase_date);
+      return {
+        id: row.id,
+        name: row.name,
+        daysLeft,
+        risk: deriveRisk(daysLeft),
+        purchaseDate: row.purchase_date,
+      };
+    });
+
+    setItems((prev) => [...mapped, ...prev]);
+    toast("Demo data added", {
+      description: `Added ${mapped.length} mock items for spoilage/risk testing.`,
+    });
+    setIsSeedingMockData(false);
   };
 
   // ─── Recipe generation ──────────────────────────────────────────
@@ -1119,7 +1186,17 @@ if (nutritionFieldsFilled < 2) {
 
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
           <h2 className="font-semibold text-sm uppercase tracking-widest text-foreground/70">Inventory Log</h2>
-          <div className="flex items-center gap-1 bg-foreground/5 p-1 rounded-full border border-border/50 w-fit">
+          <div className="flex items-center flex-wrap gap-2">
+            <button
+              onClick={() => { void addMockInventoryData(); }}
+              disabled={isSeedingMockData}
+              className="h-9 px-3 rounded-xl border border-border bg-card text-xs font-semibold hover:bg-foreground/5 transition-colors disabled:opacity-60 flex items-center gap-2"
+              title="Insert mock pantry items"
+            >
+              {isSeedingMockData ? <Loader2 size={14} className="animate-spin" /> : <Package size={14} />}
+              Add Demo Data
+            </button>
+            <div className="flex items-center gap-1 bg-foreground/5 p-1 rounded-full border border-border/50 w-fit">
             <button
               onClick={() => setIsVegMode(true)}
               className={`px-3 py-1.5 text-xs font-bold rounded-full transition-all ${isVegMode ? "bg-green-500/20 text-green-600 dark:text-green-400 shadow-sm" : "text-foreground/50 hover:text-foreground/80"}`}
@@ -1132,6 +1209,7 @@ if (nutritionFieldsFilled < 2) {
             >
               🍗 All
             </button>
+            </div>
           </div>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_auto] gap-2 mb-4">
@@ -1174,12 +1252,22 @@ if (nutritionFieldsFilled < 2) {
             <p className="text-sm text-foreground/60 max-w-50 leading-relaxed mb-6">
               {items.length > 0 ? "No items match the current filter." : "Scan a grocery receipt or barcode to start tracking food waste."}
             </p>
-            <button
-              onClick={() => setShowReceiptMenu(true)}
-              className="flex items-center gap-2 bg-foreground text-background text-sm font-semibold px-5 py-2.5 rounded-xl hover:opacity-90 transition-opacity"
-            >
-              <Camera size={16} /> Scan Receipt
-            </button>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <button
+                onClick={() => setShowReceiptMenu(true)}
+                className="flex items-center gap-2 bg-foreground text-background text-sm font-semibold px-5 py-2.5 rounded-xl hover:opacity-90 transition-opacity"
+              >
+                <Camera size={16} /> Scan Receipt
+              </button>
+              <button
+                onClick={() => { void addMockInventoryData(); }}
+                disabled={isSeedingMockData}
+                className="flex items-center gap-2 border border-border bg-card text-foreground text-sm font-semibold px-5 py-2.5 rounded-xl hover:bg-foreground/5 transition-colors disabled:opacity-60"
+              >
+                {isSeedingMockData ? <Loader2 size={16} className="animate-spin" /> : <Package size={16} />}
+                Add Demo Data
+              </button>
+            </div>
           </div>
         ) : (
           <div className="flex flex-col gap-3">
@@ -1331,7 +1419,7 @@ if (nutritionFieldsFilled < 2) {
               </button>
             </div>
             
-            <div className="p-5 flex-1 space-y-6 overflow-y-auto">
+            <div className="p-5 flex-1 space-y-6 overflow-y-auto pb-6">
               {/* TruthIn Style Rating Card */}
               <div className="bg-foreground/5 rounded-2xl p-4 flex items-center justify-between border border-border/50 sleek-shadow">
                 <div className="flex flex-col">
@@ -1457,8 +1545,7 @@ if (nutritionFieldsFilled < 2) {
               </div>
             )}
 
-            {/* Sticky Action Button */}
-            <div className="sticky bottom-0 left-0 right-0 p-4 bg-linear-to-t from-card via-card to-transparent pt-10 border-t border-border/60">
+            <div className="p-4 border-t border-border/60 bg-card">
               <button 
                 onClick={() => { void addScannedItemToPantry(); }} 
                 className="w-full bg-foreground text-background font-bold text-sm py-4 rounded-2xl hover:opacity-90 active:scale-[0.98] transition-all shadow-xl"
