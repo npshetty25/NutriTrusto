@@ -78,8 +78,8 @@ export default function LoginPage() {
             <Image
               src="/logo.svg"
               alt="Nutri-Trust"
-              width={88}
-              height={88}
+              width={200}
+              height={200}
               priority
               className="h-20 w-20 rounded-xl"
             />
