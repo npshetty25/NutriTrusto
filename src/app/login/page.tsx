@@ -79,7 +79,7 @@ export default function LoginPage() {
             <span className="absolute top-0 left-1/2 -translate-x-1/2 h-3 w-3 rounded-full bg-blue-300 shadow-[0_0_16px_rgba(147,197,253,0.8)]" />
             <div className="relative z-10 rounded-3xl border border-white/20 bg-white/95 p-2 shadow-lg shadow-blue-500/10">
               <Image
-                src="/logo.png"
+                src="/logo.svg"
                 alt="Nutri-Trust logo"
                 width={220}
                 height={220}
