@@ -612,14 +612,22 @@ export default function Home() {
     setShowBarcodeScanner(false);
     setIsAnalyzingFood(true);
     try {
-      let res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${decodedText}.json`);
-      let data = await res.json();
-      
-      // Auto-fixing zero-padding issues which are common in Asian barcode scans
-      if (data.status === 0 && !decodedText.startsWith("0")) {
-        res = await fetch(`https://world.openfoodfacts.org/api/v0/product/0${decodedText}.json`);
-        data = await res.json();
-      }
+      const OFF_FIELDS = "product_name,product_name_en,product_name_in,generic_name,brands,brand_owner,quantity,ingredients_text,categories,nutriscore_grade,additives_n,additives_tags,nutriments,image_url";
+
+let res = await fetch(`https://world.openfoodfacts.org/api/v2/product/${decodedText}.json?fields=${OFF_FIELDS}`);
+let data = await res.json();
+
+// Auto-fixing zero-padding issues common in Indian/Asian barcodes
+if (data.status === 0 && !decodedText.startsWith("0")) {
+  res = await fetch(`https://world.openfoodfacts.org/api/v2/product/0${decodedText}.json?fields=${OFF_FIELDS}`);
+  data = await res.json();
+}
+
+// Try India-specific OFF server if global fails
+if (data.status === 0) {
+  res = await fetch(`https://in.openfoodfacts.org/api/v2/product/${decodedText}.json?fields=${OFF_FIELDS}`);
+  data = await res.json();
+}
       
       let productName = "";
       let productIngredients = "None provided, rely purely on AI general knowledge";
@@ -671,14 +679,16 @@ export default function Home() {
         productIngredients = product.ingredients_text || productIngredients;
         productCategories = product.categories || productCategories;
         const nutriments = product.nutriments || {};
-        const sodiumFromSodium = typeof nutriments.sodium_100g === "number" ? nutriments.sodium_100g * 1000 : undefined;
-        const sodiumFromSalt = typeof nutriments.salt_100g === "number" ? nutriments.salt_100g * 400 : undefined;
+        // OFF stores sodium_100g in grams, so ×1000 converts to mg
+const sodiumFromSodium = typeof nutriments.sodium_100g === "number" ? nutriments.sodium_100g * 1000 : undefined;
+// Salt to sodium: sodium = salt × 0.393, then ×1000 for mg
+const sodiumFromSalt = typeof nutriments.salt_100g === "number" ? nutriments.salt_100g * 393 : undefined;
 
         nutritionData = {
          sugars_g_100g: typeof nutriments.sugars_100g === "number" ? nutriments.sugars_100g : undefined,
          sodium_mg_100g: sodiumFromSodium ?? sodiumFromSalt,
          saturated_fat_g_100g: typeof nutriments["saturated-fat_100g"] === "number" ? nutriments["saturated-fat_100g"] : undefined,
-         fibre_g_100g: typeof nutriments.fiber_100g === "number" ? nutriments.fiber_100g : undefined,
+fibre_g_100g: nutriments["fiber_100g"] ?? nutriments["fibers_100g"] ?? nutriments["fiber-dietary_100g"] ?? undefined,
          protein_g_100g: typeof nutriments.proteins_100g === "number" ? nutriments.proteins_100g : undefined,
         };
 
