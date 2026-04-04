@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
 import { Eye, EyeOff, Loader2, ArrowRight } from "lucide-react";
@@ -71,6 +72,19 @@ export default function LoginPage() {
       </div>
 
       <div className="relative z-10 w-full max-w-md rounded-2xl border border-white/10 bg-[#0B1222]/90 p-6 backdrop-blur">
+        <div className="flex flex-col items-center text-center mb-6">
+          <Image
+            src="/logo.svg"
+            alt="Nutri-Trust"
+            width={56}
+            height={56}
+            priority
+            className="h-14 w-14 rounded-xl"
+          />
+          <h1 className="mt-3 text-lg font-bold tracking-tight text-white">Nutri-Trust</h1>
+          <p className="text-xs text-white/55">Your smart pantry companion</p>
+        </div>
+
         {emailSent ? (
           <div className="text-center">
             <div className="w-14 h-14 bg-safe/10 border border-safe/20 rounded-2xl flex items-center justify-center mx-auto mb-5">
