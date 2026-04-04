@@ -66,33 +66,32 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-linear-to-b from-[#060913] via-[#090E1A] to-[#0C1220] text-foreground px-4 py-8">
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#070B14] text-foreground px-4 py-8">
       <div className="pointer-events-none absolute inset-0">
-        <div className="absolute -top-24 -left-16 h-64 w-64 rounded-full bg-blue-500/15 blur-3xl" />
-        <div className="absolute -bottom-24 -right-12 h-64 w-64 rounded-full bg-indigo-500/20 blur-3xl" />
+        <div className="absolute -top-24 -left-12 h-56 w-56 rounded-full bg-blue-500/12 blur-3xl" />
+        <div className="absolute -bottom-24 -right-10 h-56 w-56 rounded-full bg-violet-500/14 blur-3xl" />
       </div>
 
-      <div className="relative z-10 w-full max-w-md rounded-3xl border border-white/10 bg-card/75 backdrop-blur-xl shadow-[0_20px_60px_-16px_rgba(0,0,0,0.65)] p-6 sm:p-7">
+      <div className="relative z-10 w-full max-w-md rounded-3xl border border-white/10 bg-[#0B1222]/90 backdrop-blur-xl shadow-[0_20px_60px_-16px_rgba(0,0,0,0.7)] p-6 sm:p-7">
         <div className="mb-7 flex flex-col items-center text-center">
           <div className="relative mb-4 h-24 w-24">
-            <div className="absolute inset-0 rounded-full border border-blue-300/35 animate-spin [animation-duration:16s]" />
-            <div className="absolute inset-2 rounded-full border border-indigo-300/35 border-dashed animate-spin [animation-duration:10s] [animation-direction:reverse]" />
+            <div className="absolute inset-0 rounded-full border border-blue-300/25 animate-spin [animation-duration:20s]" />
+            <div className="absolute inset-2 rounded-full border border-indigo-300/20" />
             <div className="absolute inset-0 flex items-center justify-center">
               <Image
                 src={logoSrc}
                 alt="Nutri-Trust logo"
                 width={72}
                 height={72}
-                className="rounded-2xl shadow-lg shadow-blue-500/20 bg-white/5"
+                className="rounded-2xl shadow-lg shadow-blue-500/20 bg-white"
                 onError={() => setLogoSrc("/nutri-trust-logo.svg")}
                 priority
               />
             </div>
-            <span className="absolute -top-1 left-1/2 -translate-x-1/2 h-2 w-2 rounded-full bg-blue-300 shadow-[0_0_14px_2px_rgba(147,197,253,0.65)]" />
-            <span className="absolute bottom-2 -right-1 h-2 w-2 rounded-full bg-indigo-300 shadow-[0_0_12px_2px_rgba(165,180,252,0.65)]" />
+            <span className="absolute -top-1 left-1/2 -translate-x-1/2 h-2 w-2 rounded-full bg-blue-300" />
           </div>
           <h1 className="text-2xl font-extrabold tracking-tight text-white">Nutri-Trust</h1>
-          <p className="text-xs uppercase tracking-[0.18em] text-foreground/45 mt-1">Smart Pantry Intelligence</p>
+          <p className="text-xs uppercase tracking-[0.18em] text-white/45 mt-1">Smart Pantry Intelligence</p>
         </div>
 
       {/* Email confirmation sent screen */}
@@ -126,18 +125,18 @@ export default function LoginPage() {
         </div>
 
         {/* Mode Toggle */}
-        <div className="flex items-center bg-foreground/5 rounded-xl p-1 mb-6">
+        <div className="flex items-center bg-white/5 rounded-xl p-1 mb-6 border border-white/10">
           <button
             type="button"
             onClick={() => { setMode("signin"); setError(null); }}
-            className={`flex-1 text-sm font-semibold py-2 rounded-lg transition-all ${mode === "signin" ? "bg-card shadow text-foreground" : "text-foreground/50 hover:text-foreground"}`}
+            className={`flex-1 text-sm font-semibold py-2 rounded-lg transition-all ${mode === "signin" ? "bg-white text-black shadow" : "text-white/60 hover:text-white"}`}
           >
             Sign In
           </button>
           <button
             type="button"
             onClick={() => { setMode("signup"); setError(null); }}
-            className={`flex-1 text-sm font-semibold py-2 rounded-lg transition-all ${mode === "signup" ? "bg-card shadow text-foreground" : "text-foreground/50 hover:text-foreground"}`}
+            className={`flex-1 text-sm font-semibold py-2 rounded-lg transition-all ${mode === "signup" ? "bg-white text-black shadow" : "text-white/60 hover:text-white"}`}
           >
             Sign Up
           </button>
@@ -161,7 +160,7 @@ export default function LoginPage() {
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     required
-                    className="w-full bg-card border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-foreground/40 focus:ring-1 focus:ring-foreground/20 transition-all text-foreground placeholder:text-foreground/30"
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-300/50 focus:ring-1 focus:ring-blue-300/30 transition-all text-white placeholder:text-white/35"
                   />
                 </div>
 
@@ -175,8 +174,8 @@ export default function LoginPage() {
                         onClick={() => setDietaryPreference(opt.id)}
                         className={`flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl border text-xs transition-all ${
                           dietaryPreference === opt.id
-                            ? "border-foreground bg-foreground/5 text-foreground font-semibold"
-                            : "border-border bg-card text-foreground/70 hover:bg-foreground/5 mb-1"
+                            ? "border-blue-300/50 bg-blue-400/10 text-white font-semibold"
+                            : "border-white/10 bg-white/5 text-white/75 hover:bg-white/10"
                         }`}
                       >
                         <span className="text-xl">{opt.emoji}</span>
@@ -196,7 +195,7 @@ export default function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="w-full bg-card border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-foreground/40 focus:ring-1 focus:ring-foreground/20 transition-all text-foreground placeholder:text-foreground/30"
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-300/50 focus:ring-1 focus:ring-blue-300/30 transition-all text-white placeholder:text-white/35"
               />
             </div>
 
@@ -209,12 +208,12 @@ export default function LoginPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  className="w-full bg-card border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-foreground/40 focus:ring-1 focus:ring-foreground/20 transition-all text-foreground placeholder:text-foreground/30 pr-12"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-300/50 focus:ring-1 focus:ring-blue-300/30 transition-all text-white placeholder:text-white/35 pr-12"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground/40 hover:text-foreground transition-colors p-1"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-white/45 hover:text-white transition-colors p-1"
                 >
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
@@ -224,7 +223,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-foreground text-background font-semibold py-3 rounded-xl hover:opacity-90 transition-all flex items-center justify-center gap-2 mt-4 disabled:opacity-60"
+              className="w-full bg-white text-black font-bold py-3 rounded-xl hover:opacity-90 transition-all flex items-center justify-center gap-2 mt-4 disabled:opacity-60"
             >
               {loading ? <Loader2 size={16} className="animate-spin" /> : <ArrowRight size={16} />}
               {mode === "signin" ? "Sign In" : "Create Account"}
@@ -236,13 +235,13 @@ export default function LoginPage() {
         </form>
 
         <div className="relative my-7">
-          <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-border"></div></div>
+          <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/10"></div></div>
           <div className="relative flex justify-center">
-            <span className="bg-background px-3 text-[10px] uppercase font-semibold tracking-widest text-foreground/40">Or continue with</span>
+            <span className="bg-[#0B1222] px-3 text-[10px] uppercase font-semibold tracking-widest text-white/35">Or continue with</span>
           </div>
         </div>
 
-        <button type="button" className="w-full bg-card border border-border text-foreground text-sm font-semibold py-3 rounded-xl hover:bg-foreground/5 transition-colors sleek-shadow flex items-center justify-center gap-2.5">
+        <button type="button" className="w-full bg-white/5 border border-white/10 text-white text-sm font-semibold py-3 rounded-xl hover:bg-white/10 transition-colors sleek-shadow flex items-center justify-center gap-2.5">
           <svg className="w-4 h-4" viewBox="0 0 24 24">
             <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
             <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
