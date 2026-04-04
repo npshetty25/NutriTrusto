@@ -189,6 +189,13 @@ export default function Home() {
   const totalPages = Math.max(1, Math.ceil(sortedInventoryItems.length / INVENTORY_PAGE_SIZE));
   const paginatedItems = sortedInventoryItems.slice((currentPage - 1) * INVENTORY_PAGE_SIZE, currentPage * INVENTORY_PAGE_SIZE);
   const highRiskItems = displayedItems.filter(i => i.risk === "high");
+  const freshnessScore = displayedItems.length === 0
+    ? 0
+    : Math.round(
+        (displayedItems.reduce((sum, item) => sum + Math.max(0, Math.min(14, item.daysLeft)), 0) /
+          (displayedItems.length * 14)) *
+          100
+      );
   const urgentNotificationCount = items.filter(i => i.daysLeft > 0 && i.daysLeft <= 3).length;
 
   useEffect(() => {
@@ -964,10 +971,10 @@ if (nutritionFieldsFilled < 2) {
           <div className="flex-1 rounded-xl border border-border bg-background p-4 sleek-shadow">
             <div className="flex items-center gap-2 mb-2 opacity-70">
               <TrendingUp size={14} className="text-safe" />
-              <span className="text-[10px] uppercase font-semibold tracking-widest">Value Retained</span>
+              <span className="text-[10px] uppercase font-semibold tracking-widest">Pantry Freshness</span>
             </div>
-            <p className="text-3xl font-semibold tracking-tighter">{displayedItems.length > 0 ? "₹3,450" : "₹0"}</p>
-            <p className="text-xs text-foreground/50 mt-1">This Week</p>
+            <p className="text-3xl font-semibold tracking-tighter">{freshnessScore}%</p>
+            <p className="text-xs text-foreground/50 mt-1">Average freshness level</p>
           </div>
           <div className="flex-1 rounded-xl border border-border bg-background p-4 sleek-shadow">
             <div className="flex items-center gap-2 mb-2 opacity-70">
