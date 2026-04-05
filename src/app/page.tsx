@@ -616,6 +616,9 @@ export default function Home() {
 
   // ─── Recipe generation ──────────────────────────────────────────
   const generateRecipe = async (preferredItem?: string) => {
+    const userDietPreference = normalizeDietPreference(String(user?.user_metadata?.dietary_preference || "none"));
+    const shouldForceVegetarian = isVegMode || userDietPreference === "veg" || userDietPreference === "eggtarian";
+
     const fallbackRecipes = [
       {
         title: "Veggie Stir-Fry Bowl",
@@ -642,29 +645,54 @@ export default function Home() {
       .toLowerCase()
       .replace(/[^a-z\s]/g, " ")
       .split(/\s+/)
-      .find((w) => w.length > 2) || "chicken";
+      .find((w) => w.length > 2) || (shouldForceVegetarian ? "vegetable" : "chicken");
 
     setIsGeneratingRecipe(true);
     setInlineError(null);
 
     try {
       const searchByIngredient = async (ingredient: string) => {
+        let vegetarianIds: Set<string> | null = null;
+        if (shouldForceVegetarian) {
+          const vegRes = await fetch("https://www.themealdb.com/api/json/v1/1/filter.php?c=Vegetarian");
+          const vegData = await vegRes.json();
+          const vegMeals = Array.isArray(vegData?.meals) ? vegData.meals : [];
+          vegetarianIds = new Set(vegMeals.map((m: { idMeal?: string }) => m.idMeal).filter(Boolean));
+        }
+
         const filterRes = await fetch(`https://www.themealdb.com/api/json/v1/1/filter.php?i=${encodeURIComponent(ingredient)}`);
         const filterData = await filterRes.json();
-        const meals = Array.isArray(filterData?.meals) ? filterData.meals : [];
+        let meals = Array.isArray(filterData?.meals) ? filterData.meals : [];
+
+        if (shouldForceVegetarian && vegetarianIds) {
+          meals = meals.filter((m: { idMeal?: string }) => m.idMeal && vegetarianIds?.has(m.idMeal));
+        }
+
         if (meals.length === 0) return null;
 
-        const pickedMeal = meals[Math.floor(Math.random() * Math.min(meals.length, 8))];
-        const detailRes = await fetch(`https://www.themealdb.com/api/json/v1/1/lookup.php?i=${pickedMeal.idMeal}`);
-        const detailData = await detailRes.json();
-        const meal = detailData?.meals?.[0] || pickedMeal;
+        const candidates = [...meals]
+          .sort(() => Math.random() - 0.5)
+          .slice(0, Math.min(meals.length, 8));
 
-        return {
-          title: meal.strMeal || "Smart Pantry Recipe",
-          time: "20m prep",
-          image: meal.strMealThumb || fallbackRecipes[0].image,
-          link: meal.strSource || meal.strYoutube || `https://www.themealdb.com/meal/${meal.idMeal}`
-        };
+        for (const pickedMeal of candidates) {
+          const detailRes = await fetch(`https://www.themealdb.com/api/json/v1/1/lookup.php?i=${pickedMeal.idMeal}`);
+          const detailData = await detailRes.json();
+          const meal = detailData?.meals?.[0] || pickedMeal;
+
+          const mealDescriptor = `${meal?.strMeal || ""} ${meal?.strCategory || ""} ${meal?.strTags || ""}`;
+          if (shouldForceVegetarian && containsAnimalNonVegKeyword(mealDescriptor)) {
+            continue;
+          }
+
+          return {
+            title: meal.strMeal || "Smart Pantry Recipe",
+            time: "20m prep",
+            image: meal.strMealThumb || fallbackRecipes[0].image,
+            link: meal.strSource || meal.strYoutube || `https://www.themealdb.com/meal/${meal.idMeal}`
+          };
+        }
+
+        return null;
       };
 
       let recipe = await searchByIngredient(primaryToken);
