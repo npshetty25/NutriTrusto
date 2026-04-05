@@ -108,7 +108,7 @@ import BarcodeScanner from "@/components/barcode-scanner";
 import NutritionLabelScanner from "@/components/nutrition-label-scanner";
 import {
   Camera, BrainCircuit, Loader2, TrendingUp, ScanLine,
-  ExternalLink, Clock, X, Trash2, Home as HomeIcon, Info, Activity, Zap, AlertTriangle, CheckCircle2, Search, CircleAlert, Bell, Carrot, Apple, Milk, Drumstick, Wheat, CupSoda, Croissant, Snowflake, Candy, Package, ChevronLeft, ChevronRight, Trophy, Users
+  ExternalLink, Clock, X, Trash2, Home as HomeIcon, Info, Activity, Zap, AlertTriangle, CheckCircle2, Search, CircleAlert, Bell, Carrot, Apple, Milk, Drumstick, Wheat, CupSoda, Croissant, Snowflake, Candy, Package, ChevronLeft, ChevronRight
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -133,12 +133,6 @@ interface ScannedResultEntry {
   name: string;
   analysis: any;
   itemDiet: ItemDietType;
-}
-
-interface CircleLeaderboardEntry {
-  display_name: string;
-  rescued_items: number;
-  wasted_items: number;
 }
 
 const NOTIFICATIONS_PAGE_SIZE = 8;
@@ -179,10 +173,6 @@ export default function Home() {
   const [hasMoreNotifications, setHasMoreNotifications] = useState(true);
   const [notificationsInitialized, setNotificationsInitialized] = useState(false);
   const [isSeedingMockData, setIsSeedingMockData] = useState(false);
-  const [rescueStreakDays, setRescueStreakDays] = useState(0);
-  const [todayRescuedItems, setTodayRescuedItems] = useState(0);
-  const [todayWastedItems, setTodayWastedItems] = useState(0);
-  const [circleLeaderboard, setCircleLeaderboard] = useState<CircleLeaderboardEntry[]>([]);
 
 
   const [showReceiptMenu, setShowReceiptMenu] = useState(false);
@@ -218,78 +208,6 @@ export default function Home() {
       setCurrentPage(totalPages);
     }
   }, [currentPage, totalPages]);
-
-  useEffect(() => {
-    if (!user || dbLoading) return;
-
-    const dateKey = new Date().toISOString().slice(0, 10);
-    const rescuedItems = items.filter((i) => i.daysLeft > 0).length;
-    const wastedItems = items.filter((i) => i.daysLeft === 0).length;
-    const circleId = String(user.user_metadata?.accountability_circle || "solo");
-    const displayName = String(
-      user.user_metadata?.full_name ||
-      user.email?.split("@")[0] ||
-      "Anonymous"
-    );
-
-    const syncRescueStats = async () => {
-      const { error } = await supabase
-        .from("rescue_daily_stats")
-        .upsert(
-          {
-            user_id: user.id,
-            date_key: dateKey,
-            circle_id: circleId,
-            display_name: displayName,
-            rescued_items: rescuedItems,
-            wasted_items: wastedItems,
-          },
-          { onConflict: "user_id,date_key" }
-        );
-
-      if (error) {
-        console.warn("Rescue stats sync failed:", error.message);
-        return;
-      }
-
-      setTodayRescuedItems(rescuedItems);
-      setTodayWastedItems(wastedItems);
-
-      const { data: streakRows } = await supabase
-        .from("rescue_daily_stats")
-        .select("date_key,wasted_items")
-        .eq("user_id", user.id)
-        .order("date_key", { ascending: false })
-        .limit(60);
-
-      if (streakRows && streakRows.length > 0) {
-        let streak = 0;
-        for (const row of streakRows) {
-          if ((row.wasted_items ?? 0) === 0) {
-            streak += 1;
-          } else {
-            break;
-          }
-        }
-        setRescueStreakDays(streak);
-      } else {
-        setRescueStreakDays(0);
-      }
-
-      const { data: leaderboardRows } = await supabase
-        .from("rescue_daily_stats")
-        .select("display_name,rescued_items,wasted_items")
-        .eq("date_key", dateKey)
-        .eq("circle_id", circleId)
-        .order("rescued_items", { ascending: false })
-        .order("wasted_items", { ascending: true })
-        .limit(5);
-
-      setCircleLeaderboard((leaderboardRows || []) as CircleLeaderboardEntry[]);
-    };
-
-    void syncRescueStats();
-  }, [user, items, dbLoading]);
 
   useEffect(() => {
     if (!user) return;
@@ -1206,38 +1124,6 @@ if (nutritionFieldsFilled < 2) {
             </div>
             <p className="text-3xl font-semibold tracking-tighter">{highRiskItems.length}</p>
             <p className="text-xs text-foreground/50 mt-1">Require Action</p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-4">
-          <div className="flex-1 rounded-xl border border-border bg-background p-4 sleek-shadow">
-            <div className="flex items-center gap-2 mb-2 opacity-80">
-              <Trophy size={14} className="text-warning" />
-              <span className="text-[10px] uppercase font-semibold tracking-widest">Rescue Streak</span>
-            </div>
-            <p className="text-3xl font-semibold tracking-tighter">{rescueStreakDays} day{rescueStreakDays === 1 ? "" : "s"}</p>
-            <p className="text-xs text-foreground/50 mt-1">
-              Today: {todayRescuedItems} rescued, {todayWastedItems} wasted
-            </p>
-          </div>
-
-          <div className="flex-1 rounded-xl border border-border bg-background p-4 sleek-shadow">
-            <div className="flex items-center gap-2 mb-2 opacity-80">
-              <Users size={14} className="text-blue-500" />
-              <span className="text-[10px] uppercase font-semibold tracking-widest">Circle Leaderboard</span>
-            </div>
-            {circleLeaderboard.length === 0 ? (
-              <p className="text-xs text-foreground/50 mt-1">No circle activity yet. Set accountability_circle in profile metadata.</p>
-            ) : (
-              <div className="space-y-1.5">
-                {circleLeaderboard.slice(0, 3).map((entry, index) => (
-                  <div key={`${entry.display_name}-${index}`} className="flex items-center justify-between text-xs">
-                    <span className="font-semibold text-foreground/80 truncate pr-2">#{index + 1} {entry.display_name}</span>
-                    <span className="text-foreground/60">{entry.rescued_items} saved</span>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
         </div>
 
