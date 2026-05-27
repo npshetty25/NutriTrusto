@@ -1,17 +1,15 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
 import { Toaster } from "sonner";
 import { AuthProvider } from "@/context/auth-context";
 import "./globals.css";
 
-const inter = Inter({
-  variable: "--font-inter",
-  subsets: ["latin"],
-});
-
 export const metadata: Metadata = {
   title: "Nutri-Trust | Automated Pantry System",
   description: "Stop wasting food and track your groceries intelligently.",
+  other: {
+    // Inter font loaded via CSS link to avoid next/font/google network fetch at build time
+    // (known Turbopack bug in Next.js 16.2.x)
+  },
 };
 
 export default function RootLayout({
@@ -20,7 +18,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${inter.variable} min-h-screen antialiased`}>
+    <html lang="en" className="min-h-screen antialiased">
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet" />
+      </head>
       <body className="flex flex-col min-h-screen bg-background text-foreground transition-colors duration-300">
         <AuthProvider>
           <main className="flex-1 w-full max-w-md mx-auto min-h-screen relative shadow-2xl bg-card/30">
