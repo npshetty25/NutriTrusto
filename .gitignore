@@ -30,7 +30,7 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# env files — never commit secrets
 .env*
 
 # vercel
@@ -39,3 +39,32 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# ── Sensitive / personal files ──────────────────────────────
+ip.txt
+
+# ── Presentation & wireframe artifacts (not part of the app) ──
+*.pptx
+*.pdf
+_ppt_extract/
+_ppt_extract_v2/
+_final_extract/
+wireframe/
+ppt_text_dump.txt
+ppt_v2_text_dump.txt
+final_ppt_text_dump.txt
+NutriTrusto_*.pptx
+NutriTrust_*.pptx
+
+# ── QA / screenshot exports ──────────────────────────────────
+qa_jpg/
+qa_test.*
+pptxgen_smoke.*
+
+# ── Generated scripts (not source code) ──────────────────────
+generate-presentation.js
+generate-presentation-v2.js
+generate-presentation.ts
+
+# ── Duplicate / stale lib folder (use src/lib instead) ───────
+/lib/
