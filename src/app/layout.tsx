@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Toaster } from "sonner";
 import { AuthProvider } from "@/context/auth-context";
+import { THEME_INIT_SCRIPT } from "@/lib/theme";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -18,8 +19,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="min-h-screen antialiased">
+    <html lang="en" className="min-h-screen antialiased" suppressHydrationWarning>
       <head>
+        <script suppressHydrationWarning dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet" />
@@ -28,7 +30,7 @@ export default function RootLayout({
         <AuthProvider>
           <main className="flex-1 w-full max-w-md mx-auto min-h-screen relative shadow-2xl bg-card/30">
             {children}
-            <Toaster position="top-center" theme="system" toastOptions={{ className: 'border-foreground/10 rounded-2xl' }} />
+            <Toaster position="top-center" theme="system" style={{ zIndex: 45 }} toastOptions={{ className: 'border-foreground/10 rounded-2xl' }} />
           </main>
         </AuthProvider>
       </body>
