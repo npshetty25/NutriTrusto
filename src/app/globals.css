@@ -35,10 +35,35 @@
     --card: #151515;
     --card-foreground: #ededed;
     --border: #222222;
-    
+
     --primary: #ffffff;
     --primary-foreground: #000000;
   }
+}
+
+/* Manual theme override (see src/lib/theme.ts) — wins over the OS
+   preference above because a class selector outranks a bare :root
+   inside a media query, regardless of source order. */
+:root.dark {
+  --background: #09090b;
+  --foreground: #ededed;
+  --card: #151515;
+  --card-foreground: #ededed;
+  --border: #222222;
+
+  --primary: #ffffff;
+  --primary-foreground: #000000;
+}
+
+:root.light {
+  --background: #fbfbfb;
+  --foreground: #111111;
+  --card: #ffffff;
+  --card-foreground: #111111;
+  --border: #e8e8e8;
+
+  --primary: #111111;
+  --primary-foreground: #ffffff;
 }
 
 body {
@@ -66,4 +91,10 @@ body {
   .sleek-shadow {
     box-shadow: 0 4px 20px -8px rgba(0,0,0,0.5);
   }
+}
+:root.dark .sleek-shadow {
+  box-shadow: 0 4px 20px -8px rgba(0,0,0,0.5);
+}
+:root.light .sleek-shadow {
+  box-shadow: 0 4px 20px -8px rgba(0,0,0,0.06);
 }
