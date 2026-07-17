@@ -4,13 +4,22 @@ import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
 import { toast } from "sonner";
-import { LogOut, Settings, Users, ChevronDown, Bell, Loader2 } from "lucide-react";
+import { LogOut, Settings, Users, ChevronDown, Bell, Loader2, ShoppingCart, History } from "lucide-react";
+import { ThemeToggle } from "@/components/theme-toggle";
+import { HouseholdModal } from "@/components/household-modal";
+import { ScanHistoryModal } from "@/components/scan-history-modal";
 
-export function ProfileDropdown() {
+interface ProfileDropdownProps {
+  onOpenShoppingList?: () => void;
+}
+
+export function ProfileDropdown({ onOpenShoppingList }: ProfileDropdownProps) {
   const { user, signOut } = useAuth();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+  const [showHousehold, setShowHousehold] = useState(false);
+  const [showScanHistory, setShowScanHistory] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -71,10 +80,21 @@ export function ProfileDropdown() {
             <p className="text-xs text-foreground/50 mt-0.5 truncate">{email}</p>
           </div>
 
+          {/* Appearance */}
+          <ThemeToggle />
+
           {/* Menu Items */}
-          <div className="p-1.5">
-            <button onClick={() => showComingSoon("Household Settings")} className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-foreground/80 hover:bg-foreground/5 rounded-xl transition-colors text-left">
+          <div className="p-1.5 border-t border-border">
+            <button onClick={() => { setOpen(false); setShowHousehold(true); }} className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-foreground/80 hover:bg-foreground/5 rounded-xl transition-colors text-left">
               <Users size={15} className="text-foreground/50" /> Household Settings
+            </button>
+            {onOpenShoppingList && (
+              <button onClick={() => { setOpen(false); onOpenShoppingList(); }} className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-foreground/80 hover:bg-foreground/5 rounded-xl transition-colors text-left">
+                <ShoppingCart size={15} className="text-foreground/50" /> Shopping List
+              </button>
+            )}
+            <button onClick={() => { setOpen(false); setShowScanHistory(true); }} className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-foreground/80 hover:bg-foreground/5 rounded-xl transition-colors text-left">
+              <History size={15} className="text-foreground/50" /> Scan History
             </button>
             <button onClick={() => showComingSoon("Notification Preferences")} className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-foreground/80 hover:bg-foreground/5 rounded-xl transition-colors text-left">
               <Bell size={15} className="text-foreground/50" /> Notification Preferences
@@ -97,6 +117,9 @@ export function ProfileDropdown() {
           </div>
         </div>
       )}
+
+      {showHousehold && <HouseholdModal onClose={() => setShowHousehold(false)} />}
+      {showScanHistory && <ScanHistoryModal onClose={() => setShowScanHistory(false)} />}
     </div>
   );
 }
