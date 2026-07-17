@@ -74,6 +74,17 @@ const deriveRisk = (daysLeft: number): RiskLevel => {
 
 const normalizeLabel = (value: string) => value.replace(/\s+/g, " ").trim();
 
+const extractMealIngredients = (meal: Record<string, unknown>): string[] => {
+  const ingredients: string[] = [];
+  for (let i = 1; i <= 20; i += 1) {
+    const raw = meal[`strIngredient${i}`];
+    if (typeof raw === "string" && raw.trim().length > 0) {
+      ingredients.push(normalizeLabel(raw));
+    }
+  }
+  return ingredients;
+};
+
 const buildDisplayProductName = ({
   baseName,
   brand,
@@ -106,10 +117,12 @@ import { PantryCard, RiskLevel } from "@/components/pantry-card";
 import { ProfileDropdown } from "@/components/profile-dropdown";
 import BarcodeScanner from "@/components/barcode-scanner";
 import NutritionLabelScanner from "@/components/nutrition-label-scanner";
+import ExpiryDateScanner from "@/components/expiry-date-scanner";
 import {
   Camera, BrainCircuit, Loader2, TrendingUp, ScanLine,
-  ExternalLink, Clock, X, Trash2, Home as HomeIcon, Info, Activity, Zap, AlertTriangle, CheckCircle2, Search, CircleAlert, Bell, Carrot, Apple, Milk, Drumstick, Wheat, CupSoda, Croissant, Snowflake, Candy, Package, ChevronLeft, ChevronRight
+  ExternalLink, Clock, X, Trash2, Home as HomeIcon, Info, Activity, Zap, AlertTriangle, CheckCircle2, Search, CircleAlert, Bell, Carrot, Apple, Milk, Drumstick, Wheat, CupSoda, Croissant, Snowflake, Candy, Package, ChevronLeft, ChevronRight, CalendarClock, Pencil, ShoppingCart
 } from "lucide-react";
+import ShoppingListModal from "@/components/shopping-list-modal";
 import { toast } from "sonner";
 
 interface Item {
@@ -135,26 +148,45 @@ interface ScannedResultEntry {
   itemDiet: ItemDietType;
 }
 
+interface ScannedExpiryEntry {
+  daysLeft: number;
+  expiryDate: string | null;
+  source: "printed_expiry" | "mfd_plus_shelf_life" | "shelf_life_from_today" | "unknown";
+  confidence: "high" | "medium" | "low";
+}
+
+const DEFAULT_SCANNED_ITEM_DAYS_LEFT = 30;
+
 const NOTIFICATIONS_PAGE_SIZE = 8;
 const INVENTORY_PAGE_SIZE = 6;
 
 // No fallback items — real users start with an empty pantry.
 
 export default function Home() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, household, householdSchemaReady } = useAuth();
+
+  // Spread into a pantry_items insert payload. Omits the key entirely
+  // (rather than sending null) until we've confirmed the household_id
+  // column exists — Postgrest rejects an insert referencing an unknown
+  // column outright, so this must never be sent before the migration runs.
+  const householdIdField = (): { household_id?: string | null } =>
+    householdSchemaReady ? { household_id: household?.id ?? null } : {};
   const router = useRouter();
 
   const [items, setItems] = useState<Item[]>([]);
   const [dbLoading, setDbLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
   const [isGeneratingRecipe, setIsGeneratingRecipe] = useState(false);
-  const [generatedRecipe, setGeneratedRecipe] = useState<{ title: string; time: string; image: string; link: string } | null>(null);
+  const [generatedRecipe, setGeneratedRecipe] = useState<{ title: string; time: string; image: string; link: string; ingredients?: string[] } | null>(null);
+  const [isAddingToShoppingList, setIsAddingToShoppingList] = useState(false);
   const [recipeSourceItem, setRecipeSourceItem] = useState<string>("");
   const [recipeItemIndex, setRecipeItemIndex] = useState(0);
   const [isVegMode, setIsVegMode] = useState(false);
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
   const [isAnalyzingFood, setIsAnalyzingFood] = useState(false);
   const [scannedResult, setScannedResult] = useState<ScannedResultEntry | null>(null);
+  const [scannedExpiry, setScannedExpiry] = useState<ScannedExpiryEntry | null>(null);
+  const [showExpiryScanner, setShowExpiryScanner] = useState(false);
   const [barcodeRetryPrompt, setBarcodeRetryPrompt] = useState<{ code: string } | null>(null);
   const [showBarcodeRetryOptions, setShowBarcodeRetryOptions] = useState(false);
   const [manualRetryBarcode, setManualRetryBarcode] = useState("");
@@ -173,7 +205,11 @@ export default function Home() {
   const [hasMoreNotifications, setHasMoreNotifications] = useState(true);
   const [notificationsInitialized, setNotificationsInitialized] = useState(false);
   const [isSeedingMockData, setIsSeedingMockData] = useState(false);
-
+  const [editingItem, setEditingItem] = useState<Item | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editDaysLeft, setEditDaysLeft] = useState("");
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [showShoppingList, setShowShoppingList] = useState(false);
 
   const [showReceiptMenu, setShowReceiptMenu] = useState(false);
 
@@ -401,9 +437,14 @@ export default function Home() {
     fetchItems();
 
     // ─── Real-time subscription ─────────────────────────────────
+    // No `filter` here (unlike a plain per-user filter) so that changes
+    // made by other members of a shared household — whose rows have a
+    // different user_id — also trigger a refetch. Realtime payloads are
+    // still gated by the same RLS policy as the initial SELECT, so this
+    // does not broadcast rows this user can't already read.
     const channel = supabase
       .channel("pantry-realtime")
-      .on("postgres_changes", { event: "*", schema: "public", table: "pantry_items", filter: `user_id=eq.${user.id}` },
+      .on("postgres_changes", { event: "*", schema: "public", table: "pantry_items" },
         () => fetchItems() // Re-fetch on any change (INSERT, UPDATE, DELETE)
       )
       .subscribe();
@@ -454,6 +495,7 @@ export default function Home() {
             const rowToInsert = {
                id: itemToUndo.id,
                user_id: user.id,
+               ...householdIdField(),
                name: itemToUndo.name,
                days_left: itemToUndo.daysLeft,
                risk: itemToUndo.risk,
@@ -464,6 +506,59 @@ export default function Home() {
         }
       }
     });
+  };
+
+  // ─── Edit item ──────────────────────────────────────────────────
+  const openEditItem = (item: Item) => {
+    setEditingItem(item);
+    setEditName(item.name);
+    setEditDaysLeft(String(item.daysLeft));
+  };
+
+  const closeEditItem = () => {
+    setEditingItem(null);
+    setEditName("");
+    setEditDaysLeft("");
+  };
+
+  const saveEditItem = async () => {
+    if (!editingItem) return;
+    const trimmedName = editName.trim();
+    if (!trimmedName) {
+      setInlineError("Item name can't be empty.");
+      return;
+    }
+    const parsedDaysLeft = Math.round(Number(editDaysLeft));
+    if (!Number.isFinite(parsedDaysLeft) || parsedDaysLeft < 0) {
+      setInlineError("Enter a valid number of days remaining.");
+      return;
+    }
+    const clampedDaysLeft = Math.max(0, Math.min(3650, parsedDaysLeft));
+
+    setIsSavingEdit(true);
+    setInlineError(null);
+
+    // Editing resets the aging clock: purchase_date becomes today, and
+    // days_left becomes exactly what the user typed as "days remaining".
+    const newPurchaseDate = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+    const { error } = await supabase
+      .from("pantry_items")
+      .update({ name: trimmedName, days_left: clampedDaysLeft, purchase_date: newPurchaseDate, risk: deriveRisk(clampedDaysLeft) })
+      .eq("id", editingItem.id);
+
+    setIsSavingEdit(false);
+
+    if (error) {
+      setInlineError("Couldn't save changes. Please try again.");
+      return;
+    }
+
+    setItems(prev => prev.map(i => i.id === editingItem.id
+      ? { ...i, name: trimmedName, daysLeft: clampedDaysLeft, risk: deriveRisk(clampedDaysLeft), purchaseDate: newPurchaseDate }
+      : i));
+    toast("Item updated");
+    closeEditItem();
   };
 
   const addMockInventoryData = async () => {
@@ -496,6 +591,7 @@ export default function Home() {
       const currentDays = Math.max(0, entry.shelfLifeDays - entry.purchasedDaysAgo);
       return {
         user_id: user.id,
+        ...householdIdField(),
         name: entry.name,
         days_left: entry.shelfLifeDays,
         risk: deriveRisk(currentDays),
@@ -537,24 +633,27 @@ export default function Home() {
     const userDietPreference = normalizeDietPreference(String(user?.user_metadata?.dietary_preference || "none"));
     const shouldForceVegetarian = isVegMode || userDietPreference === "veg" || userDietPreference === "eggtarian";
 
-    const fallbackRecipes = [
+    const fallbackRecipes: { title: string; time: string; image: string; link: string; ingredients: string[] }[] = [
       {
         title: "Veggie Stir-Fry Bowl",
         time: "20m prep",
         image: "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=900&q=80",
-        link: "https://www.bbcgoodfood.com/recipes/collection/stir-fry-recipes"
+        link: "https://www.bbcgoodfood.com/recipes/collection/stir-fry-recipes",
+        ingredients: []
       },
       {
         title: "Quick Pantry Pasta",
         time: "18m prep",
         image: "https://images.unsplash.com/photo-1621996346565-e3dbc646d9a9?auto=format&fit=crop&w=900&q=80",
-        link: "https://www.simplyrecipes.com/quick-pasta-recipes-4799018"
+        link: "https://www.simplyrecipes.com/quick-pasta-recipes-4799018",
+        ingredients: []
       },
       {
         title: "One-Pot Rice & Beans",
         time: "25m prep",
         image: "https://images.unsplash.com/photo-1512058564366-18510be2db19?auto=format&fit=crop&w=900&q=80",
-        link: "https://www.loveandlemons.com/rice-and-beans/"
+        link: "https://www.loveandlemons.com/rice-and-beans/",
+        ingredients: []
       }
     ];
 
@@ -606,7 +705,8 @@ export default function Home() {
             title: meal.strMeal || "Smart Pantry Recipe",
             time: "20m prep",
             image: meal.strMealThumb || fallbackRecipes[0].image,
-            link: meal.strSource || meal.strYoutube || `https://www.themealdb.com/meal/${meal.idMeal}`
+            link: meal.strSource || meal.strYoutube || `https://www.themealdb.com/meal/${meal.idMeal}`,
+            ingredients: extractMealIngredients(meal),
           };
         }
 
@@ -649,6 +749,41 @@ export default function Home() {
     await generateRecipe(sourceItems[nextIndex].name);
   };
 
+  const addMissingIngredientsToShoppingList = async () => {
+    if (!user || !generatedRecipe?.ingredients || isAddingToShoppingList) return;
+
+    const pantryNames = items.map((i) => i.name.toLowerCase());
+    const missing = generatedRecipe.ingredients.filter(
+      (ingredient) => !pantryNames.some((name) => name.includes(ingredient.toLowerCase()) || ingredient.toLowerCase().includes(name))
+    );
+
+    if (missing.length === 0) {
+      toast("Nothing to add", { description: "Looks like you already have every ingredient for this recipe." });
+      return;
+    }
+
+    setIsAddingToShoppingList(true);
+    const rows = missing.map((name) => ({
+      user_id: user.id,
+      name,
+      source_recipe: generatedRecipe.title,
+    }));
+
+    const { error } = await supabase.from("shopping_list_items").insert(rows);
+    setIsAddingToShoppingList(false);
+
+    if (error) {
+      toast("Couldn't update shopping list", {
+        description: error.message?.includes("does not exist")
+          ? "Shopping list isn't set up yet — the required database migration hasn't been run."
+          : "Please try again.",
+      });
+      return;
+    }
+
+    toast("Added to shopping list", { description: `${missing.length} item(s) from "${generatedRecipe.title}" added.` });
+  };
+
   // ─── Receipt upload → Supabase insert ──────────────────────────
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     setInlineError(null);
@@ -684,6 +819,7 @@ export default function Home() {
 
         const rows = normalizedItems.map((apiItem) => ({
           user_id: user.id,
+          ...householdIdField(),
           name: apiItem.name,
           days_left: apiItem.days_left,
           risk: apiItem.risk,
@@ -720,6 +856,7 @@ export default function Home() {
                 risk: deriveRisk(daysLeft),
                 purchaseDate: insertedRow.purchase_date,
               });
+              logScanHistory(insertedRow.name, "receipt");
             }
           }
         }
@@ -752,6 +889,21 @@ export default function Home() {
       if (galleryInputRef.current) galleryInputRef.current.value = "";
       if (invoiceInputRef.current) invoiceInputRef.current.value = "";
     }
+  };
+
+  // ─── Scan history logging (best-effort, never blocks the UI) ───
+  const logScanHistory = (productName: string, source: "barcode" | "receipt" | "manual", healthScore?: string) => {
+    if (!user || !productName) return;
+    // Supabase's query builder is lazily thenable — the request is only
+    // actually sent once something calls .then()/.catch() or awaits it.
+    // `void` alone discards the builder without triggering it, so this
+    // must chain .then() to fire the insert.
+    supabase.from("scan_history").insert([{
+      user_id: user.id,
+      product_name: productName,
+      source,
+      health_score: healthScore ?? null,
+    }]).then(() => {});
   };
 
   // ─── Barcode Processing ─────────────────────────────────────────
@@ -919,6 +1071,8 @@ if (nutritionFieldsFilled < 2) {
       if (!analysis.is_food) {
         setInlineError("This barcode appears to be a non-food item, so it wasn't added.");
       } else {
+        logScanHistory(productName, "barcode", analysis.health_score);
+        setScannedExpiry(null);
         setScannedResult({
           name: productName,
           analysis,
@@ -963,6 +1117,8 @@ if (nutritionFieldsFilled < 2) {
         setInlineError("This barcode appears to be a non-food item, so it wasn't added.");
       } else {
         const detectedItemDiet = getItemDietType(`${typedName} ${manualBarcodeEntry.ingredients} ${manualBarcodeEntry.categories}`);
+        logScanHistory(typedName, "manual", analysis.health_score);
+        setScannedExpiry(null);
         setScannedResult({ name: typedName, analysis, itemDiet: detectedItemDiet });
       }
     } catch {
@@ -984,11 +1140,13 @@ if (nutritionFieldsFilled < 2) {
       return;
     }
 
+    const initialDaysLeft = scannedExpiry?.daysLeft ?? DEFAULT_SCANNED_ITEM_DAYS_LEFT;
     const newItem = {
       user_id: user.id,
+      ...householdIdField(),
       name: scannedResult.name,
-      days_left: 30, // Default for pantry scanned items
-      risk: "low",
+      days_left: initialDaysLeft,
+      risk: deriveRisk(initialDaysLeft),
       purchase_date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
     };
 
@@ -1010,12 +1168,17 @@ if (nutritionFieldsFilled < 2) {
            purchaseDate: insertedRow.purchase_date,
          }, ...prev];
        });
-       toast("Added to Pantry");
+       toast("Added to Pantry", {
+         description: scannedExpiry
+           ? `Using scanned expiry date: ${initialDaysLeft} day(s) left.`
+           : `No expiry date scanned — defaulted to ${DEFAULT_SCANNED_ITEM_DAYS_LEFT} day(s). You can scan the expiry date next time for accuracy.`,
+       });
     } else if (error) {
        setInlineError("Item was analyzed, but could not be saved to cloud inventory.");
     }
      setDietConflictPrompt(null);
     setScannedResult(null);
+    setScannedExpiry(null);
   };
 
   const handleNutritionLabelResult = async (nutrition: {
@@ -1064,6 +1227,28 @@ if (nutritionFieldsFilled < 2) {
     }
   };
 
+  const handleExpiryScanResult = (expiry: {
+    days_left: number | null;
+    expiry_date: string | null;
+    source: "printed_expiry" | "mfd_plus_shelf_life" | "shelf_life_from_today" | "unknown";
+    confidence: "high" | "medium" | "low";
+  }) => {
+    setShowExpiryScanner(false);
+    if (expiry.days_left === null) return;
+
+    setScannedExpiry({
+      daysLeft: expiry.days_left,
+      expiryDate: expiry.expiry_date,
+      source: expiry.source,
+      confidence: expiry.confidence,
+    });
+    toast("Expiry date detected", {
+      description: expiry.expiry_date
+        ? `${expiry.days_left} day(s) left (expires ${expiry.expiry_date}).`
+        : `${expiry.days_left} day(s) left.`,
+    });
+  };
+
 
   // Loading state
   if (authLoading || (!user && !authLoading)) {
@@ -1103,7 +1288,7 @@ if (nutritionFieldsFilled < 2) {
                 </span>
               )}
             </button>
-            <ProfileDropdown />
+            <ProfileDropdown onOpenShoppingList={() => setShowShoppingList(true)} />
           </div>
         </div>
 
@@ -1171,6 +1356,18 @@ if (nutritionFieldsFilled < 2) {
                     </a>
                   </div>
                 </div>
+                {generatedRecipe.ingredients && generatedRecipe.ingredients.length > 0 && (
+                  <div className="px-4 pb-4">
+                    <button
+                      onClick={() => { void addMissingIngredientsToShoppingList(); }}
+                      disabled={isAddingToShoppingList}
+                      className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg border border-background/30 text-background text-xs font-semibold hover:bg-background/10 transition-all disabled:opacity-60"
+                    >
+                      {isAddingToShoppingList ? <Loader2 size={12} className="animate-spin" /> : <ShoppingCart size={12} />}
+                      Add missing ingredients to shopping list
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -1180,7 +1377,8 @@ if (nutritionFieldsFilled < 2) {
       {showNotificationsPanel && (
         <>
           <button
-            aria-label="Close notifications"
+            aria-hidden="true"
+            tabIndex={-1}
             onClick={() => setShowNotificationsPanel(false)}
             className="fixed inset-0 z-40 bg-black/20 backdrop-blur-[1px]"
           />
@@ -1360,6 +1558,14 @@ if (nutritionFieldsFilled < 2) {
                     healthierAlternative={healthierAlternative} 
                   />
                   <button
+                    onClick={() => openEditItem(item)}
+                    className="absolute bottom-4 right-16 bg-foreground text-background p-2.5 rounded-full shadow-lg z-20 active:scale-95 transition-all opacity-90 hover:opacity-100"
+                    title="Edit item"
+                    aria-label="Edit item"
+                  >
+                    <Pencil size={16} />
+                  </button>
+                  <button
                     onClick={() => deleteItem(item.id)}
                     className="absolute bottom-4 right-4 bg-danger text-white p-2.5 rounded-full shadow-lg z-20 active:scale-95 transition-all opacity-90 hover:opacity-100"
                     title="Remove item"
@@ -1488,12 +1694,36 @@ if (nutritionFieldsFilled < 2) {
             {/* Header */}
             <div className="sticky top-0 bg-card/80 backdrop-blur-md z-10 border-b border-border px-5 py-4 flex justify-between items-center">
               <h3 className="font-bold text-lg text-foreground truncate pr-4">{scannedResult.name}</h3>
-              <button onClick={() => setScannedResult(null)} title="Close analysis" aria-label="Close analysis" className="w-8 h-8 flex items-center justify-center rounded-full bg-foreground/10 hover:bg-foreground/20 text-foreground transition-colors shrink-0">
+              <button onClick={() => { setScannedResult(null); setScannedExpiry(null); }} title="Close analysis" aria-label="Close analysis" className="w-8 h-8 flex items-center justify-center rounded-full bg-foreground/10 hover:bg-foreground/20 text-foreground transition-colors shrink-0">
                 <X size={18} />
               </button>
             </div>
-            
+
             <div className="p-5 flex-1 space-y-6 overflow-y-auto pb-6">
+              {/* Expiry Date Card */}
+              <div className="bg-foreground/5 rounded-2xl p-4 flex items-center justify-between border border-border/50 sleek-shadow gap-3">
+                <div className="flex flex-col min-w-0">
+                  <span className="text-xs font-bold uppercase tracking-widest text-foreground/50 mb-1">Expiry Date</span>
+                  {scannedExpiry ? (
+                    <>
+                      <span className="text-lg font-black">{scannedExpiry.daysLeft} day(s) left</span>
+                      <span className="text-[11px] text-foreground/50 truncate">
+                        {scannedExpiry.expiryDate ? `Expires ${scannedExpiry.expiryDate}` : "From printed shelf-life"}
+                        {scannedExpiry.confidence !== "high" ? " · double-check label" : ""}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-xs text-foreground/50">Not scanned — will default to {DEFAULT_SCANNED_ITEM_DAYS_LEFT} days</span>
+                  )}
+                </div>
+                <button
+                  onClick={() => setShowExpiryScanner(true)}
+                  className="flex items-center gap-1.5 border border-border bg-card text-foreground text-xs font-semibold px-3 py-2 rounded-lg hover:bg-foreground/5 transition-colors shrink-0 whitespace-nowrap"
+                >
+                  <CalendarClock size={13} /> {scannedExpiry ? "Rescan" : "Scan date"}
+                </button>
+              </div>
+
               {/* TruthIn Style Rating Card */}
               <div className="bg-foreground/5 rounded-2xl p-4 flex items-center justify-between border border-border/50 sleek-shadow">
                 <div className="flex flex-col">
@@ -1625,6 +1855,61 @@ if (nutritionFieldsFilled < 2) {
                 className="w-full bg-foreground text-background font-bold text-sm py-4 rounded-2xl hover:opacity-90 active:scale-[0.98] transition-all shadow-xl"
               >
                 Add to Hub Inventory
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {editingItem && (
+        <div className="fixed inset-0 z-50 bg-background/85 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-card border border-border rounded-2xl shadow-2xl p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold tracking-tight">Edit Item</h3>
+              <button onClick={closeEditItem} title="Close edit" aria-label="Close edit" className="w-8 h-8 flex items-center justify-center rounded-full bg-foreground/10 hover:bg-foreground/20 transition-colors">
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-semibold uppercase tracking-widest text-foreground/60">Item Name</label>
+                <input
+                  type="text"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-foreground/20"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-semibold uppercase tracking-widest text-foreground/60">Days Remaining</label>
+                <input
+                  type="number"
+                  min={0}
+                  inputMode="numeric"
+                  value={editDaysLeft}
+                  onChange={(e) => setEditDaysLeft(e.target.value)}
+                  className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-foreground/20"
+                />
+                <p className="text-[11px] text-foreground/45">Saving resets the freshness clock to start counting down from today.</p>
+              </div>
+            </div>
+
+            <div className="mt-5 flex flex-col sm:flex-row gap-2">
+              <button
+                onClick={closeEditItem}
+                disabled={isSavingEdit}
+                className="flex-1 border border-border rounded-xl py-2.5 text-sm font-semibold hover:bg-foreground/5 transition-colors disabled:opacity-60"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => { void saveEditItem(); }}
+                disabled={isSavingEdit}
+                className="flex-1 bg-foreground text-background rounded-xl py-2.5 text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center justify-center gap-2"
+              >
+                {isSavingEdit ? <Loader2 size={14} className="animate-spin" /> : null}
+                Save Changes
               </button>
             </div>
           </div>
@@ -1801,6 +2086,17 @@ if (nutritionFieldsFilled < 2) {
           onResult={handleNutritionLabelResult}
           onClose={() => setShowLabelScanner(false)}
         />
+      )}
+
+      {showExpiryScanner && (
+        <ExpiryDateScanner
+          onResult={handleExpiryScanResult}
+          onClose={() => setShowExpiryScanner(false)}
+        />
+      )}
+
+      {showShoppingList && (
+        <ShoppingListModal onClose={() => setShowShoppingList(false)} />
       )}
     </div>
   );
