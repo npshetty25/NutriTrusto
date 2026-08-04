@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { X, ShoppingCart, Loader2, Plus, Trash2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/auth-context";
@@ -14,7 +14,10 @@ interface ShoppingListRow {
   name: string;
   source_recipe: string | null;
   checked: boolean;
+  created_at?: string;
 }
+
+type ShoppingSortOption = "newest" | "name" | "recipe";
 
 export default function ShoppingListModal({ onClose }: ShoppingListModalProps) {
   const { user } = useAuth();
@@ -23,13 +26,15 @@ export default function ShoppingListModal({ onClose }: ShoppingListModalProps) {
   const [error, setError] = useState<string | null>(null);
   const [newItemName, setNewItemName] = useState("");
   const [isAdding, setIsAdding] = useState(false);
+  const [hideChecked, setHideChecked] = useState(false);
+  const [sortBy, setSortBy] = useState<ShoppingSortOption>("newest");
 
   const fetchList = async () => {
     if (!user) return;
     setLoading(true);
     const { data, error: fetchError } = await supabase
       .from("shopping_list_items")
-      .select("id, name, source_recipe, checked")
+      .select("id, name, source_recipe, checked, created_at")
       .order("checked", { ascending: true })
       .order("created_at", { ascending: false });
 
@@ -76,7 +81,7 @@ export default function ShoppingListModal({ onClose }: ShoppingListModalProps) {
     const { data, error: insertError } = await supabase
       .from("shopping_list_items")
       .insert([{ user_id: user.id, name }])
-      .select("id, name, source_recipe, checked")
+      .select("id, name, source_recipe, checked, created_at")
       .single();
     setIsAdding(false);
 
@@ -90,6 +95,23 @@ export default function ShoppingListModal({ onClose }: ShoppingListModalProps) {
   };
 
   const hasChecked = rows.some((r) => r.checked);
+
+  const visibleRows = useMemo(() => {
+    const filtered = hideChecked ? rows.filter((r) => !r.checked) : rows;
+
+    return [...filtered].sort((a, b) => {
+      // Unchecked items always come first regardless of sort choice —
+      // matches the DB's own default ordering.
+      if (a.checked !== b.checked) return a.checked ? 1 : -1;
+
+      if (sortBy === "name") return a.name.localeCompare(b.name);
+      if (sortBy === "recipe") {
+        const recipeCompare = (a.source_recipe || "").localeCompare(b.source_recipe || "");
+        return recipeCompare !== 0 ? recipeCompare : a.name.localeCompare(b.name);
+      }
+      return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+    });
+  }, [rows, hideChecked, sortBy]);
 
   return (
     <div className="fixed inset-0 z-70 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
@@ -131,6 +153,29 @@ export default function ShoppingListModal({ onClose }: ShoppingListModalProps) {
           </div>
         </div>
 
+        {rows.length > 0 && (
+          <div className="px-4 pt-3 shrink-0 flex items-center gap-2">
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as ShoppingSortOption)}
+              title="Sort"
+              className="flex-1 bg-background border border-border rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-foreground/30"
+            >
+              <option value="newest">Newest First</option>
+              <option value="name">Name (A-Z)</option>
+              <option value="recipe">By Recipe</option>
+            </select>
+            <button
+              onClick={() => setHideChecked((v) => !v)}
+              className={`text-[11px] font-semibold px-2.5 py-1.5 rounded-lg border whitespace-nowrap transition-colors ${
+                hideChecked ? "bg-foreground text-background border-foreground" : "border-border text-foreground/60 hover:text-foreground hover:bg-foreground/5"
+              }`}
+            >
+              {hideChecked ? "Showing Unbought" : "Hide Bought"}
+            </button>
+          </div>
+        )}
+
         <div className="p-4 overflow-y-auto space-y-2 flex-1">
           {error && (
             <div className="rounded-xl bg-red-500/10 border border-red-500/20 px-3 py-2">
@@ -148,7 +193,11 @@ export default function ShoppingListModal({ onClose }: ShoppingListModalProps) {
             <div className="text-center py-8 text-sm text-foreground/50">Your shopping list is empty.</div>
           )}
 
-          {rows.map((row) => (
+          {!loading && !error && rows.length > 0 && visibleRows.length === 0 && (
+            <div className="text-center py-8 text-sm text-foreground/50">Nothing to show — everything's checked off.</div>
+          )}
+
+          {visibleRows.map((row) => (
             <div key={row.id} className="rounded-xl border border-border bg-background px-3 py-2.5 flex items-center gap-3">
               <button
                 onClick={() => toggleChecked(row)}
