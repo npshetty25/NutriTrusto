@@ -74,6 +74,24 @@ const deriveRisk = (daysLeft: number): RiskLevel => {
 
 const normalizeLabel = (value: string) => value.replace(/\s+/g, " ").trim();
 
+// Generic, category-appropriate tips — never a fabricated specific
+// product name (there's no real per-item nutrition data to base one on).
+// Vegetables/fruit/meat/unknown return undefined: they're either already
+// whole foods ("Organic/Whole Tomato" makes no sense) or we genuinely
+// don't know enough about the item to say anything useful.
+const getHealthierAlternativeHint = (category: ItemCategory): string | undefined => {
+  switch (category) {
+    case "dairy": return "Look for a low-fat or organic dairy option";
+    case "grain": return "Choose a whole-grain version";
+    case "beverage": return "Watch for added sugar — try an unsweetened version";
+    case "bakery": return "Look for a whole-grain or lower-sugar option";
+    case "frozen": return "Check the label for versions without added preservatives";
+    case "snack": return "Look for a baked or lower-sodium version";
+    case "pantry": return "Check the label for a lower-sodium option";
+    default: return undefined;
+  }
+};
+
 const extractMealIngredients = (meal: Record<string, unknown>): string[] => {
   const ingredients: string[] = [];
   for (let i = 1; i <= 20; i += 1) {
@@ -113,6 +131,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
 import { supabase } from "@/lib/supabase";
 import { inferItemCategory, type ItemCategory } from "@/lib/item-category";
+import { detectAllergens } from "@/lib/allergens";
 import { PantryCard, RiskLevel } from "@/components/pantry-card";
 import { ProfileDropdown } from "@/components/profile-dropdown";
 import BarcodeScanner from "@/components/barcode-scanner";
@@ -131,6 +150,10 @@ interface Item {
   daysLeft: number;
   risk: RiskLevel;
   purchaseDate: string;
+  // null/undefined = no real ingredient data for this item (demo data,
+  // receipt-scanned items, or scanned before this column existed) —
+  // allergen content must be shown as unknown, not assumed safe.
+  ingredientsText?: string | null;
 }
 
 interface NotificationEntry {
@@ -146,6 +169,10 @@ interface ScannedResultEntry {
   name: string;
   analysis: any;
   itemDiet: ItemDietType;
+  // Real ingredient text from Open Food Facts, when actually available —
+  // never the "None provided..." placeholder used when no product data
+  // was found. See PLACEHOLDER_INGREDIENTS_TEXT below.
+  ingredients?: string | null;
 }
 
 interface ScannedExpiryEntry {
@@ -156,6 +183,7 @@ interface ScannedExpiryEntry {
 }
 
 const DEFAULT_SCANNED_ITEM_DAYS_LEFT = 30;
+const PLACEHOLDER_INGREDIENTS_TEXT = "None provided, rely purely on AI general knowledge";
 
 const NOTIFICATIONS_PAGE_SIZE = 8;
 const INVENTORY_PAGE_SIZE = 6;
@@ -163,7 +191,7 @@ const INVENTORY_PAGE_SIZE = 6;
 // No fallback items — real users start with an empty pantry.
 
 export default function Home() {
-  const { user, loading: authLoading, household, householdSchemaReady } = useAuth();
+  const { user, loading: authLoading, household, householdSchemaReady, ingredientsSchemaReady } = useAuth();
 
   // Spread into a pantry_items insert payload. Omits the key entirely
   // (rather than sending null) until we've confirmed the household_id
@@ -171,6 +199,10 @@ export default function Home() {
   // column outright, so this must never be sent before the migration runs.
   const householdIdField = (): { household_id?: string | null } =>
     householdSchemaReady ? { household_id: household?.id ?? null } : {};
+
+  // Same idea for ingredients_text — see ingredientsSchemaReady in AuthContext.
+  const ingredientsTextField = (ingredients: string | null | undefined): { ingredients_text?: string | null } =>
+    ingredientsSchemaReady ? { ingredients_text: ingredients ?? null } : {};
   const router = useRouter();
 
   const [items, setItems] = useState<Item[]>([]);
@@ -197,6 +229,7 @@ export default function Home() {
   const [manualBarcodeName, setManualBarcodeName] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [riskFilter, setRiskFilter] = useState<"all" | RiskLevel>("all");
+  const [inventorySortBy, setInventorySortBy] = useState<"expiring" | "freshest" | "name">("expiring");
   const [currentPage, setCurrentPage] = useState(1);
   const [showNotificationsPanel, setShowNotificationsPanel] = useState(false);
   const [notifications, setNotifications] = useState<NotificationEntry[]>([]);
@@ -204,6 +237,8 @@ export default function Home() {
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [hasMoreNotifications, setHasMoreNotifications] = useState(true);
   const [notificationsInitialized, setNotificationsInitialized] = useState(false);
+  const [notificationSeverityFilter, setNotificationSeverityFilter] = useState<"all" | NotificationEntry["severity"]>("all");
+  const [notificationSort, setNotificationSort] = useState<"newest" | "urgent">("newest");
   const [isSeedingMockData, setIsSeedingMockData] = useState(false);
   const [editingItem, setEditingItem] = useState<Item | null>(null);
   const [editName, setEditName] = useState("");
@@ -222,7 +257,11 @@ export default function Home() {
     const matchesRisk = riskFilter === "all" ? true : item.risk === riskFilter;
     return matchesSearch && matchesRisk;
   });
-  const sortedInventoryItems = [...inventoryFilteredItems].sort((a, b) => a.daysLeft - b.daysLeft);
+  const sortedInventoryItems = [...inventoryFilteredItems].sort((a, b) => {
+    if (inventorySortBy === "name") return a.name.localeCompare(b.name);
+    if (inventorySortBy === "freshest") return b.daysLeft - a.daysLeft;
+    return a.daysLeft - b.daysLeft;
+  });
   const totalPages = Math.max(1, Math.ceil(sortedInventoryItems.length / INVENTORY_PAGE_SIZE));
   const paginatedItems = sortedInventoryItems.slice((currentPage - 1) * INVENTORY_PAGE_SIZE, currentPage * INVENTORY_PAGE_SIZE);
   const highRiskItems = displayedItems.filter(i => i.risk === "high");
@@ -234,6 +273,14 @@ export default function Home() {
           100
       );
   const urgentNotificationCount = items.filter(i => i.daysLeft > 0 && i.daysLeft <= 3).length;
+
+  const severityRank: Record<NotificationEntry["severity"], number> = { high: 0, medium: 1, low: 2, info: 3 };
+  const visibleNotifications = notifications
+    .filter((n) => notificationSeverityFilter === "all" || n.severity === notificationSeverityFilter)
+    .sort((a, b) => {
+      if (notificationSort === "urgent") return severityRank[a.severity] - severityRank[b.severity];
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
 
   useEffect(() => {
     setCurrentPage(1);
@@ -265,6 +312,7 @@ export default function Home() {
             daysLeft,
             risk: deriveRisk(daysLeft),
             purchaseDate: row.purchase_date,
+            ingredientsText: row.ingredients_text ?? null,
           };
         })
       );
@@ -401,6 +449,19 @@ export default function Home() {
     }
   };
 
+  // Notifications are derived live from current pantry state (not a stored
+  // inbox), so "clear" empties what's shown now rather than dismissing
+  // something permanently. Resetting notificationsInitialized means the
+  // next time the panel opens it re-fetches — a genuinely still-critical
+  // item will reappear, which is correct: it isn't done being critical
+  // just because you closed the panel.
+  const clearAllNotifications = () => {
+    setNotifications([]);
+    setHasMoreNotifications(false);
+    setNotificationPage(0);
+    setNotificationsInitialized(false);
+  };
+
   // ─── Guard + redirect ──────────────────────────────────────────
   useEffect(() => {
     if (!authLoading && !user) router.push("/login");
@@ -427,6 +488,7 @@ export default function Home() {
           daysLeft: calculateCurrentDaysLeft(row.days_left, row.purchase_date),
           risk: deriveRisk(calculateCurrentDaysLeft(row.days_left, row.purchase_date)),
           purchaseDate: row.purchase_date,
+          ingredientsText: row.ingredients_text ?? null,
         })));
       } else {
         setItems([]);
@@ -817,13 +879,17 @@ export default function Home() {
           })
           .filter((item): item is { name: string; days_left: number; risk: RiskLevel } => Boolean(item));
 
+        const purchaseDate = typeof data.purchase_date === "string" && data.purchase_date
+          ? data.purchase_date
+          : new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
         const rows = normalizedItems.map((apiItem) => ({
           user_id: user.id,
           ...householdIdField(),
           name: apiItem.name,
           days_left: apiItem.days_left,
           risk: apiItem.risk,
-          purchase_date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+          purchase_date: purchaseDate,
         }));
 
         const failedLocalItems: Item[] = [];
@@ -932,7 +998,7 @@ if (data.status === 0) {
 }
       
       let productName = "";
-      let productIngredients = "None provided, rely purely on AI general knowledge";
+      let productIngredients = PLACEHOLDER_INGREDIENTS_TEXT;
       let productCategories = "Unknown";
       let nutritionData: {
         sugars_g_100g?: number;
@@ -1077,6 +1143,7 @@ if (nutritionFieldsFilled < 2) {
           name: productName,
           analysis,
           itemDiet: detectedItemDiet,
+          ingredients: productIngredients !== PLACEHOLDER_INGREDIENTS_TEXT ? productIngredients : null,
         });
       }
     } catch (e) {
@@ -1119,7 +1186,12 @@ if (nutritionFieldsFilled < 2) {
         const detectedItemDiet = getItemDietType(`${typedName} ${manualBarcodeEntry.ingredients} ${manualBarcodeEntry.categories}`);
         logScanHistory(typedName, "manual", analysis.health_score);
         setScannedExpiry(null);
-        setScannedResult({ name: typedName, analysis, itemDiet: detectedItemDiet });
+        setScannedResult({
+          name: typedName,
+          analysis,
+          itemDiet: detectedItemDiet,
+          ingredients: manualBarcodeEntry.ingredients !== PLACEHOLDER_INGREDIENTS_TEXT ? manualBarcodeEntry.ingredients : null,
+        });
       }
     } catch {
       setInlineError("Unable to analyze this item right now. Please try again in a moment.");
@@ -1144,6 +1216,7 @@ if (nutritionFieldsFilled < 2) {
     const newItem = {
       user_id: user.id,
       ...householdIdField(),
+      ...ingredientsTextField(scannedResult.ingredients),
       name: scannedResult.name,
       days_left: initialDaysLeft,
       risk: deriveRisk(initialDaysLeft),
@@ -1166,6 +1239,7 @@ if (nutritionFieldsFilled < 2) {
            daysLeft,
            risk: deriveRisk(daysLeft),
            purchaseDate: insertedRow.purchase_date,
+           ingredientsText: scannedResult.ingredients ?? null,
          }, ...prev];
        });
        toast("Added to Pantry", {
@@ -1250,8 +1324,14 @@ if (nutritionFieldsFilled < 2) {
   };
 
 
-  // Loading state
-  if (authLoading || (!user && !authLoading)) {
+  // Loading state. Also waits for the schema-readiness probes (household_id,
+  // ingredients_text) to resolve once a user exists — otherwise a fast
+  // scan-and-add right after signup can race ahead of them, silently
+  // omitting those fields from the very first insert (confirmed
+  // reproducible: the probes are still in flight for a beat after a fresh
+  // signup, before the dashboard would otherwise already be interactive).
+  const schemaProbesPending = !!user && (householdSchemaReady === null || ingredientsSchemaReady === null);
+  if (authLoading || (!user && !authLoading) || schemaProbesPending) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Loader2 size={24} className="animate-spin text-foreground/30" />
@@ -1383,27 +1463,67 @@ if (nutritionFieldsFilled < 2) {
             className="fixed inset-0 z-40 bg-black/20 backdrop-blur-[1px]"
           />
           <div className="fixed top-20 left-4 right-4 z-50 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:w-105 bg-card border border-border rounded-2xl shadow-2xl overflow-hidden">
-            <div className="px-4 py-3 border-b border-border flex items-center justify-between">
-              <div>
+            <div className="px-4 py-3 border-b border-border flex items-center justify-between gap-2">
+              <div className="min-w-0">
                 <h3 className="text-sm font-bold tracking-tight">Notifications</h3>
                 <p className="text-[11px] text-foreground/50">Scroll to load more</p>
               </div>
-              <button
-                title="Close notifications"
-                aria-label="Close notifications"
-                onClick={() => setShowNotificationsPanel(false)}
-                className="w-8 h-8 rounded-full hover:bg-foreground/5 flex items-center justify-center"
-              >
-                <X size={16} />
-              </button>
+              <div className="flex items-center gap-1 shrink-0">
+                {notifications.length > 0 && (
+                  <button
+                    onClick={clearAllNotifications}
+                    className="text-[11px] font-semibold text-foreground/60 hover:text-foreground px-2.5 py-1.5 rounded-lg hover:bg-foreground/5 transition-colors whitespace-nowrap"
+                  >
+                    Clear All
+                  </button>
+                )}
+                <button
+                  title="Close notifications"
+                  aria-label="Close notifications"
+                  onClick={() => setShowNotificationsPanel(false)}
+                  className="w-8 h-8 rounded-full hover:bg-foreground/5 flex items-center justify-center shrink-0"
+                >
+                  <X size={16} />
+                </button>
+              </div>
             </div>
+
+            {notifications.length > 0 && (
+              <div className="px-3 pt-3 grid grid-cols-2 gap-2">
+                <select
+                  value={notificationSeverityFilter}
+                  onChange={(e) => setNotificationSeverityFilter(e.target.value as typeof notificationSeverityFilter)}
+                  title="Filter by severity"
+                  className="bg-background border border-border rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-foreground/30"
+                >
+                  <option value="all">All Severities</option>
+                  <option value="high">High</option>
+                  <option value="medium">Medium</option>
+                  <option value="low">Low</option>
+                  <option value="info">Info</option>
+                </select>
+                <select
+                  value={notificationSort}
+                  onChange={(e) => setNotificationSort(e.target.value as typeof notificationSort)}
+                  title="Sort"
+                  className="bg-background border border-border rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-foreground/30"
+                >
+                  <option value="newest">Newest First</option>
+                  <option value="urgent">Most Urgent First</option>
+                </select>
+              </div>
+            )}
 
             <div onScroll={handleNotificationsScroll} className="max-h-96 overflow-y-auto p-3 space-y-2">
               {notifications.length === 0 && !notificationsLoading && (
                 <div className="text-center py-8 text-sm text-foreground/60">No notifications yet.</div>
               )}
 
-              {notifications.map((note) => {
+              {notifications.length > 0 && visibleNotifications.length === 0 && (
+                <div className="text-center py-8 text-sm text-foreground/60">No notifications match this filter.</div>
+              )}
+
+              {visibleNotifications.map((note) => {
                 const NoteIcon = notificationIconMap[note.category];
 
                 return (
@@ -1484,7 +1604,7 @@ if (nutritionFieldsFilled < 2) {
             </div>
           </div>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_auto] gap-2 mb-4">
+        <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_auto_auto] gap-2 mb-4">
           <div className="relative">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground/40" />
             <input
@@ -1505,6 +1625,16 @@ if (nutritionFieldsFilled < 2) {
             <option value="high">High Risk</option>
             <option value="medium">Medium Risk</option>
             <option value="low">Low Risk</option>
+          </select>
+          <select
+            value={inventorySortBy}
+            onChange={(e) => setInventorySortBy(e.target.value as typeof inventorySortBy)}
+            className="bg-card border border-border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-foreground/30"
+            title="Sort inventory"
+          >
+            <option value="expiring">Expiring Soon</option>
+            <option value="freshest">Freshest First</option>
+            <option value="name">Name (A-Z)</option>
           </select>
           <div className="text-xs font-medium text-foreground/50 flex items-center justify-start sm:justify-end px-1">
             {dbLoading ? "Loading..." : `Showing ${inventoryFilteredItems.length} items`}
@@ -1547,15 +1677,19 @@ if (nutritionFieldsFilled < 2) {
               // Deterministic assignment of mock TruthIn values based on item name character count
               const ratingsLineup = ["A", "B", "C", "D", "E"] as const;
               const healthRating = ratingsLineup[item.name.length % 5];
-              const healthierAlternative = ["C", "D", "E"].includes(healthRating) ? `Organic/Whole ${item.name}` : undefined;
+              const healthierAlternative = ["C", "D", "E"].includes(healthRating)
+                ? getHealthierAlternativeHint(inferItemCategory(item.name))
+                : undefined;
+              const detectedAllergens = item.ingredientsText ? detectAllergens(item.ingredientsText) : null;
 
               return (
                 <div key={item.id} className="relative group">
-                  <PantryCard 
-                    {...item} 
-                    healthRating={healthRating} 
-                    dietMatch={isVegMode ? true : isVegItem(item.name)} 
-                    healthierAlternative={healthierAlternative} 
+                  <PantryCard
+                    {...item}
+                    healthRating={healthRating}
+                    dietMatch={isVegMode ? true : isVegItem(item.name)}
+                    healthierAlternative={healthierAlternative}
+                    detectedAllergens={detectedAllergens}
                   />
                   <button
                     onClick={() => openEditItem(item)}
@@ -2058,7 +2192,7 @@ if (nutritionFieldsFilled < 2) {
                     setShowBarcodeRetryOptions(false);
                     setManualBarcodeEntry({
                       code,
-                      ingredients: "None provided, rely purely on AI general knowledge",
+                      ingredients: PLACEHOLDER_INGREDIENTS_TEXT,
                       categories: "Unknown",
                     });
                   }}
