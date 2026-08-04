@@ -225,3 +225,15 @@ create policy "Users manage their own scan history"
   for all
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
+
+-- ────────────────────────────────────────────────────────────
+-- 5. pantry_items — persist real ingredient text (additive)
+-- ────────────────────────────────────────────────────────────
+-- Previously the "Allergen Safe" badge was a hardcoded default shown for
+-- every item regardless of contents — a fabricated safety claim, not a
+-- placeholder. This column lets the app persist ingredient text fetched
+-- from Open Food Facts at scan time so allergen presence can be checked
+-- for real. No policy changes needed — it's covered by the existing
+-- pantry_items policy, which isn't column-specific.
+
+alter table public.pantry_items add column if not exists ingredients_text text;
