@@ -11,6 +11,27 @@ type ExtractedItem = {
   risk?: string;
 };
 
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+// The receipt's own transaction date, not "today", so freshness tracking
+// is correct for receipts scanned days after the actual purchase.
+const resolveReceiptDate = (isoDate: unknown): Date => {
+  const today = new Date();
+  if (typeof isoDate === "string" && isoDate.trim()) {
+    const parsed = new Date(`${isoDate.trim()}T00:00:00`);
+    if (!Number.isNaN(parsed.getTime())) {
+      const twoYearsAgo = new Date(today.getTime() - 2 * 365 * MS_PER_DAY);
+      // Guard against OCR misreads: a receipt can't be dated in the
+      // future, and a date wildly in the past is more likely a
+      // misread year than a genuinely ancient receipt.
+      if (parsed.getTime() <= today.getTime() && parsed.getTime() >= twoYearsAgo.getTime()) {
+        return parsed;
+      }
+    }
+  }
+  return today;
+};
+
 const normalizeRisk = (risk?: string): "high" | "medium" | "low" => {
   const value = (risk || "").toLowerCase().trim();
   if (["high", "critical", "urgent"].includes(value)) return "high";
@@ -68,6 +89,16 @@ Analyze the provided receipt/invoice image. It may be a physical piece of paper 
 For each item, infer a sensible "days_left" before expiry based on general knowledge (e.g., fresh milk = 7 days, rice = 365, vegetables = 5-7).
 Assign a "risk" level: "high" if it spoils very quickly (under 5 days), "medium" (under 14 days), "low" (pantry staples).
 
+Also find the date this purchase/order was actually made — this is the
+transaction date printed on the receipt, NOT today's date. For a physical
+receipt this is usually near the top or bottom (e.g. "Date:", "Bill Date").
+For an online order screenshot, use the order/delivered date, not a "print"
+or "download" timestamp if those differ. Indian receipts are usually
+DD/MM/YYYY — if the first number is > 12, it must be DD/MM/YYYY; if
+genuinely ambiguous, assume DD/MM/YYYY. Expand 2-digit years assuming the
+2000s. Return it as "purchase_date_iso" in YYYY-MM-DD format, or null if no
+date is visible anywhere on the receipt — never guess.
+
   Rules:
   - Return one entry per product line item from the receipt.
   - If confidence is low for shelf life, still include the item and default days_left to 7.
@@ -75,6 +106,7 @@ Assign a "risk" level: "high" if it spoils very quickly (under 5 days), "medium"
 
 Return a JSON object in exactly this format:
 {
+  "purchase_date_iso": "YYYY-MM-DD" or null,
   "items": [
     { "name": "Item Name", "days_left": 10, "risk": "low" }
   ]
@@ -118,13 +150,19 @@ Return ONLY the raw JSON string, with no markdown formatting.`;
       })
       .filter((item): item is { name: string; days_left: number; risk: "high" | "medium" | "low" } => Boolean(item));
 
+    const receiptDate = resolveReceiptDate(parsedData?.purchase_date_iso);
+    const purchase_date = receiptDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+
     log.info("Receipt extraction completed", {
       normalizedItemsCount: items.length,
+      purchase_date,
+      rawPurchaseDateIso: parsedData?.purchase_date_iso ?? null,
     });
 
     return NextResponse.json({
       success: true,
-      items
+      items,
+      purchase_date,
     });
   } catch (error: any) {
     log.error("Unhandled extraction error", {
