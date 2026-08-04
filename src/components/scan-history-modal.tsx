@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { X, History, Loader2, ScanLine, Camera, Keyboard, Plus } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
+import { X, History, Loader2, ScanLine, Camera, Keyboard, Plus, Search } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/auth-context";
@@ -26,12 +27,33 @@ const sourceIconMap = {
 
 const DEFAULT_READDED_DAYS_LEFT = 30;
 
+type SourceFilter = "all" | "barcode" | "receipt" | "manual";
+type SortOption = "newest" | "oldest" | "name";
+
 export function ScanHistoryModal({ onClose }: ScanHistoryModalProps) {
   const { user, household, householdSchemaReady } = useAuth();
   const [rows, setRows] = useState<ScanHistoryRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reAddingId, setReAddingId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
+  const [sortBy, setSortBy] = useState<SortOption>("newest");
+
+  const visibleRows = useMemo(() => {
+    const filtered = rows.filter((row) => {
+      const matchesSearch = row.product_name.toLowerCase().includes(searchQuery.trim().toLowerCase());
+      const matchesSource = sourceFilter === "all" ? true : row.source === sourceFilter;
+      return matchesSearch && matchesSource;
+    });
+
+    return [...filtered].sort((a, b) => {
+      if (sortBy === "name") return a.product_name.localeCompare(b.product_name);
+      const aTime = new Date(a.scanned_at).getTime();
+      const bTime = new Date(b.scanned_at).getTime();
+      return sortBy === "oldest" ? aTime - bTime : bTime - aTime;
+    });
+  }, [rows, searchQuery, sourceFilter, sortBy]);
 
   useEffect(() => {
     if (!user) return;
@@ -87,7 +109,14 @@ export function ScanHistoryModal({ onClose }: ScanHistoryModalProps) {
     toast("Added to Pantry", { description: `${row.product_name} added with a ${DEFAULT_READDED_DAYS_LEFT}-day default shelf life.` });
   };
 
-  return (
+  // Rendered via a portal straight into <body>: this component is triggered
+  // from inside ProfileDropdown, which lives inside the page's <header>.
+  // That header has backdrop-blur-sm (a backdrop-filter), and a
+  // backdrop-filter on an ancestor creates a new containing block for any
+  // position:fixed descendant — so without the portal, this modal would be
+  // "fixed" relative to the header, not the viewport, and scroll away with
+  // the page instead of staying pinned.
+  return createPortal(
     <div className="fixed inset-0 z-70 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
       <div className="w-full max-w-sm bg-card border border-border rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
         <div className="flex items-center justify-between p-4 border-b border-border shrink-0">
@@ -104,6 +133,44 @@ export function ScanHistoryModal({ onClose }: ScanHistoryModalProps) {
             <X size={14} />
           </button>
         </div>
+
+        {rows.length > 0 && (
+          <div className="p-4 pb-0 shrink-0 space-y-2">
+            <div className="relative">
+              <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground/40" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search scans..."
+                className="w-full bg-background border border-border rounded-lg pl-8 pr-3 py-2 text-xs focus:outline-none focus:border-foreground/30"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <select
+                value={sourceFilter}
+                onChange={(e) => setSourceFilter(e.target.value as SourceFilter)}
+                title="Filter by source"
+                className="bg-background border border-border rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-foreground/30"
+              >
+                <option value="all">All Sources</option>
+                <option value="barcode">Barcode</option>
+                <option value="receipt">Receipt</option>
+                <option value="manual">Manual</option>
+              </select>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as SortOption)}
+                title="Sort"
+                className="bg-background border border-border rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-foreground/30"
+              >
+                <option value="newest">Newest First</option>
+                <option value="oldest">Oldest First</option>
+                <option value="name">Name (A-Z)</option>
+              </select>
+            </div>
+          </div>
+        )}
 
         <div className="p-4 overflow-y-auto space-y-2">
           {error && (
@@ -122,7 +189,11 @@ export function ScanHistoryModal({ onClose }: ScanHistoryModalProps) {
             <div className="text-center py-8 text-sm text-foreground/50">No scans yet. Scan a barcode or receipt to see it here.</div>
           )}
 
-          {rows.map((row) => {
+          {!loading && !error && rows.length > 0 && visibleRows.length === 0 && (
+            <div className="text-center py-8 text-sm text-foreground/50">No scans match your search/filter.</div>
+          )}
+
+          {visibleRows.map((row) => {
             const SourceIcon = sourceIconMap[row.source] || ScanLine;
             return (
               <div key={row.id} className="rounded-xl border border-border bg-background px-3 py-2.5 flex items-center gap-3">
@@ -150,6 +221,7 @@ export function ScanHistoryModal({ onClose }: ScanHistoryModalProps) {
           })}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
