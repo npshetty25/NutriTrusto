@@ -3,6 +3,7 @@
 import { motion } from "framer-motion";
 import { ShieldCheck, ShieldAlert, ArrowRight, Leaf, Info, Carrot, Apple, Milk, Drumstick, Wheat, CupSoda, Croissant, Snowflake, Candy, Package } from "lucide-react";
 import { inferItemCategory } from "@/lib/item-category";
+import { ALLERGEN_LABELS, type AllergenTag } from "@/lib/allergens";
 
 export type RiskLevel = "high" | "medium" | "low";
 export type HealthRating = "A" | "B" | "C" | "D" | "E";
@@ -15,7 +16,11 @@ interface PantryCardProps {
   purchaseDate: string;
   healthRating?: HealthRating;
   dietMatch?: boolean;
-  allergensSafe?: boolean;
+  // null/undefined = no ingredient data was available for this item, so
+  // allergen content is genuinely unknown — must not be shown as "safe".
+  // [] = ingredient data exists and no common allergen keyword matched.
+  // non-empty = ingredient data exists and these allergens were detected.
+  detectedAllergens?: AllergenTag[] | null;
   healthierAlternative?: string;
 }
 
@@ -29,7 +34,7 @@ const ratingColor = {
   A: "bg-green-500", B: "bg-green-400", C: "bg-yellow-400", D: "bg-orange-500", E: "bg-red-500"
 };
 
-export function PantryCard({ name, daysLeft, risk, purchaseDate, healthRating = "B", dietMatch = true, allergensSafe = true, healthierAlternative }: PantryCardProps) {
+export function PantryCard({ name, daysLeft, risk, purchaseDate, healthRating = "B", dietMatch = true, detectedAllergens, healthierAlternative }: PantryCardProps) {
   const config = riskConfig[risk];
   const category = inferItemCategory(name);
 
@@ -129,10 +134,25 @@ export function PantryCard({ name, daysLeft, risk, purchaseDate, healthRating = 
           {dietMatch ? "Matches Diet" : "Diet Warning"}
         </div>
 
-        <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-bold ${allergensSafe ? "bg-blue-500/10 text-blue-600 dark:text-blue-400" : "bg-orange-500/10 text-orange-600 dark:text-orange-400"}`}>
-          <Info size={12} />
-          {allergensSafe ? "Allergen Safe" : "Check Allergens"}
-        </div>
+        {detectedAllergens == null ? (
+          <div
+            title="No ingredient data was available for this item, so allergen content couldn't be checked"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-bold bg-foreground/8 text-foreground/50"
+          >
+            <Info size={12} />
+            Allergens Unknown
+          </div>
+        ) : detectedAllergens.length > 0 ? (
+          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-bold bg-orange-500/10 text-orange-600 dark:text-orange-400">
+            <ShieldAlert size={12} />
+            Contains {detectedAllergens.map((tag) => ALLERGEN_LABELS[tag]).join(", ")}
+          </div>
+        ) : (
+          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400">
+            <ShieldCheck size={12} />
+            No Common Allergens
+          </div>
+        )}
       </div>
 
       {healthierAlternative && (
