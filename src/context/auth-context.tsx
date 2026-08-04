@@ -25,6 +25,10 @@ interface AuthContextType {
   // Callers must gate on this before including household_id in an insert —
   // Postgrest rejects the whole insert if the column doesn't exist yet.
   householdSchemaReady: boolean | null;
+  // Same idea, for pantry_items.ingredients_text (added in a later append
+  // to the same migration file). Independent from householdSchemaReady —
+  // a user may have run the file before this column was added to it.
+  ingredientsSchemaReady: boolean | null;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -36,6 +40,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [household, setHousehold] = useState<HouseholdInfo | null>(null);
   const [householdLoading, setHouseholdLoading] = useState(false);
   const [householdSchemaReady, setHouseholdSchemaReady] = useState<boolean | null>(null);
+  const [ingredientsSchemaReady, setIngredientsSchemaReady] = useState<boolean | null>(null);
 
   const refreshHousehold = useCallback(async () => {
     if (!user) {
@@ -92,9 +97,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       supabase.from("pantry_items").select("household_id").limit(1).then(({ error }) => {
         setHouseholdSchemaReady(!error);
       });
+      supabase.from("pantry_items").select("ingredients_text").limit(1).then(({ error }) => {
+        setIngredientsSchemaReady(!error);
+      });
     } else {
       setHousehold(null);
       setHouseholdSchemaReady(null);
+      setIngredientsSchemaReady(null);
     }
   }, [user, refreshHousehold]);
 
@@ -119,7 +128,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, signIn, signUp, signOut, household, householdLoading, refreshHousehold, householdSchemaReady }}>
+    <AuthContext.Provider value={{ user, session, loading, signIn, signUp, signOut, household, householdLoading, refreshHousehold, householdSchemaReady, ingredientsSchemaReady }}>
       {children}
     </AuthContext.Provider>
   );
