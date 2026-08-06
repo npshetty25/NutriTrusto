@@ -237,3 +237,89 @@ create policy "Users manage their own scan history"
 -- pantry_items policy, which isn't column-specific.
 
 alter table public.pantry_items add column if not exists ingredients_text text;
+
+-- ────────────────────────────────────────────────────────────
+-- 6. Item outcomes (per-user; log of used-in-time vs. wasted, for the
+--    impact dashboard's money/CO2/waste-rate estimates)
+-- ────────────────────────────────────────────────────────────
+-- Nothing previously recorded what happened to an item after it was
+-- deleted — this table logs the outcome at delete time so it can be
+-- aggregated later. "used" vs "expired" is inferred from whether
+-- days_left was still positive at the moment of deletion — the same
+-- heuristic the rest of the app already uses for risk/status display,
+-- not a new fabrication.
+
+create table if not exists public.item_outcomes (
+  id                    uuid primary key default gen_random_uuid(),
+  user_id               uuid references auth.users(id) on delete cascade not null,
+  name                  text not null,
+  category              text not null,
+  outcome               text check (outcome in ('used', 'expired')) not null,
+  days_left_at_removal  integer not null,
+  removed_at            timestamptz default now()
+);
+
+alter table public.item_outcomes enable row level security;
+
+drop policy if exists "Users manage their own item outcomes" on public.item_outcomes;
+create policy "Users manage their own item outcomes"
+  on public.item_outcomes
+  for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+-- ────────────────────────────────────────────────────────────
+-- 7. Household waste-reduction leaderboard (read-only aggregate)
+-- ────────────────────────────────────────────────────────────
+-- item_outcomes' own RLS policy above is owner-only ("auth.uid() =
+-- user_id"), which is correct for the raw rows — one member should not be
+-- able to browse another member's individual scan/removal history. A
+-- household leaderboard still needs *aggregate counts* across members, so
+-- this is a SECURITY DEFINER function (same pattern as my_household_ids()
+-- above) that computes the aggregate server-side and returns only
+-- display_name + counts + streak — never raw item_outcomes rows — to
+-- other members. Returns an empty set for a user with no household.
+
+create or replace function public.household_impact_leaderboard()
+returns table (
+  user_id       uuid,
+  display_name  text,
+  items_used    bigint,
+  items_expired bigint,
+  streak_days   integer
+)
+language sql
+security definer
+set search_path = public
+as $$
+  with my_household as (
+    select household_id from public.household_members where user_id = auth.uid() limit 1
+  ),
+  members as (
+    select hm.user_id from public.household_members hm
+    where hm.household_id in (select household_id from my_household)
+  ),
+  outcomes as (
+    select
+      io.user_id,
+      count(*) filter (where io.outcome = 'used') as items_used,
+      count(*) filter (where io.outcome = 'expired') as items_expired,
+      max(io.removed_at) filter (where io.outcome = 'expired') as last_expired_at
+    from public.item_outcomes io
+    where io.user_id in (select user_id from members)
+    group by io.user_id
+  )
+  select
+    m.user_id,
+    coalesce(u.raw_user_meta_data ->> 'full_name', split_part(u.email, '@', 1)) as display_name,
+    coalesce(o.items_used, 0) as items_used,
+    coalesce(o.items_expired, 0) as items_expired,
+    case when o.last_expired_at is null then null
+         else floor(extract(epoch from (now() - o.last_expired_at)) / 86400)::integer
+    end as streak_days
+  from members m
+  left join outcomes o on o.user_id = m.user_id
+  left join auth.users u on u.id = m.user_id;
+$$;
+
+grant execute on function public.household_impact_leaderboard() to authenticated;
