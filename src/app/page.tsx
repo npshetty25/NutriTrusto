@@ -137,9 +137,12 @@ import { ProfileDropdown } from "@/components/profile-dropdown";
 import BarcodeScanner from "@/components/barcode-scanner";
 import NutritionLabelScanner from "@/components/nutrition-label-scanner";
 import ExpiryDateScanner from "@/components/expiry-date-scanner";
+import PantryChatModal from "@/components/pantry-chat-modal";
+import { RestockSuggestions } from "@/components/restock-suggestions";
+import CustomRecipeModal from "@/components/custom-recipe-modal";
 import {
   Camera, BrainCircuit, Loader2, TrendingUp, ScanLine,
-  ExternalLink, Clock, X, Trash2, Home as HomeIcon, Info, Activity, Zap, AlertTriangle, CheckCircle2, Search, CircleAlert, Bell, Carrot, Apple, Milk, Drumstick, Wheat, CupSoda, Croissant, Snowflake, Candy, Package, ChevronLeft, ChevronRight, CalendarClock, Pencil, ShoppingCart
+  ExternalLink, Clock, X, Trash2, Home as HomeIcon, Info, Activity, Zap, AlertTriangle, CheckCircle2, Search, CircleAlert, Bell, Carrot, Apple, Milk, Drumstick, Wheat, CupSoda, Croissant, Snowflake, Candy, Package, ChevronLeft, ChevronRight, CalendarClock, Pencil, ShoppingCart, Sparkles
 } from "lucide-react";
 import ShoppingListModal from "@/components/shopping-list-modal";
 import { toast } from "sonner";
@@ -227,6 +230,7 @@ export default function Home() {
   const [dietConflictPrompt, setDietConflictPrompt] = useState<{ userDiet: DietPreference; itemDiet: ItemDietType; itemName: string } | null>(null);
   const [manualBarcodeEntry, setManualBarcodeEntry] = useState<{ code: string; ingredients: string; categories: string } | null>(null);
   const [manualBarcodeName, setManualBarcodeName] = useState("");
+  const [contributeToOFF, setContributeToOFF] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [riskFilter, setRiskFilter] = useState<"all" | RiskLevel>("all");
   const [inventorySortBy, setInventorySortBy] = useState<"expiring" | "freshest" | "name">("expiring");
@@ -245,6 +249,8 @@ export default function Home() {
   const [editDaysLeft, setEditDaysLeft] = useState("");
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [showShoppingList, setShowShoppingList] = useState(false);
+  const [showPantryChat, setShowPantryChat] = useState(false);
+  const [showCustomRecipe, setShowCustomRecipe] = useState(false);
 
   const [showReceiptMenu, setShowReceiptMenu] = useState(false);
 
@@ -545,8 +551,22 @@ export default function Home() {
     setItems(prev => prev.filter(i => i.id !== id));
     if (!id.startsWith("seed-")) {
       await supabase.from("pantry_items").delete().eq("id", id);
+      if (user) {
+        // Best-effort impact-dashboard log — never blocks the delete, and
+        // silently no-ops if the migration adding this table hasn't run
+        // yet. Outcome is inferred from whether days_left was still
+        // positive at removal time, same heuristic the rest of the UI
+        // already uses for risk/status.
+        supabase.from("item_outcomes").insert([{
+          user_id: user.id,
+          name: itemToUndo.name,
+          category: inferItemCategory(itemToUndo.name),
+          outcome: itemToUndo.daysLeft > 0 ? "used" : "expired",
+          days_left_at_removal: itemToUndo.daysLeft,
+        }]).then(() => {}, () => {});
+      }
     }
-    
+
     toast("Item removed", {
       description: `${itemToUndo.name} was deleted.`,
       action: {
@@ -836,7 +856,7 @@ export default function Home() {
 
     if (error) {
       toast("Couldn't update shopping list", {
-        description: error.message?.includes("does not exist")
+        description: error.code === "PGRST205" || error.message?.includes("does not exist")
           ? "Shopping list isn't set up yet — the required database migration hasn't been run."
           : "Please try again.",
       });
@@ -1192,6 +1212,23 @@ if (nutritionFieldsFilled < 2) {
           itemDiet: detectedItemDiet,
           ingredients: manualBarcodeEntry.ingredients !== PLACEHOLDER_INGREDIENTS_TEXT ? manualBarcodeEntry.ingredients : null,
         });
+
+        if (contributeToOFF) {
+          fetch("/api/contribute-product", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ barcode: manualBarcodeEntry.code, productName: typedName }),
+          })
+            .then((r) => r.json())
+            .then((result) => {
+              if (result.success) {
+                toast("Shared with Open Food Facts", { description: "Thanks for helping improve the database for everyone." });
+              } else {
+                toast("Couldn't share with Open Food Facts", { description: result.error || "Please try again later." });
+              }
+            })
+            .catch(() => toast("Couldn't share with Open Food Facts", { description: "Please try again later." }));
+        }
       }
     } catch {
       setInlineError("Unable to analyze this item right now. Please try again in a moment.");
@@ -1199,6 +1236,7 @@ if (nutritionFieldsFilled < 2) {
       setIsAnalyzingFood(false);
       setManualBarcodeEntry(null);
       setManualBarcodeName("");
+      setContributeToOFF(false);
     }
   };
 
@@ -1392,6 +1430,8 @@ if (nutritionFieldsFilled < 2) {
           </div>
         </div>
 
+        <RestockSuggestions currentItemNames={items.map((i) => i.name)} />
+
         {/* AI Recipe Card */}
         {highRiskItems.length > 0 && (
           <div className="rounded-xl border border-border bg-foreground text-background overflow-hidden">
@@ -1401,9 +1441,14 @@ if (nutritionFieldsFilled < 2) {
                   <h4 className="font-semibold text-sm flex items-center gap-2"><BrainCircuit size={14} /> AI Optimization</h4>
                   <p className="text-xs text-background/70 mt-1">Generate a recipe to utilize critical items.</p>
                 </div>
-                <button onClick={() => generateRecipe()} disabled={isGeneratingRecipe} className="w-full sm:w-auto justify-center flex items-center gap-2 bg-background text-foreground text-xs font-semibold px-4 py-2.5 rounded-lg hover:opacity-90 transition-opacity whitespace-nowrap">
-                  {isGeneratingRecipe ? <Loader2 size={14} className="animate-spin" /> : "Generate"}
-                </button>
+                <div className="w-full sm:w-auto flex flex-col sm:flex-row gap-2">
+                  <button onClick={() => setShowCustomRecipe(true)} className="w-full sm:w-auto justify-center flex items-center gap-2 border border-background/30 text-background text-xs font-semibold px-4 py-2.5 rounded-lg hover:bg-background/10 transition-all whitespace-nowrap">
+                    Custom Recipe (uses all)
+                  </button>
+                  <button onClick={() => generateRecipe()} disabled={isGeneratingRecipe} className="w-full sm:w-auto justify-center flex items-center gap-2 bg-background text-foreground text-xs font-semibold px-4 py-2.5 rounded-lg hover:opacity-90 transition-opacity whitespace-nowrap">
+                    {isGeneratingRecipe ? <Loader2 size={14} className="animate-spin" /> : "Generate"}
+                  </button>
+                </div>
               </div>
             ) : (
               <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
@@ -1795,13 +1840,19 @@ if (nutritionFieldsFilled < 2) {
 
           <div className="w-px h-8 bg-border hidden sm:block" />
 
-          <button 
-            onClick={() => setShowReceiptMenu(!showReceiptMenu)} 
-            disabled={isUploading} 
+          <button
+            onClick={() => setShowReceiptMenu(!showReceiptMenu)}
+            disabled={isUploading}
             className={`flex-1 sm:flex-none min-w-0 flex flex-col items-center justify-center gap-1 hover:bg-foreground/5 h-16 px-2 sm:w-16 rounded-xl transition-all disabled:opacity-50 ${showReceiptMenu ? 'bg-foreground/10 text-foreground' : 'text-foreground/80 hover:text-foreground'}`}
           >
             {isUploading ? <Loader2 size={18} className="animate-spin" /> : <Camera size={18} />}
             <span className="text-[10px] tracking-wide">{isUploading ? "Reading" : "Receipt"}</span>
+          </button>
+
+          <div className="w-px h-8 bg-border hidden sm:block" />
+
+          <button onClick={() => setShowPantryChat(true)} className="flex-1 sm:flex-none min-w-0 flex flex-col items-center justify-center gap-1 hover:bg-foreground/5 text-foreground/80 hover:text-foreground h-16 px-2 sm:w-16 rounded-xl transition-all">
+            <Sparkles size={18} /><span className="text-[10px] tracking-wide">Ask AI</span>
           </button>
         </div>
       </div>
@@ -2064,11 +2115,23 @@ if (nutritionFieldsFilled < 2) {
               placeholder="e.g., Whole Wheat Pasta"
               className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-foreground/20"
             />
+            <label className="mt-3 flex items-start gap-2.5 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={contributeToOFF}
+                onChange={(e) => setContributeToOFF(e.target.checked)}
+                className="mt-0.5 shrink-0"
+              />
+              <span className="text-xs text-foreground/60 leading-relaxed">
+                Also share this barcode + name with Open Food Facts, the open database this app looks products up from, so other users benefit too.
+              </span>
+            </label>
             <div className="mt-4 flex flex-col sm:flex-row gap-2">
               <button
                 onClick={() => {
                   setManualBarcodeEntry(null);
                   setManualBarcodeName("");
+                  setContributeToOFF(false);
                 }}
                 className="flex-1 border border-border rounded-xl py-2.5 text-sm font-semibold hover:bg-foreground/5 transition-colors"
               >
@@ -2231,6 +2294,22 @@ if (nutritionFieldsFilled < 2) {
 
       {showShoppingList && (
         <ShoppingListModal onClose={() => setShowShoppingList(false)} />
+      )}
+
+      {showPantryChat && (
+        <PantryChatModal
+          items={items.map((i) => ({ name: i.name, daysLeft: i.daysLeft, risk: i.risk, ingredientsText: i.ingredientsText }))}
+          dietaryPreference={String(user?.user_metadata?.dietary_preference || "none")}
+          onClose={() => setShowPantryChat(false)}
+        />
+      )}
+
+      {showCustomRecipe && (
+        <CustomRecipeModal
+          itemNames={(highRiskItems.length > 0 ? highRiskItems : displayedItems).map((i) => i.name)}
+          dietaryPreference={String(user?.user_metadata?.dietary_preference || "none")}
+          onClose={() => setShowCustomRecipe(false)}
+        />
       )}
     </div>
   );
