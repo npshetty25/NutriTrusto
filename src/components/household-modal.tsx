@@ -33,7 +33,7 @@ export function HouseholdModal({ onClose }: HouseholdModalProps) {
 
     if (createError) {
       setError(
-        createError.message?.includes("does not exist")
+        createError.code === "PGRST202" || createError.message?.includes("does not exist")
           ? "Household tables aren't set up yet — the required database migration hasn't been run."
           : "Couldn't create a household. Please try again."
       );
@@ -59,7 +59,7 @@ export function HouseholdModal({ onClose }: HouseholdModalProps) {
 
     if (rpcError) {
       setError(
-        rpcError.message?.includes("does not exist")
+        rpcError.code === "PGRST202" || rpcError.message?.includes("does not exist")
           ? "Household tables aren't set up yet — the required database migration hasn't been run."
           : "Invalid invite code. Double-check and try again."
       );

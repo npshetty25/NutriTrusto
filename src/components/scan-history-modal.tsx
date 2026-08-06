@@ -71,7 +71,7 @@ export function ScanHistoryModal({ onClose }: ScanHistoryModalProps) {
 
       if (fetchError) {
         setError(
-          fetchError.message?.includes("does not exist")
+          fetchError.code === "PGRST205" || fetchError.message?.includes("does not exist")
             ? "Scan history isn't set up yet — the required database migration hasn't been run."
             : "Couldn't load scan history."
         );

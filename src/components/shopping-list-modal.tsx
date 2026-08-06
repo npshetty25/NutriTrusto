@@ -40,7 +40,7 @@ export default function ShoppingListModal({ onClose }: ShoppingListModalProps) {
 
     if (fetchError) {
       setError(
-        fetchError.message?.includes("does not exist")
+        fetchError.code === "PGRST205" || fetchError.message?.includes("does not exist")
           ? "Shopping list isn't set up yet — the required database migration hasn't been run."
           : "Couldn't load your shopping list."
       );
