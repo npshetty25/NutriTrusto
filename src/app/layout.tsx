@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Toaster } from "sonner";
 import { AuthProvider } from "@/context/auth-context";
 import { THEME_INIT_SCRIPT } from "@/lib/theme";
@@ -13,6 +13,18 @@ export const metadata: Metadata = {
   },
 };
 
+export const viewport: Viewport = {
+  themeColor: "#111111",
+};
+
+// Registered client-side (not via next-pwa or similar). Only included in
+// production builds — decided here at render time via NODE_ENV, not with
+// a client-side hostname check, since a LAN IP in dev (see
+// allowedDevOrigins in next.config.ts) wouldn't match "localhost" either.
+// A service worker intercepting fetches during `next dev` fights
+// Turbopack's own HMR and caches stale modules.
+const SW_REGISTER_SCRIPT = `if ('serviceWorker' in navigator) { window.addEventListener('load', () => { navigator.serviceWorker.register('/sw.js').catch(() => {}); }); }`;
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -22,6 +34,9 @@ export default function RootLayout({
     <html lang="en" className="min-h-screen antialiased" suppressHydrationWarning>
       <head>
         <script suppressHydrationWarning dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+        {process.env.NODE_ENV === "production" && (
+          <script suppressHydrationWarning dangerouslySetInnerHTML={{ __html: SW_REGISTER_SCRIPT }} />
+        )}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet" />
