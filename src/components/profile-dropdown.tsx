@@ -4,10 +4,11 @@ import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
 import { toast } from "sonner";
-import { LogOut, Settings, Users, ChevronDown, Bell, Loader2, ShoppingCart, History } from "lucide-react";
+import { LogOut, Settings, Users, ChevronDown, Bell, Loader2, ShoppingCart, History, Leaf } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { HouseholdModal } from "@/components/household-modal";
 import { ScanHistoryModal } from "@/components/scan-history-modal";
+import { ImpactDashboardModal } from "@/components/impact-dashboard-modal";
 
 interface ProfileDropdownProps {
   onOpenShoppingList?: () => void;
@@ -20,6 +21,7 @@ export function ProfileDropdown({ onOpenShoppingList }: ProfileDropdownProps) {
   const [signingOut, setSigningOut] = useState(false);
   const [showHousehold, setShowHousehold] = useState(false);
   const [showScanHistory, setShowScanHistory] = useState(false);
+  const [showImpactDashboard, setShowImpactDashboard] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -96,6 +98,9 @@ export function ProfileDropdown({ onOpenShoppingList }: ProfileDropdownProps) {
             <button onClick={() => { setOpen(false); setShowScanHistory(true); }} className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-foreground/80 hover:bg-foreground/5 rounded-xl transition-colors text-left">
               <History size={15} className="text-foreground/50" /> Scan History
             </button>
+            <button onClick={() => { setOpen(false); setShowImpactDashboard(true); }} className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-foreground/80 hover:bg-foreground/5 rounded-xl transition-colors text-left">
+              <Leaf size={15} className="text-foreground/50" /> Impact Dashboard
+            </button>
             <button onClick={() => showComingSoon("Notification Preferences")} className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-foreground/80 hover:bg-foreground/5 rounded-xl transition-colors text-left">
               <Bell size={15} className="text-foreground/50" /> Notification Preferences
             </button>
@@ -120,6 +125,7 @@ export function ProfileDropdown({ onOpenShoppingList }: ProfileDropdownProps) {
 
       {showHousehold && <HouseholdModal onClose={() => setShowHousehold(false)} />}
       {showScanHistory && <ScanHistoryModal onClose={() => setShowScanHistory(false)} />}
+      {showImpactDashboard && <ImpactDashboardModal onClose={() => setShowImpactDashboard(false)} />}
     </div>
   );
 }
