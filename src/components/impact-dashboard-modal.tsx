@@ -102,11 +102,11 @@ export function ImpactDashboardModal({ onClose }: ImpactDashboardModalProps) {
   const totals = used.reduce(
     (acc, row) => {
       const est = getImpactEstimate((row.category as ItemCategory) || "unknown");
-      acc.usd += est.usdPerItem;
+      acc.inr += est.inrPerItem;
       acc.co2 += est.co2KgPerItem;
       return acc;
     },
-    { usd: 0, co2: 0 }
+    { inr: 0, co2: 0 }
   );
 
   // Personal streak, not a household one — item_outcomes is per-user, not
@@ -206,7 +206,7 @@ export function ImpactDashboardModal({ onClose }: ImpactDashboardModalProps) {
                     <Wallet size={13} />
                     <span className="text-[10px] uppercase font-semibold tracking-widest text-foreground/50">Est. Saved</span>
                   </div>
-                  <p className="text-2xl font-bold tracking-tight">${totals.usd.toFixed(0)}</p>
+                  <p className="text-2xl font-bold tracking-tight">₹{totals.inr.toFixed(0)}</p>
                   <p className="text-[11px] text-foreground/45">based on category averages</p>
                 </div>
                 <div className="rounded-2xl border border-border bg-background p-3">
