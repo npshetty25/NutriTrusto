@@ -145,6 +145,8 @@ import {
   ExternalLink, Clock, X, Trash2, Home as HomeIcon, Info, Activity, Zap, AlertTriangle, CheckCircle2, Search, CircleAlert, Bell, Carrot, Apple, Milk, Drumstick, Wheat, CupSoda, Croissant, Snowflake, Candy, Package, ChevronLeft, ChevronRight, CalendarClock, Pencil, ShoppingCart, Sparkles
 } from "lucide-react";
 import ShoppingListModal from "@/components/shopping-list-modal";
+import { CountUp } from "@/components/count-up";
+import { motion, MotionConfig } from "framer-motion";
 import { toast } from "sonner";
 
 interface Item {
@@ -1371,64 +1373,139 @@ if (nutritionFieldsFilled < 2) {
   const schemaProbesPending = !!user && (householdSchemaReady === null || ingredientsSchemaReady === null);
   if (authLoading || (!user && !authLoading) || schemaProbesPending) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 size={24} className="animate-spin text-foreground/30" />
+      <div className="flex flex-col items-center justify-center gap-5 min-h-screen">
+        <motion.div
+          animate={{ scale: [1, 1.06, 1] }}
+          transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
+          className="neu-raised w-20 h-20 rounded-3xl flex items-center justify-center"
+        >
+          <Image src="/logo.svg" alt="" width={36} height={36} className="w-9 h-9 object-contain" />
+        </motion.div>
+        <div className="flex gap-1.5">
+          {[0, 1, 2].map((i) => (
+            <motion.span
+              key={i}
+              animate={{ y: [0, -7, 0], opacity: [0.35, 1, 0.35] }}
+              transition={{ duration: 0.9, repeat: Infinity, delay: i * 0.15, ease: "easeInOut" }}
+              className="w-1.5 h-1.5 rounded-full bg-foreground/50"
+            />
+          ))}
+        </div>
       </div>
     );
   }
 
   return (
+    <MotionConfig reducedMotion="user">
     <div className="flex flex-col min-h-screen pb-32 sm:pb-28 bg-background">
       {/* Header */}
       <header className="px-4 sm:px-6 pt-8 sm:pt-10 pb-6 border-b border-border bg-card/90 backdrop-blur-sm">
-        <div className="flex justify-between items-center mb-8">
+        <motion.div
+          initial={{ opacity: 0, y: -14 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ type: "spring", stiffness: 300, damping: 26 }}
+          className="flex justify-between items-center mb-8"
+        >
           <div className="flex items-center gap-2">
-            <Image
-              src="/logo.svg"
-              alt="Nutri-Trust logo"
-              width={24}
-              height={24}
-              className="w-6 h-6 rounded-md object-contain"
-            />
+            <motion.div whileHover={{ rotate: [0, -12, 12, 0], scale: 1.1 }} transition={{ duration: 0.5 }}>
+              <Image
+                src="/logo.svg"
+                alt="Nutri-Trust logo"
+                width={24}
+                height={24}
+                className="w-6 h-6 rounded-md object-contain"
+              />
+            </motion.div>
             <h1 className="text-xl font-bold tracking-tight">Nutri-Trust</h1>
           </div>
           <div className="flex items-center gap-2">
-            <button
+            <motion.button
               title="Open notifications"
               aria-label="Open notifications"
               onClick={handleNotificationPanelToggle}
-              className="relative w-9 h-9 rounded-full border border-border bg-card hover:bg-foreground/5 transition-colors flex items-center justify-center"
+              whileTap={{ scale: 0.9 }}
+              className="neu-pressable relative w-9 h-9 rounded-full flex items-center justify-center"
             >
-              <Bell size={16} className="text-foreground/80" />
+              <motion.span
+                animate={urgentNotificationCount > 0 ? { rotate: [0, -14, 12, -8, 6, 0] } : { rotate: 0 }}
+                transition={urgentNotificationCount > 0 ? { duration: 0.9, repeat: Infinity, repeatDelay: 3.5 } : undefined}
+                className="flex"
+              >
+                <Bell size={16} className="text-foreground/80" />
+              </motion.span>
               {urgentNotificationCount > 0 && (
-                <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-danger text-white text-[10px] font-bold flex items-center justify-center leading-none">
+                <motion.span
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ type: "spring", stiffness: 500, damping: 18 }}
+                  className="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-danger text-white text-[10px] font-bold flex items-center justify-center leading-none"
+                >
                   {urgentNotificationCount > 9 ? "9+" : urgentNotificationCount}
-                </span>
+                </motion.span>
               )}
-            </button>
+            </motion.button>
             <ProfileDropdown onOpenShoppingList={() => setShowShoppingList(true)} />
           </div>
-        </div>
+        </motion.div>
 
         {/* KPI Widgets */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-4">
-          <div className="flex-1 rounded-xl border border-border bg-background p-4 sleek-shadow">
+        <motion.div
+          initial="hidden"
+          animate="show"
+          variants={{
+            hidden: { opacity: 0 },
+            show: { opacity: 1, transition: { staggerChildren: 0.09, delayChildren: 0.05 } },
+          }}
+          className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-4"
+        >
+          <motion.div
+            variants={{
+              hidden: { opacity: 0, y: 18 },
+              show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 280, damping: 24 } },
+            }}
+            className="neu-pressable flex-1 rounded-2xl p-4"
+          >
             <div className="flex items-center gap-2 mb-2 opacity-70">
               <TrendingUp size={14} className="text-safe" />
               <span className="text-[10px] uppercase font-semibold tracking-widest">Pantry Freshness</span>
             </div>
-            <p className="text-3xl font-semibold tracking-tighter">{freshnessScore}%</p>
-            <p className="text-xs text-foreground/50 mt-1">Average freshness level</p>
-          </div>
-          <div className="flex-1 rounded-xl border border-border bg-background p-4 sleek-shadow">
+            <p className="text-3xl font-semibold tracking-tighter">
+              <CountUp value={freshnessScore} suffix="%" />
+            </p>
+            <div className="mt-2 h-1.5 w-full rounded-full bg-foreground/10 overflow-hidden">
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{ width: `${freshnessScore}%` }}
+                transition={{ duration: 1, ease: [0.16, 1, 0.3, 1], delay: 0.15 }}
+                className={`h-full rounded-full ${
+                  freshnessScore >= 66 ? "bg-safe" : freshnessScore >= 33 ? "bg-warning" : "bg-danger"
+                }`}
+              />
+            </div>
+            <p className="text-xs text-foreground/50 mt-1.5">Average freshness level</p>
+          </motion.div>
+          <motion.div
+            variants={{
+              hidden: { opacity: 0, y: 18 },
+              show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 280, damping: 24 } },
+            }}
+            className="neu-pressable flex-1 rounded-2xl p-4"
+          >
             <div className="flex items-center gap-2 mb-2 opacity-70">
-              <span className="w-2 h-2 rounded-full bg-danger animate-pulse" />
+              <span className="relative flex w-2 h-2">
+                {highRiskItems.length > 0 && (
+                  <span className="absolute inline-flex h-full w-full rounded-full bg-danger opacity-70 animate-ping" />
+                )}
+                <span className={`relative inline-flex w-2 h-2 rounded-full ${highRiskItems.length > 0 ? "bg-danger" : "bg-safe"}`} />
+              </span>
               <span className="text-[10px] uppercase font-semibold tracking-widest">Critical Items</span>
             </div>
-            <p className="text-3xl font-semibold tracking-tighter">{highRiskItems.length}</p>
+            <p className="text-3xl font-semibold tracking-tighter">
+              <CountUp value={highRiskItems.length} />
+            </p>
             <p className="text-xs text-foreground/50 mt-1">Require Action</p>
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
 
         <RestockSuggestions currentItemNames={items.map((i) => i.name)} />
 
@@ -1442,12 +1519,12 @@ if (nutritionFieldsFilled < 2) {
                   <p className="text-xs text-background/70 mt-1">Generate a recipe to utilize critical items.</p>
                 </div>
                 <div className="w-full sm:w-auto flex flex-col sm:flex-row gap-2">
-                  <button onClick={() => setShowCustomRecipe(true)} className="w-full sm:w-auto justify-center flex items-center gap-2 border border-background/30 text-background text-xs font-semibold px-4 py-2.5 rounded-lg hover:bg-background/10 transition-all whitespace-nowrap">
+                  <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }} onClick={() => setShowCustomRecipe(true)} className="w-full sm:w-auto justify-center flex items-center gap-2 border border-background/30 text-background text-xs font-semibold px-4 py-2.5 rounded-lg hover:bg-background/10 transition-all whitespace-nowrap">
                     Custom Recipe (uses all)
-                  </button>
-                  <button onClick={() => generateRecipe()} disabled={isGeneratingRecipe} className="w-full sm:w-auto justify-center flex items-center gap-2 bg-background text-foreground text-xs font-semibold px-4 py-2.5 rounded-lg hover:opacity-90 transition-opacity whitespace-nowrap">
+                  </motion.button>
+                  <motion.button whileHover={{ scale: isGeneratingRecipe ? 1 : 1.04 }} whileTap={{ scale: isGeneratingRecipe ? 1 : 0.96 }} onClick={() => generateRecipe()} disabled={isGeneratingRecipe} className="w-full sm:w-auto justify-center flex items-center gap-2 bg-background text-foreground text-xs font-semibold px-4 py-2.5 rounded-lg hover:opacity-90 transition-opacity whitespace-nowrap">
                     {isGeneratingRecipe ? <Loader2 size={14} className="animate-spin" /> : "Generate"}
-                  </button>
+                  </motion.button>
                 </div>
               </div>
             ) : (
@@ -2312,5 +2389,6 @@ if (nutritionFieldsFilled < 2) {
         />
       )}
     </div>
+    </MotionConfig>
   );
 }
