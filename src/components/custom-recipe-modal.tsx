@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { X, ChefHat, Clock, Loader2, RefreshCw } from "lucide-react";
 
 interface CustomRecipe {
@@ -49,26 +50,49 @@ export default function CustomRecipeModal({ itemNames, dietaryPreference, onClos
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return (
-    <div className="fixed inset-0 z-50 bg-background flex flex-col animate-in fade-in duration-200">
-      <div className="flex items-center justify-between p-4 border-b border-border bg-card/90 backdrop-blur-sm shrink-0">
-        <div className="flex items-center gap-2 min-w-0">
-          <div className="w-8 h-8 rounded-full bg-foreground text-background flex items-center justify-center shrink-0">
-            <ChefHat size={14} />
-          </div>
-          <h3 className="font-bold text-sm tracking-tight truncate">Custom Pantry Recipe</h3>
-        </div>
-        <button
-          onClick={onClose}
-          title="Close recipe"
-          aria-label="Close recipe"
-          className="w-8 h-8 flex items-center justify-center rounded-full bg-foreground/10 hover:bg-foreground/20 transition-colors shrink-0"
-        >
-          <X size={16} />
-        </button>
-      </div>
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
 
-      <div className="flex-1 overflow-y-auto p-4 max-w-md mx-auto w-full">
+  // Portalled and shaped like every other modal in the app (dimmed
+  // backdrop + centred rounded card). It previously rendered as a flat
+  // full-bleed takeover with no backdrop, which read as a broken page
+  // rather than a dialog — and became indistinguishable from the page
+  // once --card and --background were unified for neumorphism.
+  return createPortal(
+    <div
+      onClick={onClose}
+      className="fixed inset-0 z-70 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Custom pantry recipe"
+        className="w-full max-w-md bg-card border border-border rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-200"
+      >
+        <div className="flex items-center justify-between p-4 border-b border-border shrink-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-8 h-8 rounded-full bg-foreground text-background flex items-center justify-center shrink-0">
+              <ChefHat size={14} />
+            </div>
+            <h3 className="font-bold text-sm tracking-tight truncate">Custom Pantry Recipe</h3>
+          </div>
+          <button
+            onClick={onClose}
+            title="Close recipe"
+            aria-label="Close recipe"
+            className="w-8 h-8 flex items-center justify-center rounded-full bg-foreground/10 hover:bg-foreground/20 transition-colors shrink-0"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-4 w-full">
         {loading && (
           <div className="flex flex-col items-center justify-center gap-3 py-16 text-foreground/50">
             <Loader2 size={24} className="animate-spin" />
@@ -135,7 +159,9 @@ export default function CustomRecipeModal({ itemNames, dietaryPreference, onClos
             </button>
           </div>
         )}
+        </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
