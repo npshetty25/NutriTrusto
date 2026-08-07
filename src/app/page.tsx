@@ -717,29 +717,55 @@ export default function Home() {
     const userDietPreference = normalizeDietPreference(String(user?.user_metadata?.dietary_preference || "none"));
     const shouldForceVegetarian = isVegMode || userDietPreference === "veg" || userDietPreference === "eggtarian";
 
-    const fallbackRecipes: { title: string; time: string; image: string; link: string; ingredients: string[] }[] = [
+    // Offline fallbacks — everyday Indian home cooking rather than the
+    // pasta/stir-fry defaults this used to ship. Links and images were
+    // each checked to actually resolve rather than guessed at.
+    type SimpleRecipe = { title: string; time: string; image: string; link: string; ingredients: string[] };
+
+    const INDIAN_VEG_FALLBACKS: SimpleRecipe[] = [
       {
-        title: "Veggie Stir-Fry Bowl",
-        time: "20m prep",
-        image: "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=900&q=80",
-        link: "https://www.bbcgoodfood.com/recipes/collection/stir-fry-recipes",
+        title: "Dal Fry",
+        time: "30m prep",
+        image: "https://www.themealdb.com/images/media/meals/wuxrtu1483564410.jpg",
+        link: "https://www.indianhealthyrecipes.com/dal-fry-recipe/",
         ingredients: []
       },
       {
-        title: "Quick Pantry Pasta",
-        time: "18m prep",
-        image: "https://images.unsplash.com/photo-1621996346565-e3dbc646d9a9?auto=format&fit=crop&w=900&q=80",
-        link: "https://www.simplyrecipes.com/quick-pasta-recipes-4799018",
+        title: "Matar Paneer",
+        time: "35m prep",
+        image: "https://www.themealdb.com/images/media/meals/xxpqsy1511452222.jpg",
+        link: "https://www.indianhealthyrecipes.com/matar-paneer/",
         ingredients: []
       },
       {
-        title: "One-Pot Rice & Beans",
-        time: "25m prep",
-        image: "https://images.unsplash.com/photo-1512058564366-18510be2db19?auto=format&fit=crop&w=900&q=80",
-        link: "https://www.loveandlemons.com/rice-and-beans/",
+        title: "Baingan Bharta",
+        time: "40m prep",
+        image: "https://www.themealdb.com/images/media/meals/urtpqw1487341253.jpg",
+        link: "https://www.vegrecipesofindia.com/baingan-bharta-recipe/",
         ingredients: []
-      }
+      },
+      {
+        title: "Veg Pulao",
+        time: "30m prep",
+        image: "https://www.themealdb.com/images/media/meals/sywrsu1511463066.jpg",
+        link: "https://www.indianhealthyrecipes.com/vegetable-pulao-recipe/",
+        ingredients: []
+      },
     ];
+
+    const INDIAN_NONVEG_FALLBACKS: SimpleRecipe[] = [
+      {
+        title: "Chicken Curry",
+        time: "40m prep",
+        image: "https://www.themealdb.com/images/media/meals/wyxwsp1486979827.jpg",
+        link: "https://www.indianhealthyrecipes.com/chicken-curry/",
+        ingredients: []
+      },
+    ];
+
+    const fallbackRecipes = shouldForceVegetarian
+      ? INDIAN_VEG_FALLBACKS
+      : [...INDIAN_VEG_FALLBACKS, ...INDIAN_NONVEG_FALLBACKS];
 
     const preferredItemName = preferredItem || highRiskItems[0]?.name || displayedItems[0]?.name || "";
     const primaryToken = preferredItemName
@@ -752,68 +778,87 @@ export default function Home() {
     setInlineError(null);
 
     try {
-      const searchByIngredient = async (ingredient: string) => {
-        let vegetarianIds: Set<string> | null = null;
-        if (shouldForceVegetarian) {
-          const vegRes = await fetch("https://www.themealdb.com/api/json/v1/1/filter.php?c=Vegetarian");
-          const vegData = await vegRes.json();
-          const vegMeals = Array.isArray(vegData?.meals) ? vegData.meals : [];
-          vegetarianIds = new Set(vegMeals.map((m: { idMeal?: string }) => m.idMeal).filter(Boolean));
-        }
+      // Search the provider's Indian catalogue only. Searching by
+      // ingredient across all cuisines is what produced Tuna Nicoise and
+      // Spinach Cannelloni for an Indian pantry — checked directly against
+      // the API, where "spinach" returns ten dishes, none of them Indian.
+      // Note the area value is "India", not the "Indian" listed in the
+      // provider's own area list, which returns zero results.
+      const excludesEgg = userDietPreference === "veg" || (isVegMode && userDietPreference !== "eggtarian");
 
-        const filterRes = await fetch(`https://www.themealdb.com/api/json/v1/1/filter.php?i=${encodeURIComponent(ingredient)}`);
-        const filterData = await filterRes.json();
-        let meals = Array.isArray(filterData?.meals) ? filterData.meals : [];
-
-        if (shouldForceVegetarian && vegetarianIds) {
-          meals = meals.filter((m: { idMeal?: string }) => m.idMeal && vegetarianIds?.has(m.idMeal));
-        }
-
-        if (meals.length === 0) return null;
-
-        const candidates = [...meals]
-          .sort(() => Math.random() - 0.5)
-          .slice(0, Math.min(meals.length, 8));
-
-        for (const pickedMeal of candidates) {
-          const detailRes = await fetch(`https://www.themealdb.com/api/json/v1/1/lookup.php?i=${pickedMeal.idMeal}`);
-          const detailData = await detailRes.json();
-          const meal = detailData?.meals?.[0] || pickedMeal;
-
-          const mealDescriptor = `${meal?.strMeal || ""} ${meal?.strCategory || ""} ${meal?.strTags || ""}`;
-          if (shouldForceVegetarian && containsAnimalNonVegKeyword(mealDescriptor)) {
-            continue;
-          }
-
-          return {
-            title: meal.strMeal || "Smart Pantry Recipe",
-            time: "20m prep",
-            image: meal.strMealThumb || fallbackRecipes[0].image,
-            link: meal.strSource || meal.strYoutube || `https://www.themealdb.com/meal/${meal.idMeal}`,
-            ingredients: extractMealIngredients(meal),
-          };
-        }
-
-        return null;
+      const isDietSafe = (meal: { strMeal?: string; strCategory?: string; strTags?: string }, mealIngredients: string[]) => {
+        if (!shouldForceVegetarian) return true;
+        const descriptor = `${meal?.strMeal || ""} ${meal?.strCategory || ""} ${meal?.strTags || ""}`;
+        const haystack = [descriptor, ...mealIngredients];
+        const banned = excludesEgg ? containsNonVegKeyword : containsAnimalNonVegKeyword;
+        return !haystack.some((text) => banned(text));
       };
 
-      let recipe = await searchByIngredient(primaryToken);
+      const searchIndianCatalogue = async (ingredientToken: string) => {
+        const areaRes = await fetch("https://www.themealdb.com/api/json/v1/1/filter.php?a=India");
+        const areaData = await areaRes.json();
+        const areaMeals = Array.isArray(areaData?.meals) ? areaData.meals : [];
+        if (areaMeals.length === 0) return null;
 
-      if (!recipe && preferredItemName) {
-        recipe = await searchByIngredient(preferredItemName);
+        const shuffled = [...areaMeals].sort(() => Math.random() - 0.5);
+        // Kept aside so a diet-safe Indian dish is still offered when the
+        // near-expiry item itself isn't in the catalogue — better than
+        // falling back to a cuisine the user doesn't cook.
+        let firstDietSafe: SimpleRecipe | null = null;
+
+        for (const candidate of shuffled) {
+          const detailRes = await fetch(`https://www.themealdb.com/api/json/v1/1/lookup.php?i=${candidate.idMeal}`);
+          const detailData = await detailRes.json();
+          const meal = detailData?.meals?.[0];
+          if (!meal) continue;
+
+          const mealIngredients = extractMealIngredients(meal);
+          if (!isDietSafe(meal, mealIngredients)) continue;
+
+          const built: SimpleRecipe = {
+            title: meal.strMeal || "Indian Pantry Recipe",
+            time: "30m prep",
+            image: meal.strMealThumb || fallbackRecipes[0].image,
+            link: meal.strSource || meal.strYoutube || `https://www.themealdb.com/meal/${meal.idMeal}`,
+            ingredients: mealIngredients,
+          };
+
+          const token = ingredientToken.toLowerCase();
+          const usesItem = token.length > 2 && (
+            (meal.strMeal || "").toLowerCase().includes(token) ||
+            mealIngredients.some((ing) => ing.toLowerCase().includes(token))
+          );
+
+          if (usesItem) return { recipe: built, matchedItem: true };
+          if (!firstDietSafe) firstDietSafe = built;
+        }
+
+        return firstDietSafe ? { recipe: firstDietSafe, matchedItem: false } : null;
+      };
+
+      let found = await searchIndianCatalogue(primaryToken);
+
+      if (!found && preferredItemName) {
+        found = await searchIndianCatalogue(preferredItemName);
       }
 
-      if (!recipe) {
-        recipe = fallbackRecipes[Math.floor(Math.random() * fallbackRecipes.length)];
-      }
+      const recipe = found?.recipe ?? fallbackRecipes[Math.floor(Math.random() * fallbackRecipes.length)];
 
       setGeneratedRecipe(recipe);
-      setRecipeSourceItem(preferredItemName);
-      toast("Recipe Ready", { description: `Generated a recipe using ${preferredItemName || "pantry"} ingredients.` });
+      // Only claim the dish uses the near-expiry item when it actually
+      // does — otherwise the card would credit an ingredient the recipe
+      // never mentions.
+      setRecipeSourceItem(found?.matchedItem ? preferredItemName : "");
+      toast("Recipe Ready", {
+        description: found?.matchedItem
+          ? `An Indian dish using ${preferredItemName}.`
+          : "An Indian dish from your pantry's cuisine.",
+      });
     } catch {
       const recipe = fallbackRecipes[Math.floor(Math.random() * fallbackRecipes.length)];
       setGeneratedRecipe(recipe);
-      setInlineError("Live recipe provider was unavailable, so we loaded a curated fallback recipe.");
+      setRecipeSourceItem("");
+      setInlineError("Live recipe provider was unavailable, so we loaded a curated Indian recipe.");
     } finally {
       setIsGeneratingRecipe(false);
     }
