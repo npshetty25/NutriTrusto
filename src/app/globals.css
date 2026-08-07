@@ -1,15 +1,19 @@
 @import "tailwindcss";
 
+/* Base surface is a single mid-tone, not white — neumorphism reads as
+   depth only when an element and the surface it sits on share one colour,
+   so --background, --card and --neu-surface are deliberately identical.
+   All hierarchy comes from the paired shadows, not from fills. */
 :root {
-  --background: #fbfbfb;
+  --background: #e9ebf1;
   --foreground: #111111;
-  --card: #ffffff;
+  --card: #e9ebf1;
   --card-foreground: #111111;
-  --border: #e8e8e8;
-  
+  --border: #d7dae3;
+
   --primary: #111111;
   --primary-foreground: #ffffff;
-  
+
   --danger: #e5484d;
   --warning: #f76b15;
   --safe: #30a46c;
@@ -28,13 +32,16 @@
   --color-safe: var(--safe);
 }
 
+/* Dark mode lifts off pure black for the same reason: #09090b leaves no
+   room for a lighter highlight edge, so the neumorphic top-left light
+   source would have nothing to catch. */
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #09090b;
+    --background: #17171c;
     --foreground: #ededed;
-    --card: #151515;
+    --card: #17171c;
     --card-foreground: #ededed;
-    --border: #222222;
+    --border: #26262e;
 
     --primary: #ffffff;
     --primary-foreground: #000000;
@@ -45,31 +52,31 @@
    preference above because a class selector outranks a bare :root
    inside a media query, regardless of source order. */
 :root.dark {
-  --background: #09090b;
+  --background: #17171c;
   --foreground: #ededed;
-  --card: #151515;
+  --card: #17171c;
   --card-foreground: #ededed;
-  --border: #222222;
+  --border: #26262e;
 
   --primary: #ffffff;
   --primary-foreground: #000000;
 }
 
 :root.light {
-  --background: #fbfbfb;
+  --background: #e9ebf1;
   --foreground: #111111;
-  --card: #ffffff;
+  --card: #e9ebf1;
   --card-foreground: #111111;
-  --border: #e8e8e8;
+  --border: #d7dae3;
 
   --primary: #111111;
   --primary-foreground: #ffffff;
 }
 
+/* Flat, ungradiented base — a vignette here would stop the neumorphic
+   surfaces from matching the page exactly at the top of the scroll. */
 body {
-  background:
-    radial-gradient(1200px 500px at 50% -10%, color-mix(in srgb, var(--primary) 7%, transparent), transparent 60%),
-    var(--background);
+  background: var(--background);
   color: var(--foreground);
   font-family: 'Inter', var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -97,4 +104,132 @@ body {
 }
 :root.light .sleek-shadow {
   box-shadow: 0 4px 20px -8px rgba(0,0,0,0.06);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Neumorphism
+   ─────────────────────────────────────────────────────────────
+   Soft-UI surfaces built from a paired light/dark shadow, as if lit
+   from the top-left. The effect only reads correctly when the element
+   shares its parent's background, so every token below is a variable
+   that a scope can override — see .neu-scope-navy, used on the login
+   screen, which sits on its own dark-navy backdrop rather than the
+   app's normal --background. */
+
+:root {
+  --neu-surface: var(--background);
+  --neu-shadow-dark: rgba(160, 172, 196, 0.7);
+  --neu-shadow-light: rgba(255, 255, 255, 0.95);
+  --neu-dist: 6px;
+  --neu-blur: 14px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --neu-shadow-dark: rgba(0, 0, 0, 0.72);
+    --neu-shadow-light: rgba(255, 255, 255, 0.055);
+  }
+}
+
+:root.dark {
+  --neu-shadow-dark: rgba(0, 0, 0, 0.72);
+  --neu-shadow-light: rgba(255, 255, 255, 0.055);
+}
+
+:root.light {
+  --neu-shadow-dark: rgba(160, 172, 196, 0.7);
+  --neu-shadow-light: rgba(255, 255, 255, 0.95);
+}
+
+/* Login screen sits on #050A16, so it needs navy-tinted shadows to keep
+   the "lit from top-left" illusion instead of gray-on-navy mud. */
+.neu-scope-navy {
+  --neu-surface: #101a2e;
+  --neu-shadow-dark: rgba(2, 5, 16, 0.9);
+  --neu-shadow-light: rgba(125, 175, 255, 0.085);
+}
+
+.neu-raised {
+  background: var(--neu-surface);
+  box-shadow:
+    var(--neu-dist) var(--neu-dist) var(--neu-blur) var(--neu-shadow-dark),
+    calc(var(--neu-dist) * -1) calc(var(--neu-dist) * -1) var(--neu-blur) var(--neu-shadow-light);
+}
+
+.neu-raised-sm {
+  background: var(--neu-surface);
+  box-shadow:
+    3px 3px 7px var(--neu-shadow-dark),
+    -3px -3px 7px var(--neu-shadow-light);
+}
+
+.neu-inset {
+  background: var(--neu-surface);
+  box-shadow:
+    inset 4px 4px 9px var(--neu-shadow-dark),
+    inset -4px -4px 9px var(--neu-shadow-light);
+}
+
+/* Raised at rest, lifts on hover, presses *into* the surface on click —
+   the press is what sells soft-UI as a physical control. */
+.neu-pressable {
+  background: var(--neu-surface);
+  box-shadow:
+    var(--neu-dist) var(--neu-dist) var(--neu-blur) var(--neu-shadow-dark),
+    calc(var(--neu-dist) * -1) calc(var(--neu-dist) * -1) var(--neu-blur) var(--neu-shadow-light);
+  transition: box-shadow 240ms cubic-bezier(0.4, 0, 0.2, 1),
+              transform 240ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.neu-pressable:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    8px 8px 18px var(--neu-shadow-dark),
+    -8px -8px 18px var(--neu-shadow-light);
+}
+
+.neu-pressable:active {
+  transform: translateY(0);
+  box-shadow:
+    inset 4px 4px 9px var(--neu-shadow-dark),
+    inset -4px -4px 9px var(--neu-shadow-light);
+}
+
+/* ── Ambient motion ── */
+
+@keyframes neu-float {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-8px); }
+}
+
+@keyframes blob-drift {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33%      { transform: translate(28px, -22px) scale(1.08); }
+  66%      { transform: translate(-22px, 18px) scale(0.95); }
+}
+
+@keyframes sheen {
+  0%   { background-position: -220% 0; }
+  100% { background-position: 220% 0; }
+}
+
+.animate-float { animation: neu-float 5.5s ease-in-out infinite; }
+.animate-blob  { animation: blob-drift 18s ease-in-out infinite; }
+
+/* Moving highlight across text — used for the login wordmark. */
+.text-sheen {
+  background-size: 220% auto;
+  animation: sheen 5s linear infinite;
+}
+
+/* Honour users who've asked their OS for less motion: keep the
+   neumorphic depth (it's static styling, not movement) but stop
+   everything that loops or travels. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-float,
+  .animate-blob,
+  .text-sheen {
+    animation: none;
+  }
+  .neu-pressable:hover { transform: none; }
 }
