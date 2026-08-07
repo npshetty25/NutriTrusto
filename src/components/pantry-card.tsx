@@ -70,10 +70,12 @@ export function PantryCard({ name, daysLeft, risk, purchaseDate, healthRating = 
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 5 }}
-      animate={{ opacity: 1, y: 0 }}
-      whileHover={{ y: -1 }}
-      className="group relative p-4 sm:p-5 rounded-2xl border border-border bg-card sleek-shadow hover:border-foreground/20 transition-all duration-200"
+      initial={{ opacity: 0, y: 16, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: -8, scale: 0.97 }}
+      transition={{ type: "spring", stiffness: 300, damping: 26 }}
+      whileHover={{ y: -4 }}
+      className="neu-pressable group relative p-4 sm:p-5 rounded-2xl"
     >
       <div className="flex items-start justify-between gap-3 mb-4">
         <div className="min-w-0 flex-1">
