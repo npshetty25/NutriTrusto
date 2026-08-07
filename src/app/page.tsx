@@ -1561,14 +1561,26 @@ if (nutritionFieldsFilled < 2) {
               <div className="p-4 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
                 <div>
                   <h4 className="font-semibold text-sm flex items-center gap-2"><BrainCircuit size={14} /> AI Optimization</h4>
-                  <p className="text-xs text-background/70 mt-1">Generate a recipe to utilize critical items.</p>
+                  <p className="text-xs text-background/70 mt-1">Two ways to use up your critical items.</p>
                 </div>
+                {/* Each button says what it actually does — "Custom Recipe
+                    (uses all)" vs "Generate" gave no hint that one writes a
+                    new recipe from your pantry and the other looks up a
+                    published one. */}
                 <div className="w-full sm:w-auto flex flex-col sm:flex-row gap-2">
-                  <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }} onClick={() => setShowCustomRecipe(true)} className="w-full sm:w-auto justify-center flex items-center gap-2 border border-background/30 text-background text-xs font-semibold px-4 py-2.5 rounded-lg hover:bg-background/10 transition-all whitespace-nowrap">
-                    Custom Recipe (uses all)
+                  <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }} onClick={() => setShowCustomRecipe(true)} className="w-full sm:w-auto flex items-center gap-2 bg-background text-foreground text-xs px-4 py-2.5 rounded-lg hover:opacity-90 transition-opacity">
+                    <Sparkles size={14} className="shrink-0" />
+                    <span className="flex flex-col items-start leading-tight text-left">
+                      <span className="font-bold">Cook with my items</span>
+                      <span className="text-[10px] opacity-60">AI writes one, full steps</span>
+                    </span>
                   </motion.button>
-                  <motion.button whileHover={{ scale: isGeneratingRecipe ? 1 : 1.04 }} whileTap={{ scale: isGeneratingRecipe ? 1 : 0.96 }} onClick={() => generateRecipe()} disabled={isGeneratingRecipe} className="w-full sm:w-auto justify-center flex items-center gap-2 bg-background text-foreground text-xs font-semibold px-4 py-2.5 rounded-lg hover:opacity-90 transition-opacity whitespace-nowrap">
-                    {isGeneratingRecipe ? <Loader2 size={14} className="animate-spin" /> : "Generate"}
+                  <motion.button whileHover={{ scale: isGeneratingRecipe ? 1 : 1.04 }} whileTap={{ scale: isGeneratingRecipe ? 1 : 0.96 }} onClick={() => generateRecipe()} disabled={isGeneratingRecipe} className="w-full sm:w-auto flex items-center gap-2 border border-background/30 text-background text-xs px-4 py-2.5 rounded-lg hover:bg-background/10 transition-all disabled:opacity-60">
+                    {isGeneratingRecipe ? <Loader2 size={14} className="animate-spin shrink-0" /> : <ExternalLink size={14} className="shrink-0" />}
+                    <span className="flex flex-col items-start leading-tight text-left">
+                      <span className="font-bold">Find a classic dish</span>
+                      <span className="text-[10px] opacity-60">Published Indian recipe</span>
+                    </span>
                   </motion.button>
                 </div>
               </div>
