@@ -103,6 +103,18 @@ const extractMealIngredients = (meal: Record<string, unknown>): string[] => {
   return ingredients;
 };
 
+// Pulls the video id out of a YouTube watch/short-link URL so the video's
+// own thumbnail can be shown as the recipe preview — a still from the
+// actual cooking video is a much clearer "there's a video here" cue than
+// a generic food photo.
+const getYoutubeThumbnail = (url: string | undefined): string | null => {
+  if (!url) return null;
+  const match = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([A-Za-z0-9_-]{11})/);
+  // hqdefault, not maxresdefault: maxres only exists for HD uploads and
+  // 404s on several of these videos (checked against the real URLs).
+  return match ? `https://img.youtube.com/vi/${match[1]}/hqdefault.jpg` : null;
+};
+
 const buildDisplayProductName = ({
   baseName,
   brand,
@@ -139,10 +151,9 @@ import NutritionLabelScanner from "@/components/nutrition-label-scanner";
 import ExpiryDateScanner from "@/components/expiry-date-scanner";
 import PantryChatModal from "@/components/pantry-chat-modal";
 import { RestockSuggestions } from "@/components/restock-suggestions";
-import CustomRecipeModal from "@/components/custom-recipe-modal";
 import {
   Camera, BrainCircuit, Loader2, TrendingUp, ScanLine,
-  ExternalLink, Clock, X, Trash2, Home as HomeIcon, Info, Activity, Zap, AlertTriangle, CheckCircle2, Search, CircleAlert, Bell, Carrot, Apple, Milk, Drumstick, Wheat, CupSoda, Croissant, Snowflake, Candy, Package, ChevronLeft, ChevronRight, CalendarClock, Pencil, ShoppingCart, Sparkles
+  ExternalLink, Clock, X, Trash2, Home as HomeIcon, Info, Activity, Zap, AlertTriangle, CheckCircle2, Search, CircleAlert, Bell, Carrot, Apple, Milk, Drumstick, Wheat, CupSoda, Croissant, Snowflake, Candy, Package, ChevronLeft, ChevronRight, CalendarClock, Pencil, ShoppingCart, Sparkles, Play
 } from "lucide-react";
 import ShoppingListModal from "@/components/shopping-list-modal";
 import { CountUp } from "@/components/count-up";
@@ -214,7 +225,7 @@ export default function Home() {
   const [dbLoading, setDbLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
   const [isGeneratingRecipe, setIsGeneratingRecipe] = useState(false);
-  const [generatedRecipe, setGeneratedRecipe] = useState<{ title: string; time: string; image: string; link: string; ingredients?: string[] } | null>(null);
+  const [generatedRecipe, setGeneratedRecipe] = useState<{ title: string; time: string; image: string; link: string; ingredients?: string[]; isVideo?: boolean; photoFallback?: string } | null>(null);
   const [isAddingToShoppingList, setIsAddingToShoppingList] = useState(false);
   const [recipeSourceItem, setRecipeSourceItem] = useState<string>("");
   const [recipeItemIndex, setRecipeItemIndex] = useState(0);
@@ -252,7 +263,6 @@ export default function Home() {
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [showShoppingList, setShowShoppingList] = useState(false);
   const [showPantryChat, setShowPantryChat] = useState(false);
-  const [showCustomRecipe, setShowCustomRecipe] = useState(false);
 
   const [showReceiptMenu, setShowReceiptMenu] = useState(false);
 
@@ -720,7 +730,7 @@ export default function Home() {
     // Offline fallbacks — everyday Indian home cooking rather than the
     // pasta/stir-fry defaults this used to ship. Links and images were
     // each checked to actually resolve rather than guessed at.
-    type SimpleRecipe = { title: string; time: string; image: string; link: string; ingredients: string[] };
+    type SimpleRecipe = { title: string; time: string; image: string; link: string; ingredients: string[]; isVideo?: boolean; photoFallback?: string };
 
     const INDIAN_VEG_FALLBACKS: SimpleRecipe[] = [
       {
@@ -815,12 +825,22 @@ export default function Home() {
           const mealIngredients = extractMealIngredients(meal);
           if (!isDietSafe(meal, mealIngredients)) continue;
 
+          // Prefer the cooking video over strSource: several of these
+          // point somewhere unhelpful (Dal fry's source is an Instagram
+          // post), whereas the video is a step-by-step you can follow.
+          const videoThumb = getYoutubeThumbnail(meal.strYoutube);
+          const photo = meal.strMealThumb || fallbackRecipes[0].image;
+
           const built: SimpleRecipe = {
             title: meal.strMeal || "Indian Pantry Recipe",
             time: "30m prep",
-            image: meal.strMealThumb || fallbackRecipes[0].image,
-            link: meal.strSource || meal.strYoutube || `https://www.themealdb.com/meal/${meal.idMeal}`,
+            image: videoThumb || photo,
+            link: meal.strYoutube || meal.strSource || `https://www.themealdb.com/meal/${meal.idMeal}`,
             ingredients: mealIngredients,
+            isVideo: Boolean(meal.strYoutube),
+            // Not every video has a thumbnail on file (some are removed or
+            // never had one), so the dish photo stands by as an onError swap.
+            photoFallback: photo,
           };
 
           const token = ingredientToken.toLowerCase();
@@ -1561,38 +1581,59 @@ if (nutritionFieldsFilled < 2) {
               <div className="p-4 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
                 <div>
                   <h4 className="font-semibold text-sm flex items-center gap-2"><BrainCircuit size={14} /> AI Optimization</h4>
-                  <p className="text-xs text-background/70 mt-1">Two ways to use up your critical items.</p>
+                  <p className="text-xs text-background/70 mt-1">Find a recipe video for your critical items.</p>
                 </div>
-                {/* Each button says what it actually does — "Custom Recipe
-                    (uses all)" vs "Generate" gave no hint that one writes a
-                    new recipe from your pantry and the other looks up a
-                    published one. */}
-                <div className="w-full sm:w-auto flex flex-col sm:flex-row gap-2">
-                  <motion.button whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }} onClick={() => setShowCustomRecipe(true)} className="w-full sm:w-auto flex items-center gap-2 bg-background text-foreground text-xs px-4 py-2.5 rounded-lg hover:opacity-90 transition-opacity">
-                    <Sparkles size={14} className="shrink-0" />
-                    <span className="flex flex-col items-start leading-tight text-left">
-                      <span className="font-bold">Cook with my items</span>
-                      <span className="text-[10px] opacity-60">AI writes one, full steps</span>
-                    </span>
-                  </motion.button>
-                  <motion.button whileHover={{ scale: isGeneratingRecipe ? 1 : 1.04 }} whileTap={{ scale: isGeneratingRecipe ? 1 : 0.96 }} onClick={() => generateRecipe()} disabled={isGeneratingRecipe} className="w-full sm:w-auto flex items-center gap-2 border border-background/30 text-background text-xs px-4 py-2.5 rounded-lg hover:bg-background/10 transition-all disabled:opacity-60">
-                    {isGeneratingRecipe ? <Loader2 size={14} className="animate-spin shrink-0" /> : <ExternalLink size={14} className="shrink-0" />}
-                    <span className="flex flex-col items-start leading-tight text-left">
-                      <span className="font-bold">Find a classic dish</span>
-                      <span className="text-[10px] opacity-60">Published Indian recipe</span>
-                    </span>
-                  </motion.button>
-                </div>
+                <motion.button
+                  whileHover={{ scale: isGeneratingRecipe ? 1 : 1.04 }}
+                  whileTap={{ scale: isGeneratingRecipe ? 1 : 0.96 }}
+                  onClick={() => generateRecipe()}
+                  disabled={isGeneratingRecipe}
+                  className="w-full sm:w-auto justify-center flex items-center gap-2 bg-background text-foreground text-xs font-semibold px-5 py-2.5 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-60 whitespace-nowrap"
+                >
+                  {isGeneratingRecipe ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                  {isGeneratingRecipe ? "Finding..." : "Find a Recipe"}
+                </motion.button>
               </div>
             ) : (
               <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
-                <div className="h-32 w-full bg-cover bg-center relative">
-                  <img src={generatedRecipe.image} alt={generatedRecipe.title} className="absolute inset-0 w-full h-full object-cover" />
+                <a
+                  href={generatedRecipe.link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group block h-40 w-full bg-cover bg-center relative"
+                >
+                  <img
+                    src={generatedRecipe.image}
+                    alt={generatedRecipe.title}
+                    onError={(e) => {
+                      // Swap to the dish photo if the video still is missing.
+                      const img = e.currentTarget;
+                      if (generatedRecipe.photoFallback && img.src !== generatedRecipe.photoFallback) {
+                        img.src = generatedRecipe.photoFallback;
+                      }
+                    }}
+                    className="absolute inset-0 w-full h-full object-cover"
+                  />
                   <div className="absolute inset-0 bg-linear-to-t from-foreground/90 to-transparent" />
+
+                  {generatedRecipe.isVideo && (
+                    <>
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="w-14 h-14 rounded-full bg-black/55 backdrop-blur-sm border border-white/25 flex items-center justify-center text-white transition-transform duration-200 group-hover:scale-110">
+                          <Play size={22} className="translate-x-0.5" fill="currentColor" />
+                        </div>
+                      </div>
+                      <div className="absolute top-3 left-3 bg-red-600 px-2 py-1 rounded-md flex items-center gap-1.5 text-white shadow-lg">
+                        <Play size={10} fill="currentColor" />
+                        <span className="text-[10px] font-bold uppercase tracking-wide">Video Recipe</span>
+                      </div>
+                    </>
+                  )}
+
                   <div className="absolute top-3 right-3 bg-black/30 backdrop-blur-sm px-2 py-1 rounded-lg border border-white/10 flex items-center gap-1.5 text-white">
                     <Clock size={12} /><span className="text-[10px] font-semibold">{generatedRecipe.time}</span>
                   </div>
-                </div>
+                </a>
                 <div className="p-4 pt-2 flex justify-between items-end gap-2">
                   <div>
                     <p className="text-[10px] text-background/60 uppercase font-semibold tracking-widest mb-1">AI Recommendation</p>
@@ -1611,7 +1652,7 @@ if (nutritionFieldsFilled < 2) {
                       Try another
                     </button>
                     <a href={generatedRecipe.link} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 bg-background text-foreground text-xs font-semibold px-3 py-2 rounded-lg hover:scale-105 active:scale-95 transition-all justify-center">
-                      Cook this <ExternalLink size={12} />
+                      {generatedRecipe.isVideo ? <>Watch <Play size={11} fill="currentColor" /></> : <>Cook this <ExternalLink size={12} /></>}
                     </a>
                   </div>
                 </div>
@@ -2435,14 +2476,6 @@ if (nutritionFieldsFilled < 2) {
           items={items.map((i) => ({ name: i.name, daysLeft: i.daysLeft, risk: i.risk, ingredientsText: i.ingredientsText }))}
           dietaryPreference={String(user?.user_metadata?.dietary_preference || "none")}
           onClose={() => setShowPantryChat(false)}
-        />
-      )}
-
-      {showCustomRecipe && (
-        <CustomRecipeModal
-          itemNames={(highRiskItems.length > 0 ? highRiskItems : displayedItems).map((i) => i.name)}
-          dietaryPreference={String(user?.user_metadata?.dietary_preference || "none")}
-          onClose={() => setShowCustomRecipe(false)}
         />
       )}
     </div>
