@@ -21,7 +21,7 @@ interface AuthContextType {
   householdLoading: boolean;
   refreshHousehold: () => Promise<void>;
   // True once we've confirmed pantry_items.household_id actually exists
-  // (i.e. supabase-schema-additions.sql has been run). Null while unknown.
+  // (i.e. db/supabase-schema-additions.sql has been run). Null while unknown.
   // Callers must gate on this before including household_id in an insert —
   // Postgrest rejects the whole insert if the column doesn't exist yet.
   householdSchemaReady: boolean | null;

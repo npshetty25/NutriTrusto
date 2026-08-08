@@ -30,8 +30,11 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files — never commit secrets
+# env files — never commit secrets. The .example template is the one
+# exception: it holds placeholders only, and without it a fresh clone has
+# no record of which keys the app needs.
 .env*
+!.env*.example
 
 # vercel
 .vercel
@@ -40,31 +43,21 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# ── Sensitive / personal files ──────────────────────────────
+# ── Non-app material ────────────────────────────────────────
+# Slide decks, reports, wireframes, deck-generation scripts and QA
+# exports now live outside this repo in ../project-files/. These guards
+# stay so such files don't creep back into the app folder.
 ip.txt
-
-# ── Presentation & wireframe artifacts (not part of the app) ──
 *.pptx
 *.pdf
-_ppt_extract/
-_ppt_extract_v2/
+_ppt_extract*/
 _final_extract/
 wireframe/
-ppt_text_dump.txt
-ppt_v2_text_dump.txt
-final_ppt_text_dump.txt
-NutriTrusto_*.pptx
-NutriTrust_*.pptx
-
-# ── QA / screenshot exports ──────────────────────────────────
+*_text_dump.txt
 qa_jpg/
 qa_test.*
 pptxgen_smoke.*
+generate-presentation.*
 
-# ── Generated scripts (not source code) ──────────────────────
-generate-presentation.js
-generate-presentation-v2.js
-generate-presentation.ts
-
-# ── Duplicate / stale lib folder (use src/lib instead) ───────
+# ── Superseded root lib/ (the real one is src/lib/) ──────────
 /lib/
