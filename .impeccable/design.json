@@ -1,0 +1,181 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-09T00:00:00Z",
+  "title": "Design System: Nutri-Trust",
+  "extensions": {
+    "colorMeta": {
+      "instrument-body": {
+        "role": "neutral",
+        "displayName": "Instrument Body",
+        "canonical": "#e9ebf1",
+        "tonalRamp": ["#1b1d22", "#2c2f36", "#43474f", "#5d6169", "#7d818a", "#a2a6b0", "#c6c9d2", "#e9ebf1"]
+      },
+      "instrument-body-dark": {
+        "role": "neutral",
+        "displayName": "Instrument Body (Dark)",
+        "canonical": "#17171c",
+        "tonalRamp": ["#0b0b0e", "#17171c", "#26262e", "#3a3a45", "#55555f", "#7b7b86", "#a8a8b1", "#d6d6db"]
+      },
+      "ink": {
+        "role": "primary",
+        "displayName": "Ink",
+        "canonical": "#111111",
+        "tonalRamp": ["#000000", "#111111", "#2b2b2b", "#454545", "#666666", "#8f8f8f", "#bcbcbc", "#ededed"]
+      },
+      "hairline": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "canonical": "#d7dae3",
+        "tonalRamp": ["#1a1c21", "#2b2e35", "#43464f", "#5f636d", "#848896", "#a9adb9", "#c4c8d2", "#d7dae3"]
+      },
+      "reading-safe": {
+        "role": "tertiary",
+        "displayName": "Reading Safe",
+        "canonical": "#30a46c",
+        "tonalRamp": ["#082518", "#0c3b26", "#125537", "#187048", "#1f8b5a", "#30a46c", "#5cbf8d", "#9adcb9"]
+      },
+      "reading-warning": {
+        "role": "tertiary",
+        "displayName": "Reading Warning",
+        "canonical": "#f76b15",
+        "tonalRamp": ["#361504", "#4f1f06", "#6d2b08", "#8d380a", "#b0470d", "#d45810", "#f76b15", "#fba468"]
+      },
+      "reading-danger": {
+        "role": "tertiary",
+        "displayName": "Reading Danger",
+        "canonical": "#e5484d",
+        "tonalRamp": ["#340d0f", "#4c1315", "#691c1f", "#87252a", "#a72f35", "#c73a40", "#e5484d", "#f28f92"]
+      },
+      "entry-navy": {
+        "role": "neutral",
+        "displayName": "Entry Navy",
+        "canonical": "#050A16",
+        "tonalRamp": ["#02040a", "#050a16", "#0a1224", "#101a2e", "#1a2a48", "#2a4270", "#4a6ba8", "#8fa8d6"]
+      }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Measured values only — freshness %, critical count, days remaining, streak days." },
+      "headline": { "displayName": "Headline", "purpose": "Screen and dialog titles." },
+      "title": { "displayName": "Title", "purpose": "Item names and card headings." },
+      "body": { "displayName": "Body", "purpose": "Descriptions, recipe steps, chat, explanatory copy." },
+      "label": { "displayName": "Label", "purpose": "Uppercase engraved panel markings and status chips. Always >=600 weight with >=0.1em tracking." }
+    },
+    "shadows": [
+      { "name": "neu-raised", "value": "6px 6px 14px var(--neu-shadow-dark), -6px -6px 14px var(--neu-shadow-light)", "purpose": "Default resting state for cards, tiles and panels." },
+      { "name": "neu-raised-sm", "value": "3px 3px 7px var(--neu-shadow-dark), -3px -3px 7px var(--neu-shadow-light)", "purpose": "Compact controls where full distance looks inflated." },
+      { "name": "neu-inset", "value": "inset 4px 4px 9px var(--neu-shadow-dark), inset -4px -4px 9px var(--neu-shadow-light)", "purpose": "Inputs, and any selected option. A groove in the panel." },
+      { "name": "neu-lifted", "value": "8px 8px 18px var(--neu-shadow-dark), -8px -8px 18px var(--neu-shadow-light)", "purpose": "Hover only, paired with translateY(-2px)." },
+      { "name": "sleek-shadow-legacy", "value": "0 4px 20px -8px rgba(0,0,0,0.06)", "purpose": "DEPRECATED pre-neumorphism helper. Prefer neu-raised." }
+    ],
+    "motion": [
+      { "name": "ease-standard", "value": "cubic-bezier(0.4, 0, 0.2, 1)", "purpose": "Neumorphic shadow and transform transitions, 240ms." },
+      { "name": "ease-out-expo", "value": "cubic-bezier(0.16, 1, 0.3, 1)", "purpose": "Count-up tweens and bar fills; decelerates hard so the final value settles." },
+      { "name": "spring-card", "value": "type: spring, stiffness: 300, damping: 26", "purpose": "Card and list-item entry." },
+      { "name": "spring-pill", "value": "type: spring, stiffness: 380, damping: 32", "purpose": "Shared-element layoutId pill sliding between tabs." },
+      { "name": "spring-badge", "value": "type: spring, stiffness: 500, damping: 18", "purpose": "Badge and icon pop-in." },
+      { "name": "duration-press", "value": "240ms", "purpose": "Raised to lifted to pressed." },
+      { "name": "reduced-motion", "value": "@media (prefers-reduced-motion: reduce)", "purpose": "Disables float, blob-drift, sheen and hover translate. Static neumorphic depth is retained — it is styling, not movement." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "container-max", "value": "448px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Pressable Tile",
+      "kind": "button",
+      "refersTo": "button-pressable",
+      "description": "The default soft-UI control. Same colour as its ground; defined entirely by its shadow pair. Raises, lifts on hover, presses inward on click.",
+      "html": "<button class=\"ds-tile\"><span class=\"ds-tile-label\">PANTRY FRESHNESS</span><span class=\"ds-tile-value\">30%</span></button>",
+      "css": ".ds-tile { display: block; text-align: left; width: 200px; background: var(--neu-surface, #e9ebf1); color: var(--foreground, #111111); border: none; border-radius: 16px; padding: 16px; font-family: Inter, sans-serif; box-shadow: 6px 6px 14px var(--neu-shadow-dark, rgba(160,172,196,0.7)), -6px -6px 14px var(--neu-shadow-light, rgba(255,255,255,0.95)); transition: box-shadow 240ms cubic-bezier(0.4,0,0.2,1), transform 240ms cubic-bezier(0.4,0,0.2,1); cursor: pointer; } .ds-tile:hover { transform: translateY(-2px); box-shadow: 8px 8px 18px var(--neu-shadow-dark, rgba(160,172,196,0.7)), -8px -8px 18px var(--neu-shadow-light, rgba(255,255,255,0.95)); } .ds-tile:active { transform: translateY(0); box-shadow: inset 4px 4px 9px var(--neu-shadow-dark, rgba(160,172,196,0.7)), inset -4px -4px 9px var(--neu-shadow-light, rgba(255,255,255,0.95)); } .ds-tile:focus-visible { outline: 2px solid #111111; outline-offset: 3px; } .ds-tile-label { display: block; font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.55; margin-bottom: 8px; } .ds-tile-value { display: block; font-size: 30px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; }"
+    },
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Ink fill on the instrument body. One per region, for the single most likely action.",
+      "html": "<button class=\"ds-btn-primary\"><svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z\"/></svg>Find a Recipe</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; gap: 8px; background: #111111; color: #e9ebf1; border: none; border-radius: 8px; padding: 10px 20px; font-family: Inter, sans-serif; font-size: 12px; font-weight: 600; cursor: pointer; transition: opacity 200ms cubic-bezier(0.4,0,0.2,1), transform 200ms cubic-bezier(0.4,0,0.2,1); } .ds-btn-primary:hover { opacity: 0.9; transform: scale(1.04); } .ds-btn-primary:active { transform: scale(0.96); } .ds-btn-primary:focus-visible { outline: 2px solid #111111; outline-offset: 3px; }"
+    },
+    {
+      "name": "Inset Input",
+      "kind": "input",
+      "refersTo": "input-inset",
+      "description": "A groove in the panel, never a raised block. The inset shadow does not change on focus; only a ring is added.",
+      "html": "<input class=\"ds-input\" type=\"text\" placeholder=\"Search inventory...\" />",
+      "css": ".ds-input { width: 260px; background: var(--neu-surface, #e9ebf1); color: var(--foreground, #111111); border: 1px solid rgba(0,0,0,0.04); border-radius: 12px; padding: 14px 16px; font-family: Inter, sans-serif; font-size: 14px; box-shadow: inset 4px 4px 9px var(--neu-shadow-dark, rgba(160,172,196,0.7)), inset -4px -4px 9px var(--neu-shadow-light, rgba(255,255,255,0.95)); transition: border-color 300ms, box-shadow 300ms; } .ds-input::placeholder { color: rgba(17,17,17,0.35); } .ds-input:focus { outline: none; border-color: rgba(17,17,17,0.35); box-shadow: inset 4px 4px 9px var(--neu-shadow-dark, rgba(160,172,196,0.7)), inset -4px -4px 9px var(--neu-shadow-light, rgba(255,255,255,0.95)), 0 0 0 2px rgba(17,17,17,0.12); }"
+    },
+    {
+      "name": "Reading Chip",
+      "kind": "chip",
+      "refersTo": "chip-reading",
+      "description": "A read-only measurement. 10% wash, 20% border, solid text, all in one readout colour.",
+      "html": "<span class=\"ds-chip ds-chip-danger\">CRITICAL</span> <span class=\"ds-chip ds-chip-safe\">Matches Diet</span> <span class=\"ds-chip ds-chip-unknown\">Allergens Unknown</span>",
+      "css": ".ds-chip { display: inline-flex; align-items: center; gap: 6px; border-radius: 8px; padding: 6px 10px; font-family: Inter, sans-serif; font-size: 10px; font-weight: 700; letter-spacing: 0.06em; } .ds-chip-danger { background: rgba(229,72,77,0.1); border: 1px solid rgba(229,72,77,0.2); color: #e5484d; text-transform: uppercase; letter-spacing: 0.1em; } .ds-chip-safe { background: rgba(48,164,108,0.1); border: 1px solid rgba(48,164,108,0.2); color: #30a46c; } .ds-chip-unknown { background: rgba(17,17,17,0.08); border: 1px solid transparent; color: rgba(17,17,17,0.5); }"
+    },
+    {
+      "name": "Item Card",
+      "kind": "card",
+      "refersTo": "card-item",
+      "description": "The signature component. Raised card, nested inset readout panel, oversized day count, measurement chips. Demonstrates every rule of the system at once.",
+      "html": "<div class=\"ds-card\"><div class=\"ds-card-head\"><span class=\"ds-grade\">B</span><span class=\"ds-card-title\">Amul Milk 1L</span><span class=\"ds-chip ds-chip-danger\">CRITICAL</span></div><div class=\"ds-readout\"><span class=\"ds-readout-label\">DAYS REMAINING</span><div class=\"ds-readout-row\"><span class=\"ds-readout-value\">1</span><span class=\"ds-readout-unit\">day(s)</span><span class=\"ds-bar\"><span class=\"ds-bar-fill\"></span></span></div></div></div>",
+      "css": ".ds-card { width: 320px; background: var(--neu-surface, #e9ebf1); color: var(--foreground, #111111); border-radius: 16px; padding: 16px; font-family: Inter, sans-serif; box-shadow: 6px 6px 14px var(--neu-shadow-dark, rgba(160,172,196,0.7)), -6px -6px 14px var(--neu-shadow-light, rgba(255,255,255,0.95)); transition: box-shadow 240ms cubic-bezier(0.4,0,0.2,1), transform 240ms cubic-bezier(0.4,0,0.2,1); } .ds-card:hover { transform: translateY(-4px); box-shadow: 8px 8px 18px var(--neu-shadow-dark, rgba(160,172,196,0.7)), -8px -8px 18px var(--neu-shadow-light, rgba(255,255,255,0.95)); } .ds-card-head { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; } .ds-grade { width: 24px; height: 24px; border-radius: 6px; background: #30a46c; color: #fff; font-size: 10px; font-weight: 900; display: flex; align-items: center; justify-content: center; } .ds-card-title { font-size: 15px; font-weight: 700; letter-spacing: -0.01em; flex: 1; } .ds-readout { border: 1px solid rgba(0,0,0,0.06); border-radius: 12px; padding: 12px; } .ds-readout-label { display: block; font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.45; margin-bottom: 8px; } .ds-readout-row { display: flex; align-items: flex-end; gap: 8px; } .ds-readout-value { font-size: 30px; font-weight: 800; letter-spacing: -0.02em; line-height: 1; color: #e5484d; } .ds-readout-unit { font-size: 12px; font-weight: 600; opacity: 0.6; } .ds-bar { flex: 1; height: 10px; border-radius: 999px; background: rgba(17,17,17,0.1); overflow: hidden; align-self: center; } .ds-bar-fill { display: block; width: 8%; height: 100%; border-radius: 999px; background: #e5484d; }"
+    },
+    {
+      "name": "Bottom Navigation",
+      "kind": "nav",
+      "refersTo": null,
+      "description": "Pinned four-destination bar. Active destination is Ink; the rest sit at reduced opacity.",
+      "html": "<nav class=\"ds-nav\"><a class=\"ds-nav-item\" href=\"#\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\"><path d=\"M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2\"/></svg><span>Barcode</span></a><a class=\"ds-nav-item ds-nav-active\" href=\"#\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M3 9.5 12 3l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z\"/></svg><span>Home</span></a><a class=\"ds-nav-item\" href=\"#\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3z\"/><circle cx=\"12\" cy=\"13\" r=\"3\"/></svg><span>Receipt</span></a><a class=\"ds-nav-item\" href=\"#\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"m12 3-1.9 5.8L4 10.7l5.8 1.9L11.7 19l1.9-5.8L20 11.3l-5.8-1.9z\"/></svg><span>Ask AI</span></a></nav>",
+      "css": ".ds-nav { display: flex; gap: 4px; background: var(--neu-surface, #e9ebf1); border-radius: 24px; padding: 12px 8px; font-family: Inter, sans-serif; box-shadow: 6px 6px 14px var(--neu-shadow-dark, rgba(160,172,196,0.7)), -6px -6px 14px var(--neu-shadow-light, rgba(255,255,255,0.95)); } .ds-nav-item { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 14px; color: var(--foreground, #111111); opacity: 0.45; text-decoration: none; font-size: 10px; font-weight: 600; letter-spacing: 0.04em; border-radius: 12px; transition: opacity 200ms; } .ds-nav-item:hover { opacity: 0.75; } .ds-nav-active { opacity: 1; }"
+    },
+    {
+      "name": "Dialog Surface",
+      "kind": "custom",
+      "refersTo": "dialog-surface",
+      "description": "Centred 24px card over a dimmed blurred backdrop. Never a full-bleed takeover — that reads as the page breaking.",
+      "html": "<div class=\"ds-dialog\"><div class=\"ds-dialog-head\"><span class=\"ds-dialog-title\">Impact Dashboard</span><button class=\"ds-dialog-close\" aria-label=\"Close\"><svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\"><path d=\"M18 6 6 18M6 6l12 12\"/></svg></button></div><div class=\"ds-dialog-body\">Estimates use average per-category prices, not real receipts.</div></div>",
+      "css": ".ds-dialog { width: 300px; background: var(--card, #e9ebf1); color: var(--foreground, #111111); border: 1px solid var(--border, #d7dae3); border-radius: 24px; font-family: Inter, sans-serif; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.35); } .ds-dialog-head { display: flex; align-items: center; justify-content: space-between; padding: 16px; border-bottom: 1px solid var(--border, #d7dae3); } .ds-dialog-title { font-size: 14px; font-weight: 700; letter-spacing: -0.01em; } .ds-dialog-close { width: 32px; height: 32px; border: none; border-radius: 999px; background: rgba(17,17,17,0.1); color: inherit; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background 200ms; } .ds-dialog-close:hover { background: rgba(17,17,17,0.2); } .ds-dialog-body { padding: 16px; font-size: 12px; line-height: 1.6; opacity: 0.6; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Honest Instrument",
+    "overview": "Nutri-Trust looks like a calibrated measuring device, not a lifestyle app. The body of the instrument is a single continuous neutral surface — every panel, tile, card and control is carved from the same sheet, and depth comes only from the way light falls across it. Nothing is tinted to attract attention. Nothing floats on a different-coloured plate.\n\nColour enters only where the instrument reports a reading. Green, amber and red are not brand colours; they are measurements of how close food is to being wasted. Because the rest of the interface is deliberately colourless, a single red badge is impossible to miss on a shelf of twenty items. This is the visual expression of the product's first principle: the name is trust, so the interface must never overstate what it knows. A surface that shouts everywhere can't be believed when it shouts about something real.\n\nThe material is soft-UI — surfaces raise, lift under a cursor, and physically press inward when clicked — but the tactility is disciplined rather than decorative. Motion follows the same rule: it exists to confirm a physical action or to make a number legible as it changes, and it stops entirely when the operating system asks it to.",
+    "keyCharacteristics": [
+      "One continuous material; hierarchy from shadow, never from fill colour",
+      "A greyscale instrument body with a strict three-colour readout",
+      "Tactile controls that raise, lift, and press",
+      "Mobile-first single column, capped at a hand's width",
+      "Depth that survives both light and dark without changing its logic"
+    ],
+    "rules": [
+      { "name": "The Readout Rule", "body": "Colour is a measurement, not decoration. Green, amber and red state how close something is to being wasted or how risky it is to eat — nothing else, ever. If a colour on screen isn't reporting a reading, it is a bug.", "section": "colors" },
+      { "name": "The One Material Rule", "body": "--background, --card and --neu-surface are the same value and must stay that way. The moment a surface is tinted a different shade from the page, the soft-UI illusion collapses into 'a grey box on a lighter grey page.' Depth is shadow's job.", "section": "colors" },
+      { "name": "The Earned Alarm Rule", "body": "Because the body is colourless, red carries real weight. Never spend it on anything the user cannot act on.", "section": "colors" },
+      { "name": "The Engraved Label Rule", "body": "Small uppercase labels are always >=600 weight with >=0.1em tracking. Uppercase at small sizes without tracking is unreadable on a phone, and this system uses uppercase constantly.", "section": "typography" },
+      { "name": "The Big Number Rule", "body": "A measured value gets Display weight and negative tracking; its unit and caption stay Body or Label. The number is the reading; the words around it are the engraving.", "section": "typography" },
+      { "name": "The Single Light Rule", "body": "Light comes from the top-left, always. Every raised surface is dark-shadowed bottom-right and light-shadowed top-left. A shadow pair in any other direction breaks the whole panel's illusion, not just its own element.", "section": "elevation" },
+      { "name": "The Press Rule", "body": "Interactive surfaces must complete the physical loop: raised at rest, lifted on hover, inset on press. A soft-UI control that doesn't depress on click reads as a picture of a button rather than a button.", "section": "elevation" },
+      { "name": "The Matching Ground Rule", "body": "Before applying any neu- class, confirm the element's parent background equals --neu-surface. On a different ground, override the scope's tokens (as .neu-scope-navy does) rather than accepting grey-on-colour mud.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do keep --background, --card and --neu-surface identical. Changing one without the others is the single fastest way to break this system.",
+      "Do complete the physical loop on every interactive surface: raised, lifted on hover, inset on press.",
+      "Do put uppercase labels at 600 weight with 0.1em tracking, never less.",
+      "Do show 'unknown' rather than a reassuring default when data is missing — the 'Allergens Unknown' chip is the reference implementation.",
+      "Do re-tint --neu-shadow-dark / --neu-shadow-light when placing neumorphic surfaces on a non-standard ground, as .neu-scope-navy does.",
+      "Do cap layouts at max-w-md and design for one hand.",
+      "Do disable looping motion under prefers-reduced-motion while keeping the static depth, which is styling rather than movement."
+    ],
+    "donts": [
+      "Don't introduce a decorative accent colour. If it isn't reporting a reading, it doesn't get colour.",
+      "Don't put a border on the outer edge of a raised surface — the shadow pair is that edge.",
+      "Don't use a generic single drop shadow (0 4px 12px rgba(0,0,0,.1)) on a surface that sits on the instrument body. It reads as a foreign object. The legacy .sleek-shadow helper predates this system; prefer neu-raised.",
+      "Don't light anything from a direction other than top-left.",
+      "Don't build a full-bleed opaque panel as a dialog. Dialogs are centred 24px-radius cards over a dimmed, blurred backdrop; a full-screen takeover reads as the page breaking.",
+      "Don't animate width, height, top or left. Transform and opacity only.",
+      "Don't add a tablet or desktop layout without an explicit decision — the fixed phone frame is intentional."
+    ]
+  }
+}
