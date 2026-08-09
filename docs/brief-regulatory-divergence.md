@@ -178,13 +178,19 @@ vocabulary.
 
 ## Recommended build order
 
-1. Source and cite the dataset (**the critical path** — the UI is fast, the
-   verification is not)
-2. Resolve the semantic-colour decision against `DESIGN.md`
-3. Detection in `src/lib/` mirroring the allergens module
-4. Scan-result section
-5. Additive Reference screen
-6. Pantry-card chip + its migration
+1. ✅ **Seeded** — `src/lib/additive-divergence.ts` carries 9 verified entries
+   (E171; potassium bromate; BVO; and the six Southampton colours), each with
+   a dated citation, plus `LAST_REVIEWED`. Grow it only as entries are
+   actually checked against their instrument.
+2. ⬜ Resolve the semantic-colour decision against `DESIGN.md` — **blocking**
+3. ✅ Detection — `detectDivergentAdditives()`, mirroring the allergens
+   module, returning `null` for "no ingredient data" and `[]` for "none
+   found" so the two can never be collapsed
+4. ⬜ Scan-result section
+5. ⬜ Additive Reference screen
+6. ⬜ Pantry-card chip + its migration
 
-Steps 1–2 must complete before any UI is written; building the surface first
-would invite filling the dataset to fit it.
+Step 2 must be resolved before any UI is written. Note that steps 1 and 3
+deliberately produce no visual output — the data and the matching are useful
+and testable on their own, and building the surface first would invite
+padding the dataset to fill it.
