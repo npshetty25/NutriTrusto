@@ -98,6 +98,7 @@ Rules, in order of importance:
 5. Assume the usual Indian kitchen staples are on hand (oil/ghee, salt, onion, tomato, ginger, garlic, green chilli, basic spices, atta, rice, dal). You may use them freely and they do not need to be in the list above.
 6. Respect the dietary preference absolutely. "Veg" means no meat, no fish, no egg. "Eggtarian" allows egg but no meat or fish. Never break this.
 7. Use Indian measures and names naturally (katori, tsp, tbsp, grams, ml; jeera, haldi, dhania), with the English term in brackets on first use where it isn't obvious.
+8. Name it like a person would, not like a label. Pick the closest real Indian dish and use that name, adding at most ONE distinguishing word. "Palak Paneer Bhurji" is a name; "Dahi-Doodh Paneer-Palak Bread Bhurji" is an ingredient list with hyphens. Never chain more than two ingredients into the title, never use "&", and keep it under five words.
 
 Split the ingredients into three groups so the cook knows what they already
 have and what they must go out and buy:
@@ -110,7 +111,8 @@ have and what they must go out and buy:
 
 Return ONLY this JSON object, no markdown fence, no commentary:
 {
-  "title": "Dish name",
+  "title": "Dish name — at most five words, at most two ingredients named",
+  "baseDish": "the closest well-known Indian dish this is a version of, 2-3 words, exactly as someone would type it into YouTube (e.g. Palak Paneer, Paneer Bhurji, Vegetable Khichdi)",
   "prepTime": "e.g. 25m",
   "fromPantry": [{"item": "exact name from the lists above", "quantity": "200 g, cubed"}],
   "toBuy": ["1 bunch fresh coriander", "..."],
@@ -163,6 +165,8 @@ Your previous attempt included ${lastViolations.join(", ")}, which breaks the "$
     }
 
     const title = String(recipe.title || "Pantry Special").trim();
+    // Fall back to the title only if the model skipped the field entirely.
+    const baseDish = String(recipe.baseDish || "").trim() || title;
 
     const fromPantry = (Array.isArray(recipe.fromPantry) ? recipe.fromPantry : [])
       .map((row: unknown) => {
@@ -182,10 +186,13 @@ Your previous attempt included ${lastViolations.join(", ")}, which breaks the "$
       staples: (Array.isArray(recipe.staples) ? recipe.staples : []).map(String).filter(Boolean),
       steps: (Array.isArray(recipe.steps) ? recipe.steps : []).map(String).filter(Boolean),
       rescueNote: String(recipe.rescueNote || "").trim(),
-      // A search rather than a specific video: TheMealDB's curated links go
-      // dead (one of its Indian recipes is already a 404 after a copyright
-      // takedown), and a search for the dish can never 404.
-      videoSearchUrl: `https://www.youtube.com/results?search_query=${encodeURIComponent(title + " recipe")}`,
+      baseDish,
+      // Searched on the well-known dish rather than the generated title: the
+      // title describes this specific combination and often has no videos at
+      // all, whereas the base dish reliably does. A search also can't 404 the
+      // way a curated link can — one of the provider's Indian videos is
+      // already dead after a copyright takedown.
+      videoSearchUrl: `https://www.youtube.com/results?search_query=${encodeURIComponent(baseDish + " recipe")}`,
     };
 
     log.info("Recipe generated", {

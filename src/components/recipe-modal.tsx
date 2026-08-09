@@ -9,6 +9,7 @@ export interface GeneratedRecipe {
   prepTime: string;
   fromPantry: { item: string; quantity: string }[];
   usesItems: string[];
+  baseDish: string;
   toBuy: string[];
   staples: string[];
   steps: string[];
@@ -194,7 +195,8 @@ export function RecipeModal({
             )}
 
             <p className="text-[11px] leading-relaxed text-foreground/40">
-              Written for the items you have, so it won&apos;t match any single published recipe.
+              Written for the items you have, so it won&apos;t match any single published recipe. The video
+              button searches for {recipe.baseDish || "the dish"}, the closest standard dish.
             </p>
           </div>
         </div>
@@ -206,7 +208,7 @@ export function RecipeModal({
             rel="noopener noreferrer"
             className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-foreground text-background text-xs font-semibold hover:opacity-90 transition-opacity"
           >
-            <Play size={12} fill="currentColor" /> Watch on YouTube
+            <Play size={12} fill="currentColor" /> {recipe.baseDish ? `Watch ${recipe.baseDish}` : "Watch on YouTube"}
           </a>
           <button
             onClick={onTryAnother}
