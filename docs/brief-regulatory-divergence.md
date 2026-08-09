@@ -1,6 +1,6 @@
 # Design Brief — Additive Regulatory Divergence
 
-Status: **shaped, not built.** No code written. Confirm before implementation.
+Status: **built and verified.** All six steps complete.
 
 Supersedes the "globally banned ingredient alerts" concept described in
 `PRODUCT.md → Committed, not yet built` and in the judge Q&A (Q13/Q14).
@@ -182,15 +182,20 @@ vocabulary.
    (E171; potassium bromate; BVO; and the six Southampton colours), each with
    a dated citation, plus `LAST_REVIEWED`. Grow it only as entries are
    actually checked against their instrument.
-2. ⬜ Resolve the semantic-colour decision against `DESIGN.md` — **blocking**
+2. ✅ **Resolved: divergence carries no readout colour at all.** Recorded as
+   *The Annotation Rule* in `DESIGN.md`. A citation is not a reading, and an
+   amber chip would say *danger* about a fact meaning *two regulators
+   disagree*. It renders in neutral ink with an outline icon, earning
+   prominence from position and type instead.
 3. ✅ Detection — `detectDivergentAdditives()`, mirroring the allergens
    module, returning `null` for "no ingredient data" and `[]` for "none
    found" so the two can never be collapsed
-4. ⬜ Scan-result section
-5. ⬜ Additive Reference screen
-6. ⬜ Pantry-card chip + its migration
+4. ✅ Scan-result section
+5. ✅ Additive Reference screen
+6. ✅ Pantry-card chip — **no migration needed after all**: `ingredients_text`
+   is already persisted, so divergence is derived client-side exactly as
+   allergens are
 
-Step 2 must be resolved before any UI is written. Note that steps 1 and 3
-deliberately produce no visual output — the data and the matching are useful
-and testable on their own, and building the surface first would invite
-padding the dataset to fill it.
+Verified per-card in light and dark at phone and desktop widths: a 3-match
+item, a 1-match item, an item with ingredients but no match, and an item with
+no ingredient data at all each render correctly, with no page errors.

@@ -144,6 +144,7 @@ import { useAuth } from "@/context/auth-context";
 import { supabase } from "@/lib/supabase";
 import { inferItemCategory, type ItemCategory } from "@/lib/item-category";
 import { detectAllergens } from "@/lib/allergens";
+import { detectDivergentAdditives, ADDITIVE_ENTRIES, LAST_REVIEWED } from "@/lib/additive-divergence";
 import { PantryCard, RiskLevel } from "@/components/pantry-card";
 import { ProfileDropdown } from "@/components/profile-dropdown";
 import BarcodeScanner from "@/components/barcode-scanner";
@@ -153,7 +154,7 @@ import PantryChatModal from "@/components/pantry-chat-modal";
 import { RestockSuggestions } from "@/components/restock-suggestions";
 import {
   Camera, BrainCircuit, Loader2, TrendingUp, ScanLine,
-  ExternalLink, Clock, X, Trash2, Home as HomeIcon, Info, Activity, Zap, AlertTriangle, CheckCircle2, Search, CircleAlert, Bell, Carrot, Apple, Milk, Drumstick, Wheat, CupSoda, Croissant, Snowflake, Candy, Package, ChevronLeft, ChevronRight, CalendarClock, Pencil, ShoppingCart, Sparkles, Play
+  ExternalLink, Clock, X, Trash2, Home as HomeIcon, Info, Activity, Zap, AlertTriangle, CheckCircle2, Search, CircleAlert, Bell, Carrot, Apple, Milk, Drumstick, Wheat, CupSoda, Croissant, Snowflake, Candy, Package, ChevronLeft, ChevronRight, CalendarClock, Pencil, ShoppingCart, Sparkles, Play, Scale
 } from "lucide-react";
 import ShoppingListModal from "@/components/shopping-list-modal";
 import { CountUp } from "@/components/count-up";
@@ -1901,6 +1902,7 @@ if (nutritionFieldsFilled < 2) {
                 ? getHealthierAlternativeHint(inferItemCategory(item.name))
                 : undefined;
               const detectedAllergens = item.ingredientsText ? detectAllergens(item.ingredientsText) : null;
+              const divergentAdditives = detectDivergentAdditives(item.ingredientsText);
 
               return (
                 <div key={item.id} className="relative group">
@@ -1910,6 +1912,7 @@ if (nutritionFieldsFilled < 2) {
                     dietMatch={isVegMode ? true : isVegItem(item.name)}
                     healthierAlternative={healthierAlternative}
                     detectedAllergens={detectedAllergens}
+                    divergentAdditives={divergentAdditives}
                   />
                   <button
                     onClick={() => openEditItem(item)}
@@ -2156,6 +2159,65 @@ if (nutritionFieldsFilled < 2) {
                   </div>
                 </div>
               )}
+
+              {/* Regulatory notes — uncoloured by design (The Annotation
+                  Rule in DESIGN.md). Sits below the concerns because a
+                  citation is context for the score, not a finding that
+                  outranks it. */}
+              {(() => {
+                const divergent = detectDivergentAdditives(scannedResult.ingredients);
+                if (divergent === null) {
+                  return (
+                    <div className="space-y-3">
+                      <h4 className="font-bold flex items-center gap-2 text-foreground">
+                        <Scale size={16} className="text-foreground/50" /> Regulatory Notes
+                      </h4>
+                      <p className="text-xs leading-relaxed text-foreground/55 bg-foreground/5 rounded-2xl border border-border/50 p-3.5">
+                        No ingredient list was available for this product, so its additives
+                        could not be checked.
+                      </p>
+                    </div>
+                  );
+                }
+                return (
+                  <div className="space-y-3">
+                    <h4 className="font-bold flex items-center gap-2 text-foreground">
+                      <Scale size={16} className="text-foreground/50" /> Regulatory Notes
+                    </h4>
+                    {divergent.length === 0 ? (
+                      <p className="text-xs leading-relaxed text-foreground/55 bg-foreground/5 rounded-2xl border border-border/50 p-3.5">
+                        None of the {ADDITIVE_ENTRIES.length} substances we track were found in
+                        this ingredient list.
+                      </p>
+                    ) : (
+                      <div className="bg-foreground/5 rounded-2xl border border-border/50 divide-y divide-border/50 overflow-hidden">
+                        {divergent.map((entry) => (
+                          <div key={entry.id} className="p-3.5 space-y-1.5">
+                            <p className="text-sm font-bold text-foreground">
+                              {entry.name}
+                              {entry.eNumber && (
+                                <span className="ml-1.5 font-mono text-[11px] font-semibold text-foreground/45">
+                                  {entry.eNumber}
+                                </span>
+                              )}
+                            </p>
+                            <p className="text-[11px] leading-relaxed text-foreground/70">
+                              {entry.summary}
+                            </p>
+                            <p className="text-[10px] leading-relaxed text-foreground/40">
+                              {entry.source}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <p className="text-[10px] leading-relaxed text-foreground/40 px-1">
+                      Records of what regulators decided, not a judgement about safety.
+                      Hand-maintained list, last checked {LAST_REVIEWED}.
+                    </p>
+                  </div>
+                );
+              })()}
 
               {/* What You'll Like */}
               {scannedResult.analysis.positives?.length > 0 && (

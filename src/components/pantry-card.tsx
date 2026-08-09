@@ -1,9 +1,10 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { ShieldCheck, ShieldAlert, ArrowRight, Leaf, Info, Carrot, Apple, Milk, Drumstick, Wheat, CupSoda, Croissant, Snowflake, Candy, Package } from "lucide-react";
+import { ShieldCheck, ShieldAlert, ArrowRight, Leaf, Info, Scale, Carrot, Apple, Milk, Drumstick, Wheat, CupSoda, Croissant, Snowflake, Candy, Package } from "lucide-react";
 import { inferItemCategory } from "@/lib/item-category";
 import { ALLERGEN_LABELS, type AllergenTag } from "@/lib/allergens";
+import { type AdditiveEntry } from "@/lib/additive-divergence";
 
 export type RiskLevel = "high" | "medium" | "low";
 export type HealthRating = "A" | "B" | "C" | "D" | "E";
@@ -21,6 +22,9 @@ interface PantryCardProps {
   // [] = ingredient data exists and no common allergen keyword matched.
   // non-empty = ingredient data exists and these allergens were detected.
   detectedAllergens?: AllergenTag[] | null;
+  // Same null/[] contract as detectedAllergens: null means no ingredient
+  // data was available, [] means none of the tracked substances matched.
+  divergentAdditives?: AdditiveEntry[] | null;
   healthierAlternative?: string;
 }
 
@@ -34,7 +38,7 @@ const ratingColor = {
   A: "bg-green-500", B: "bg-green-400", C: "bg-yellow-400", D: "bg-orange-500", E: "bg-red-500"
 };
 
-export function PantryCard({ name, daysLeft, risk, purchaseDate, healthRating = "B", dietMatch = true, detectedAllergens, healthierAlternative }: PantryCardProps) {
+export function PantryCard({ name, daysLeft, risk, purchaseDate, healthRating = "B", dietMatch = true, detectedAllergens, divergentAdditives, healthierAlternative }: PantryCardProps) {
   const config = riskConfig[risk];
   const category = inferItemCategory(name);
 
@@ -153,6 +157,22 @@ export function PantryCard({ name, daysLeft, risk, purchaseDate, healthRating = 
           <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400">
             <ShieldCheck size={12} />
             No Common Allergens
+          </div>
+        )}
+
+        {/* Regulatory annotation, deliberately uncoloured — see The
+            Annotation Rule in DESIGN.md. A citation is not a reading, and
+            an amber chip here would read as danger when it only means two
+            authorities disagree. */}
+        {divergentAdditives && divergentAdditives.length > 0 && (
+          <div
+            title={divergentAdditives.map((a) => a.summary).join("\n\n")}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-bold bg-foreground/8 text-foreground/70"
+          >
+            <Scale size={12} />
+            {divergentAdditives.length === 1
+              ? `${divergentAdditives[0].eNumber ?? divergentAdditives[0].name} differs by region`
+              : `${divergentAdditives.length} additives differ by region`}
           </div>
         )}
       </div>
