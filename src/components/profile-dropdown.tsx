@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
 import { toast } from "sonner";
@@ -24,15 +25,49 @@ export function ProfileDropdown({ onOpenShoppingList }: ProfileDropdownProps) {
   const [showScanHistory, setShowScanHistory] = useState(false);
   const [showImpactDashboard, setShowImpactDashboard] = useState(false);
   const [showAdditiveReference, setShowAdditiveReference] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  const positionMenu = useCallback(() => {
+    const rect = triggerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    setMenuPos({ top: rect.bottom + 8, right: window.innerWidth - rect.right });
+  }, []);
 
   useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    if (!open) return;
+
+    // The menu is portalled out of this component, so a plain
+    // "is the click inside our ref" test would treat every menu click as an
+    // outside click and close it instantly. Check both the trigger and the
+    // portalled menu.
+    function handlePointerDown(e: MouseEvent) {
+      const target = e.target as Node;
+      if (triggerRef.current?.contains(target)) return;
+      if (menuRef.current?.contains(target)) return;
+      setOpen(false);
     }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, []);
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    // Fixed positioning is resolved once at open time, so anything that moves
+    // the trigger would leave the menu stranded.
+    function handleReflow() {
+      setOpen(false);
+    }
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("scroll", handleReflow, true);
+    window.addEventListener("resize", handleReflow);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("scroll", handleReflow, true);
+      window.removeEventListener("resize", handleReflow);
+    };
+  }, [open]);
 
   if (!user) {
     return (
@@ -54,8 +89,17 @@ export function ProfileDropdown({ onOpenShoppingList }: ProfileDropdownProps) {
   const handleSignOut = async () => {
     setSigningOut(true);
     setOpen(false);
-    await signOut();
-    router.push("/login");
+    try {
+      await signOut();
+    } catch {
+      // Supabase revokes the session over the network, so this rejects when
+      // offline or when the refresh token is already invalid. Either way the
+      // user asked to leave — fall through to the redirect rather than
+      // stranding them on a signed-in screen with a stuck button.
+    } finally {
+      setSigningOut(false);
+      router.push("/login");
+    }
   };
 
   const showComingSoon = (feature: string) => {
@@ -63,10 +107,81 @@ export function ProfileDropdown({ onOpenShoppingList }: ProfileDropdownProps) {
     toast("Coming Soon", { description: `${feature} will be available in the next update.` });
   };
 
+  const toggleOpen = () => {
+    if (!open) positionMenu();
+    setOpen((v) => !v);
+  };
+
+  const itemClass =
+    "w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-foreground/80 hover:bg-foreground/5 rounded-xl transition-colors text-left";
+
+  const menu = open && menuPos ? createPortal(
+    <div
+      ref={menuRef}
+      role="menu"
+      aria-label="Profile menu"
+      style={{ top: menuPos.top, right: menuPos.right }}
+      // Portalled to <body> for the same reason as every modal in this app:
+      // the page header sets backdrop-blur, which creates a stacking context,
+      // so a z-50 menu nested inside it still paints *behind* the main
+      // content below the header. That put Sign Out underneath the inventory
+      // search field, where it silently swallowed the click.
+      className="fixed w-64 max-h-[80vh] overflow-y-auto bg-card border border-border rounded-2xl shadow-xl z-70 animate-in fade-in slide-in-from-top-2 duration-200"
+    >
+      <div className="px-4 py-3 border-b border-border">
+        <p className="font-semibold text-sm text-foreground">{fullName}</p>
+        <p className="text-xs text-foreground/50 mt-0.5 truncate">{email}</p>
+      </div>
+
+      <ThemeToggle />
+
+      <div className="p-1.5 border-t border-border">
+        <button onClick={() => { setOpen(false); setShowHousehold(true); }} className={itemClass}>
+          <Users size={15} className="text-foreground/50" /> Household Settings
+        </button>
+        {onOpenShoppingList && (
+          <button onClick={() => { setOpen(false); onOpenShoppingList(); }} className={itemClass}>
+            <ShoppingCart size={15} className="text-foreground/50" /> Shopping List
+          </button>
+        )}
+        <button onClick={() => { setOpen(false); setShowScanHistory(true); }} className={itemClass}>
+          <History size={15} className="text-foreground/50" /> Scan History
+        </button>
+        <button onClick={() => { setOpen(false); setShowImpactDashboard(true); }} className={itemClass}>
+          <Leaf size={15} className="text-foreground/50" /> Impact Dashboard
+        </button>
+        <button onClick={() => { setOpen(false); setShowAdditiveReference(true); }} className={itemClass}>
+          <Scale size={15} className="text-foreground/50" /> Additive Reference
+        </button>
+        <button onClick={() => showComingSoon("Notification Preferences")} className={itemClass}>
+          <Bell size={15} className="text-foreground/50" /> Notification Preferences
+        </button>
+        <button onClick={() => showComingSoon("Account Settings")} className={itemClass}>
+          <Settings size={15} className="text-foreground/50" /> Account Settings
+        </button>
+      </div>
+
+      <div className="p-1.5 border-t border-border">
+        <button
+          onClick={handleSignOut}
+          disabled={signingOut}
+          className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-danger hover:bg-danger/5 rounded-xl transition-colors text-left disabled:opacity-60"
+        >
+          {signingOut ? <Loader2 size={15} className="animate-spin" /> : <LogOut size={15} />}
+          {signingOut ? "Signing Out..." : "Sign Out"}
+        </button>
+      </div>
+    </div>,
+    document.body
+  ) : null;
+
   return (
-    <div className="relative" ref={ref}>
+    <div className="relative">
       <button
-        onClick={() => setOpen(!open)}
+        ref={triggerRef}
+        onClick={toggleOpen}
+        aria-haspopup="menu"
+        aria-expanded={open}
         className="flex items-center gap-2 bg-foreground/5 border border-border hover:border-foreground/20 rounded-full pl-1 pr-3 py-1 transition-all"
       >
         <div className="w-7 h-7 rounded-full bg-foreground text-background flex items-center justify-center text-xs font-bold shrink-0">
@@ -76,57 +191,7 @@ export function ProfileDropdown({ onOpenShoppingList }: ProfileDropdownProps) {
         <ChevronDown size={14} className={`text-foreground/50 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
       </button>
 
-      {open && (
-        <div className="absolute right-0 top-full mt-2 w-64 bg-card border border-border rounded-2xl shadow-xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
-          {/* User Info */}
-          <div className="px-4 py-3 border-b border-border">
-            <p className="font-semibold text-sm text-foreground">{fullName}</p>
-            <p className="text-xs text-foreground/50 mt-0.5 truncate">{email}</p>
-          </div>
-
-          {/* Appearance */}
-          <ThemeToggle />
-
-          {/* Menu Items */}
-          <div className="p-1.5 border-t border-border">
-            <button onClick={() => { setOpen(false); setShowHousehold(true); }} className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-foreground/80 hover:bg-foreground/5 rounded-xl transition-colors text-left">
-              <Users size={15} className="text-foreground/50" /> Household Settings
-            </button>
-            {onOpenShoppingList && (
-              <button onClick={() => { setOpen(false); onOpenShoppingList(); }} className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-foreground/80 hover:bg-foreground/5 rounded-xl transition-colors text-left">
-                <ShoppingCart size={15} className="text-foreground/50" /> Shopping List
-              </button>
-            )}
-            <button onClick={() => { setOpen(false); setShowScanHistory(true); }} className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-foreground/80 hover:bg-foreground/5 rounded-xl transition-colors text-left">
-              <History size={15} className="text-foreground/50" /> Scan History
-            </button>
-            <button onClick={() => { setOpen(false); setShowImpactDashboard(true); }} className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-foreground/80 hover:bg-foreground/5 rounded-xl transition-colors text-left">
-              <Leaf size={15} className="text-foreground/50" /> Impact Dashboard
-            </button>
-            <button onClick={() => { setOpen(false); setShowAdditiveReference(true); }} className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-foreground/80 hover:bg-foreground/5 rounded-xl transition-colors text-left">
-              <Scale size={15} className="text-foreground/50" /> Additive Reference
-            </button>
-            <button onClick={() => showComingSoon("Notification Preferences")} className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-foreground/80 hover:bg-foreground/5 rounded-xl transition-colors text-left">
-              <Bell size={15} className="text-foreground/50" /> Notification Preferences
-            </button>
-            <button onClick={() => showComingSoon("Account Settings")} className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-foreground/80 hover:bg-foreground/5 rounded-xl transition-colors text-left">
-              <Settings size={15} className="text-foreground/50" /> Account Settings
-            </button>
-          </div>
-
-          {/* Sign Out */}
-          <div className="p-1.5 border-t border-border">
-            <button
-              onClick={handleSignOut}
-              disabled={signingOut}
-              className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-danger hover:bg-danger/5 rounded-xl transition-colors text-left disabled:opacity-60"
-            >
-              {signingOut ? <Loader2 size={15} className="animate-spin" /> : <LogOut size={15} />}
-              {signingOut ? "Signing Out..." : "Sign Out"}
-            </button>
-          </div>
-        </div>
-      )}
+      {menu}
 
       {showHousehold && <HouseholdModal onClose={() => setShowHousehold(false)} />}
       {showScanHistory && <ScanHistoryModal onClose={() => setShowScanHistory(false)} />}
