@@ -751,11 +751,10 @@ export default function Home() {
 
       setGeneratedRecipe(data.recipe);
       setShowRecipe(true);
-      const rescued = data.recipe.usesItems?.length || 0;
+      const rescued = data.recipe.fromPantry?.length || 0;
+      const toBuy = data.recipe.toBuy?.length || 0;
       toast("Recipe ready", {
-        description: rescued > 0
-          ? `Uses ${data.recipe.usesItems.slice(0, 3).join(", ")}${rescued > 3 ? ` +${rescued - 3} more` : ""}.`
-          : "Built from what's in your pantry.",
+        description: `Saves ${rescued} item${rescued === 1 ? "" : "s"}${toBuy > 0 ? ` · ${toBuy} to buy` : " · nothing to buy"}.`,
       });
     } catch {
       setInlineError("Couldn't reach the recipe service. Check your connection and try again.");
@@ -771,15 +770,15 @@ export default function Home() {
 
 
   const addMissingIngredientsToShoppingList = async () => {
-    if (!user || !generatedRecipe?.ingredients || isAddingToShoppingList) return;
+    if (!user || !generatedRecipe || isAddingToShoppingList) return;
 
-    const pantryNames = items.map((i) => i.name.toLowerCase());
-    const missing = generatedRecipe.ingredients.filter(
-      (ingredient) => !pantryNames.some((name) => name.includes(ingredient.toLowerCase()) || ingredient.toLowerCase().includes(name))
-    );
+    // toBuy comes from the recipe itself, which knows what it drew from the
+    // pantry. The old version guessed by substring-matching every ingredient
+    // against item names, which both missed things and added things you had.
+    const missing = generatedRecipe.toBuy;
 
     if (missing.length === 0) {
-      toast("Nothing to add", { description: "Looks like you already have every ingredient for this recipe." });
+      toast("Nothing to add", { description: "This recipe only uses things you already have." });
       return;
     }
 
@@ -1476,18 +1475,27 @@ if (nutritionFieldsFilled < 2) {
                     </div>
                   </div>
 
-                  {generatedRecipe.usesItems.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5">
-                      {generatedRecipe.usesItems.map((name) => (
-                        <span key={name} className="text-[10px] font-semibold px-2 py-1 rounded-md bg-background/15 text-background">
-                          {name}
-                        </span>
-                      ))}
+                  <div className="flex items-stretch gap-3">
+                    <div className="flex-1">
+                      <p className="text-[10px] font-semibold uppercase tracking-widest text-background/50">Saves</p>
+                      <p className="text-xl font-bold tracking-tight tabular-nums leading-tight">
+                        {generatedRecipe.fromPantry.length}<span className="text-[11px] font-medium text-background/60 ml-1">of your items</span>
+                      </p>
                     </div>
-                  )}
+                    <div className="w-px bg-background/15" />
+                    <div className="flex-1">
+                      <p className="text-[10px] font-semibold uppercase tracking-widest text-background/50">To buy</p>
+                      <p className="text-xl font-bold tracking-tight tabular-nums leading-tight">
+                        {generatedRecipe.toBuy.length}<span className="text-[11px] font-medium text-background/60 ml-1">{generatedRecipe.toBuy.length === 1 ? "ingredient" : "ingredients"}</span>
+                      </p>
+                    </div>
+                  </div>
 
-                  {generatedRecipe.rescueNote && (
-                    <p className="text-[11px] leading-relaxed text-background/70">{generatedRecipe.rescueNote}</p>
+                  {generatedRecipe.usesItems.length > 0 && (
+                    <p className="text-[11px] leading-relaxed text-background/70">
+                      Uses {generatedRecipe.usesItems.slice(0, 4).join(", ")}
+                      {generatedRecipe.usesItems.length > 4 ? ` +${generatedRecipe.usesItems.length - 4} more` : ""}.
+                    </p>
                   )}
 
                   <div className="flex gap-2">

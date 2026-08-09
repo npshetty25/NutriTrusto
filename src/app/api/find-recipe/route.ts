@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { createRequestContext } from "@/lib/server-logger";
+import { findDietViolations, normalizeDiet } from "@/lib/diet-check";
 
 const apiKey = process.env.GEMINI_API_KEY;
 const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null;
@@ -98,42 +99,89 @@ Rules, in order of importance:
 6. Respect the dietary preference absolutely. "Veg" means no meat, no fish, no egg. "Eggtarian" allows egg but no meat or fish. Never break this.
 7. Use Indian measures and names naturally (katori, tsp, tbsp, grams, ml; jeera, haldi, dhania), with the English term in brackets on first use where it isn't obvious.
 
+Split the ingredients into three groups so the cook knows what they already
+have and what they must go out and buy:
+- "fromPantry": ingredients that come from the numbered lists above. Give the
+  pantry item's exact name plus the quantity to use.
+- "toBuy": ingredients that are NOT in the lists above and are NOT everyday
+  staples — things they genuinely have to buy.
+- "staples": everyday Indian kitchen basics you assumed (oil/ghee, salt,
+  onion, tomato, ginger, garlic, green chilli, ground spices, atta, rice).
+
 Return ONLY this JSON object, no markdown fence, no commentary:
 {
   "title": "Dish name",
   "prepTime": "e.g. 25m",
-  "usesItems": ["exact names, copied from the lists above, that this dish actually uses"],
-  "ingredients": ["ingredient with quantity", "..."],
+  "fromPantry": [{"item": "exact name from the lists above", "quantity": "200 g, cubed"}],
+  "toBuy": ["1 bunch fresh coriander", "..."],
+  "staples": ["2 tbsp oil", "1 tsp jeera", "..."],
   "steps": ["step 1", "step 2", "..."],
   "rescueNote": "one short sentence naming which about-to-spoil items this saves"
 }`;
 
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-    const result = await generateWithRetry(model, prompt);
-    const text = result.response.text().trim();
-
-    const jsonStr = text
-      .replace(/^```json\s*/im, "")
-      .replace(/^```\s*/im, "")
-      .replace(/```$/m, "")
-      .trim();
-
-    const parsed = JSON.parse(jsonStr);
-
-    const title = String(parsed?.title || "Pantry Special").trim();
+    const diet = normalizeDiet(dietaryPreference);
     const knownNames = new Set(pantry.map((i) => i.name.toLowerCase()));
 
-    const recipe = {
+    let recipe: Record<string, unknown> | null = null;
+    let lastViolations: string[] = [];
+
+    // A prompt is a request, not a guarantee. Check the result and try again
+    // once before giving up — never serve the violation.
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const attemptPrompt = attempt === 0
+        ? prompt
+        : `${prompt}
+
+Your previous attempt included ${lastViolations.join(", ")}, which breaks the "${dietaryPreference}" requirement. Write a completely different dish containing no meat, no fish${diet === "veg" ? ", and no egg" : ""} whatsoever.`;
+
+      const result = await generateWithRetry(model, attemptPrompt);
+      const text = result.response.text().trim();
+      const jsonStr = text
+        .replace(/^```json\s*/im, "")
+        .replace(/^```\s*/im, "")
+        .replace(/```$/m, "")
+        .trim();
+
+      const parsed = JSON.parse(jsonStr);
+      const violations = findDietViolations(JSON.stringify(parsed), diet);
+
+      if (violations.length === 0) {
+        recipe = parsed;
+        break;
+      }
+      lastViolations = violations;
+      log.warn("Generated recipe violated dietary preference", { diet, violations, attempt });
+    }
+
+    if (!recipe) {
+      log.error("Could not produce a diet-safe recipe", { diet, lastViolations });
+      return NextResponse.json(
+        { success: false, error: `Couldn't put together a ${dietaryPreference} recipe from these items. Please try again.` },
+        { status: 502 }
+      );
+    }
+
+    const title = String(recipe.title || "Pantry Special").trim();
+
+    const fromPantry = (Array.isArray(recipe.fromPantry) ? recipe.fromPantry : [])
+      .map((row: unknown) => {
+        const r = row as { item?: unknown; quantity?: unknown };
+        return { item: String(r?.item ?? "").trim(), quantity: String(r?.quantity ?? "").trim() };
+      })
+      // Only keep rows that name something genuinely in the pantry, so the
+      // card can never credit an ingredient the user doesn't own.
+      .filter((r: { item: string }) => r.item && knownNames.has(r.item.toLowerCase()));
+
+    const payload = {
       title,
-      prepTime: String(parsed?.prepTime || "25m"),
-      // Only echo back items that are genuinely in the pantry, so the card
-      // can never credit an ingredient the user doesn't own.
-      usesItems: (Array.isArray(parsed?.usesItems) ? parsed.usesItems.map(String) : []).filter((n: string) =>
-        knownNames.has(n.trim().toLowerCase())
-      ),
-      ingredients: Array.isArray(parsed?.ingredients) ? parsed.ingredients.map(String) : [],
-      steps: Array.isArray(parsed?.steps) ? parsed.steps.map(String) : [],
-      rescueNote: String(parsed?.rescueNote || "").trim(),
+      prepTime: String(recipe.prepTime || "25m"),
+      fromPantry,
+      usesItems: fromPantry.map((r: { item: string }) => r.item),
+      toBuy: (Array.isArray(recipe.toBuy) ? recipe.toBuy : []).map(String).filter(Boolean),
+      staples: (Array.isArray(recipe.staples) ? recipe.staples : []).map(String).filter(Boolean),
+      steps: (Array.isArray(recipe.steps) ? recipe.steps : []).map(String).filter(Boolean),
+      rescueNote: String(recipe.rescueNote || "").trim(),
       // A search rather than a specific video: TheMealDB's curated links go
       // dead (one of its Indian recipes is already a 404 after a copyright
       // takedown), and a search for the dish can never 404.
@@ -141,12 +189,14 @@ Return ONLY this JSON object, no markdown fence, no commentary:
     };
 
     log.info("Recipe generated", {
-      title: recipe.title,
-      usesCount: recipe.usesItems.length,
+      title: payload.title,
+      usesCount: payload.usesItems.length,
+      toBuyCount: payload.toBuy.length,
       criticalCount: critical.length,
+      diet,
     });
 
-    return NextResponse.json({ success: true, recipe });
+    return NextResponse.json({ success: true, recipe: payload });
   } catch (error: unknown) {
     log.error("Unhandled find-recipe error", {
       message: error instanceof Error ? error.message : "Unknown error",
