@@ -102,10 +102,19 @@ These are described as working in the judge Q&A but do not exist in the code.
 They are intended and confirmed as differentiators to build. **Until they
 ship, no surface, document, or answer may present them as working.**
 
-- FSSAI compliance check against a curated additive list
-- Globally banned ingredient alerts (e.g. titanium dioxide E171, brominated
-  vegetable oil, potassium bromate), to be sourced from EU EC 1333/2008, the
-  US FDA prohibited list, and IARC classifications
+- Additive regulatory divergence — surfacing substances whose status differs
+  between India and other major authorities, each with a dated citation.
+  Shaped in `docs/brief-regulatory-divergence.md`; not yet built.
+
+  This replaces the earlier "globally banned ingredient alerts" concept,
+  whose premise did not survive checking: of the three examples given in the
+  judge Q&A, only titanium dioxide (E171) holds. India banned potassium
+  bromate in 2016 and brominated vegetable oil in 1990 — in the latter case
+  ahead of the EU, Japan and the US. **The Q&A's Q13/Q14 answers are
+  factually wrong and need correcting before any viva.**
+- A live FSSAI compliance verdict is explicitly *not* a goal: no public
+  machine-readable FSSAI API exists, so any such check would be a
+  hand-maintained list and must be described as one
 - Health-conditions profile — only allergens and diet type exist today
 - The NutriTrust score's documented weighting (Nutri-Score 40% / additives
   30% / NOVA 20% / banned-ingredient penalty 10%). The shipped score derives
