@@ -103,18 +103,6 @@ const extractMealIngredients = (meal: Record<string, unknown>): string[] => {
   return ingredients;
 };
 
-// Pulls the video id out of a YouTube watch/short-link URL so the video's
-// own thumbnail can be shown as the recipe preview — a still from the
-// actual cooking video is a much clearer "there's a video here" cue than
-// a generic food photo.
-const getYoutubeThumbnail = (url: string | undefined): string | null => {
-  if (!url) return null;
-  const match = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([A-Za-z0-9_-]{11})/);
-  // hqdefault, not maxresdefault: maxres only exists for HD uploads and
-  // 404s on several of these videos (checked against the real URLs).
-  return match ? `https://img.youtube.com/vi/${match[1]}/hqdefault.jpg` : null;
-};
-
 const buildDisplayProductName = ({
   baseName,
   brand,
@@ -152,9 +140,10 @@ import NutritionLabelScanner from "@/components/nutrition-label-scanner";
 import ExpiryDateScanner from "@/components/expiry-date-scanner";
 import PantryChatModal from "@/components/pantry-chat-modal";
 import { RestockSuggestions } from "@/components/restock-suggestions";
+import { RecipeModal, type GeneratedRecipe } from "@/components/recipe-modal";
 import {
   Camera, BrainCircuit, Loader2, TrendingUp, ScanLine,
-  ExternalLink, Clock, X, Trash2, Home as HomeIcon, Info, Activity, Zap, AlertTriangle, CheckCircle2, Search, CircleAlert, Bell, Carrot, Apple, Milk, Drumstick, Wheat, CupSoda, Croissant, Snowflake, Candy, Package, ChevronLeft, ChevronRight, CalendarClock, Pencil, ShoppingCart, Sparkles, Play, Scale
+  Clock, X, Trash2, Home as HomeIcon, Info, Activity, Zap, AlertTriangle, CheckCircle2, Search, CircleAlert, Bell, Carrot, Apple, Milk, Drumstick, Wheat, CupSoda, Croissant, Snowflake, Candy, Package, ChevronLeft, ChevronRight, CalendarClock, Pencil, Sparkles, Scale, RefreshCw
 } from "lucide-react";
 import ShoppingListModal from "@/components/shopping-list-modal";
 import { CountUp } from "@/components/count-up";
@@ -226,10 +215,9 @@ export default function Home() {
   const [dbLoading, setDbLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
   const [isGeneratingRecipe, setIsGeneratingRecipe] = useState(false);
-  const [generatedRecipe, setGeneratedRecipe] = useState<{ title: string; time: string; image: string; link: string; ingredients?: string[]; isVideo?: boolean; photoFallback?: string } | null>(null);
+  const [generatedRecipe, setGeneratedRecipe] = useState<GeneratedRecipe | null>(null);
+  const [showRecipe, setShowRecipe] = useState(false);
   const [isAddingToShoppingList, setIsAddingToShoppingList] = useState(false);
-  const [recipeSourceItem, setRecipeSourceItem] = useState<string>("");
-  const [recipeItemIndex, setRecipeItemIndex] = useState(0);
   const [isVegMode, setIsVegMode] = useState(false);
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
   const [isAnalyzingFood, setIsAnalyzingFood] = useState(false);
@@ -724,180 +712,63 @@ export default function Home() {
   };
 
   // ─── Recipe generation ──────────────────────────────────────────
-  const generateRecipe = async (preferredItem?: string) => {
-    const userDietPreference = normalizeDietPreference(String(user?.user_metadata?.dietary_preference || "none"));
-    const shouldForceVegetarian = isVegMode || userDietPreference === "veg" || userDietPreference === "eggtarian";
+  // Recipes are generated from the pantry rather than looked up. The
+  // provider's Indian catalogue is 14 dishes (4 of them vegetarian) and its
+  // ingredient index has no entry at all for staples like curd, so a lookup
+  // could not reliably use the food that is actually about to spoil — which
+  // is the only reason this feature exists. Generation also removes a whole
+  // class of failure: one of the provider's Indian videos is already a dead
+  // link after a copyright takedown.
+  const generateRecipe = async (avoidTitles: string[] = []) => {
+    if (isGeneratingRecipe) return;
 
-    // Offline fallbacks — everyday Indian home cooking rather than the
-    // pasta/stir-fry defaults this used to ship. Links and images were
-    // each checked to actually resolve rather than guessed at.
-    type SimpleRecipe = { title: string; time: string; image: string; link: string; ingredients: string[]; isVideo?: boolean; photoFallback?: string };
-
-    const INDIAN_VEG_FALLBACKS: SimpleRecipe[] = [
-      {
-        title: "Dal Fry",
-        time: "30m prep",
-        image: "https://www.themealdb.com/images/media/meals/wuxrtu1483564410.jpg",
-        link: "https://www.indianhealthyrecipes.com/dal-fry-recipe/",
-        ingredients: []
-      },
-      {
-        title: "Matar Paneer",
-        time: "35m prep",
-        image: "https://www.themealdb.com/images/media/meals/xxpqsy1511452222.jpg",
-        link: "https://www.indianhealthyrecipes.com/matar-paneer/",
-        ingredients: []
-      },
-      {
-        title: "Baingan Bharta",
-        time: "40m prep",
-        image: "https://www.themealdb.com/images/media/meals/urtpqw1487341253.jpg",
-        link: "https://www.vegrecipesofindia.com/baingan-bharta-recipe/",
-        ingredients: []
-      },
-      {
-        title: "Veg Pulao",
-        time: "30m prep",
-        image: "https://www.themealdb.com/images/media/meals/sywrsu1511463066.jpg",
-        link: "https://www.indianhealthyrecipes.com/vegetable-pulao-recipe/",
-        ingredients: []
-      },
-    ];
-
-    const INDIAN_NONVEG_FALLBACKS: SimpleRecipe[] = [
-      {
-        title: "Chicken Curry",
-        time: "40m prep",
-        image: "https://www.themealdb.com/images/media/meals/wyxwsp1486979827.jpg",
-        link: "https://www.indianhealthyrecipes.com/chicken-curry/",
-        ingredients: []
-      },
-    ];
-
-    const fallbackRecipes = shouldForceVegetarian
-      ? INDIAN_VEG_FALLBACKS
-      : [...INDIAN_VEG_FALLBACKS, ...INDIAN_NONVEG_FALLBACKS];
-
-    const preferredItemName = preferredItem || highRiskItems[0]?.name || displayedItems[0]?.name || "";
-    const primaryToken = preferredItemName
-      .toLowerCase()
-      .replace(/[^a-z\s]/g, " ")
-      .split(/\s+/)
-      .find((w) => w.length > 2) || (shouldForceVegetarian ? "vegetable" : "chicken");
+    // Most urgent first. Everything else is context the model may draw on.
+    const candidates = [...displayedItems].sort((a, b) => a.daysLeft - b.daysLeft);
+    if (candidates.length === 0) {
+      toast("Nothing to cook with", { description: "Add a few items to your pantry first." });
+      return;
+    }
 
     setIsGeneratingRecipe(true);
     setInlineError(null);
 
     try {
-      // Search the provider's Indian catalogue only. Searching by
-      // ingredient across all cuisines is what produced Tuna Nicoise and
-      // Spinach Cannelloni for an Indian pantry — checked directly against
-      // the API, where "spinach" returns ten dishes, none of them Indian.
-      // Note the area value is "India", not the "Indian" listed in the
-      // provider's own area list, which returns zero results.
-      const excludesEgg = userDietPreference === "veg" || (isVegMode && userDietPreference !== "eggtarian");
+      const res = await fetch("/api/find-recipe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          items: candidates.map((i) => ({ name: i.name, daysLeft: i.daysLeft, risk: i.risk })),
+          dietaryPreference: String(user?.user_metadata?.dietary_preference || "none"),
+          avoidTitles,
+        }),
+      });
+      const data = await res.json();
 
-      const isDietSafe = (meal: { strMeal?: string; strCategory?: string; strTags?: string }, mealIngredients: string[]) => {
-        if (!shouldForceVegetarian) return true;
-        const descriptor = `${meal?.strMeal || ""} ${meal?.strCategory || ""} ${meal?.strTags || ""}`;
-        const haystack = [descriptor, ...mealIngredients];
-        const banned = excludesEgg ? containsNonVegKeyword : containsAnimalNonVegKeyword;
-        return !haystack.some((text) => banned(text));
-      };
-
-      const searchIndianCatalogue = async (ingredientToken: string) => {
-        const areaRes = await fetch("https://www.themealdb.com/api/json/v1/1/filter.php?a=India");
-        const areaData = await areaRes.json();
-        const areaMeals = Array.isArray(areaData?.meals) ? areaData.meals : [];
-        if (areaMeals.length === 0) return null;
-
-        const shuffled = [...areaMeals].sort(() => Math.random() - 0.5);
-        // Kept aside so a diet-safe Indian dish is still offered when the
-        // near-expiry item itself isn't in the catalogue — better than
-        // falling back to a cuisine the user doesn't cook.
-        let firstDietSafe: SimpleRecipe | null = null;
-
-        for (const candidate of shuffled) {
-          const detailRes = await fetch(`https://www.themealdb.com/api/json/v1/1/lookup.php?i=${candidate.idMeal}`);
-          const detailData = await detailRes.json();
-          const meal = detailData?.meals?.[0];
-          if (!meal) continue;
-
-          const mealIngredients = extractMealIngredients(meal);
-          if (!isDietSafe(meal, mealIngredients)) continue;
-
-          // Prefer the cooking video over strSource: several of these
-          // point somewhere unhelpful (Dal fry's source is an Instagram
-          // post), whereas the video is a step-by-step you can follow.
-          const videoThumb = getYoutubeThumbnail(meal.strYoutube);
-          const photo = meal.strMealThumb || fallbackRecipes[0].image;
-
-          const built: SimpleRecipe = {
-            title: meal.strMeal || "Indian Pantry Recipe",
-            time: "30m prep",
-            image: videoThumb || photo,
-            link: meal.strYoutube || meal.strSource || `https://www.themealdb.com/meal/${meal.idMeal}`,
-            ingredients: mealIngredients,
-            isVideo: Boolean(meal.strYoutube),
-            // Not every video has a thumbnail on file (some are removed or
-            // never had one), so the dish photo stands by as an onError swap.
-            photoFallback: photo,
-          };
-
-          const token = ingredientToken.toLowerCase();
-          const usesItem = token.length > 2 && (
-            (meal.strMeal || "").toLowerCase().includes(token) ||
-            mealIngredients.some((ing) => ing.toLowerCase().includes(token))
-          );
-
-          if (usesItem) return { recipe: built, matchedItem: true };
-          if (!firstDietSafe) firstDietSafe = built;
-        }
-
-        return firstDietSafe ? { recipe: firstDietSafe, matchedItem: false } : null;
-      };
-
-      let found = await searchIndianCatalogue(primaryToken);
-
-      if (!found && preferredItemName) {
-        found = await searchIndianCatalogue(preferredItemName);
+      if (!data.success) {
+        setInlineError(data.error || "Couldn't put a recipe together just now. Try again in a moment.");
+        return;
       }
 
-      const recipe = found?.recipe ?? fallbackRecipes[Math.floor(Math.random() * fallbackRecipes.length)];
-
-      setGeneratedRecipe(recipe);
-      // Only claim the dish uses the near-expiry item when it actually
-      // does — otherwise the card would credit an ingredient the recipe
-      // never mentions.
-      setRecipeSourceItem(found?.matchedItem ? preferredItemName : "");
-      toast("Recipe Ready", {
-        description: found?.matchedItem
-          ? `An Indian dish using ${preferredItemName}.`
-          : "An Indian dish from your pantry's cuisine.",
+      setGeneratedRecipe(data.recipe);
+      setShowRecipe(true);
+      const rescued = data.recipe.usesItems?.length || 0;
+      toast("Recipe ready", {
+        description: rescued > 0
+          ? `Uses ${data.recipe.usesItems.slice(0, 3).join(", ")}${rescued > 3 ? ` +${rescued - 3} more` : ""}.`
+          : "Built from what's in your pantry.",
       });
     } catch {
-      const recipe = fallbackRecipes[Math.floor(Math.random() * fallbackRecipes.length)];
-      setGeneratedRecipe(recipe);
-      setRecipeSourceItem("");
-      setInlineError("Live recipe provider was unavailable, so we loaded a curated Indian recipe.");
+      setInlineError("Couldn't reach the recipe service. Check your connection and try again.");
     } finally {
       setIsGeneratingRecipe(false);
     }
   };
 
   const tryAnotherRecipe = async () => {
-    if (isGeneratingRecipe) return;
-
-    const sourceItems = highRiskItems.length > 0 ? highRiskItems : displayedItems;
-    if (sourceItems.length === 0) {
-      await generateRecipe();
-      return;
-    }
-
-    const nextIndex = (recipeItemIndex + 1) % sourceItems.length;
-    setRecipeItemIndex(nextIndex);
-    await generateRecipe(sourceItems[nextIndex].name);
+    // Pass the current title back so the next idea is genuinely different.
+    await generateRecipe(generatedRecipe ? [generatedRecipe.title] : []);
   };
+
 
   const addMissingIngredientsToShoppingList = async () => {
     if (!user || !generatedRecipe?.ingredients || isAddingToShoppingList) return;
@@ -1597,78 +1468,45 @@ if (nutritionFieldsFilled < 2) {
               </div>
             ) : (
               <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
-                <a
-                  href={generatedRecipe.link}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="group block h-40 w-full bg-cover bg-center relative"
-                >
-                  <img
-                    src={generatedRecipe.image}
-                    alt={generatedRecipe.title}
-                    onError={(e) => {
-                      // Swap to the dish photo if the video still is missing.
-                      const img = e.currentTarget;
-                      if (generatedRecipe.photoFallback && img.src !== generatedRecipe.photoFallback) {
-                        img.src = generatedRecipe.photoFallback;
-                      }
-                    }}
-                    className="absolute inset-0 w-full h-full object-cover"
-                  />
-                  <div className="absolute inset-0 bg-linear-to-t from-foreground/90 to-transparent" />
+                <div className="p-4 space-y-3">
+                  <div>
+                    <h4 className="font-bold text-lg leading-tight">{generatedRecipe.title}</h4>
+                    <div className="flex items-center gap-1.5 text-background/60 text-[11px] mt-1">
+                      <Clock size={11} /> {generatedRecipe.prepTime}
+                    </div>
+                  </div>
 
-                  {generatedRecipe.isVideo && (
-                    <>
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <div className="w-14 h-14 rounded-full bg-black/55 backdrop-blur-sm border border-white/25 flex items-center justify-center text-white transition-transform duration-200 group-hover:scale-110">
-                          <Play size={22} className="translate-x-0.5" fill="currentColor" />
-                        </div>
-                      </div>
-                      <div className="absolute top-3 left-3 bg-red-600 px-2 py-1 rounded-md flex items-center gap-1.5 text-white shadow-lg">
-                        <Play size={10} fill="currentColor" />
-                        <span className="text-[10px] font-bold uppercase tracking-wide">Video Recipe</span>
-                      </div>
-                    </>
+                  {generatedRecipe.usesItems.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {generatedRecipe.usesItems.map((name) => (
+                        <span key={name} className="text-[10px] font-semibold px-2 py-1 rounded-md bg-background/15 text-background">
+                          {name}
+                        </span>
+                      ))}
+                    </div>
                   )}
 
-                  <div className="absolute top-3 right-3 bg-black/30 backdrop-blur-sm px-2 py-1 rounded-lg border border-white/10 flex items-center gap-1.5 text-white">
-                    <Clock size={12} /><span className="text-[10px] font-semibold">{generatedRecipe.time}</span>
-                  </div>
-                </a>
-                <div className="p-4 pt-2 flex justify-between items-end gap-2">
-                  <div>
-                    <p className="text-[10px] text-background/60 uppercase font-semibold tracking-widest mb-1">AI Recommendation</p>
-                    <h4 className="font-bold text-lg leading-tight">{generatedRecipe.title}</h4>
-                    {recipeSourceItem && (
-                      <p className="text-[11px] text-background/70 mt-1">Using near-expiry item: {recipeSourceItem}</p>
-                    )}
-                  </div>
-                  <div className="flex flex-col sm:flex-row gap-2 sm:items-center shrink-0">
+                  {generatedRecipe.rescueNote && (
+                    <p className="text-[11px] leading-relaxed text-background/70">{generatedRecipe.rescueNote}</p>
+                  )}
+
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setShowRecipe(true)}
+                      className="flex-1 flex items-center justify-center gap-1.5 bg-background text-foreground text-xs font-semibold px-3 py-2.5 rounded-lg hover:opacity-90 transition-opacity"
+                    >
+                      View recipe
+                    </button>
                     <button
                       onClick={tryAnotherRecipe}
                       disabled={isGeneratingRecipe}
-                      className="flex items-center justify-center gap-1.5 border border-background/30 text-background text-xs font-semibold px-3 py-2 rounded-lg hover:bg-background/10 transition-all disabled:opacity-60"
+                      className="flex items-center justify-center gap-1.5 border border-background/30 text-background text-xs font-semibold px-3 py-2.5 rounded-lg hover:bg-background/10 transition-all disabled:opacity-60"
                     >
-                      {isGeneratingRecipe ? <Loader2 size={12} className="animate-spin" /> : null}
-                      Try another
+                      {isGeneratingRecipe ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+                      Another
                     </button>
-                    <a href={generatedRecipe.link} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 bg-background text-foreground text-xs font-semibold px-3 py-2 rounded-lg hover:scale-105 active:scale-95 transition-all justify-center">
-                      {generatedRecipe.isVideo ? <>Watch <Play size={11} fill="currentColor" /></> : <>Cook this <ExternalLink size={12} /></>}
-                    </a>
                   </div>
                 </div>
-                {generatedRecipe.ingredients && generatedRecipe.ingredients.length > 0 && (
-                  <div className="px-4 pb-4">
-                    <button
-                      onClick={() => { void addMissingIngredientsToShoppingList(); }}
-                      disabled={isAddingToShoppingList}
-                      className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg border border-background/30 text-background text-xs font-semibold hover:bg-background/10 transition-all disabled:opacity-60"
-                    >
-                      {isAddingToShoppingList ? <Loader2 size={12} className="animate-spin" /> : <ShoppingCart size={12} />}
-                      Add missing ingredients to shopping list
-                    </button>
-                  </div>
-                )}
               </div>
             )}
           </div>
@@ -2531,6 +2369,17 @@ if (nutritionFieldsFilled < 2) {
 
       {showShoppingList && (
         <ShoppingListModal onClose={() => setShowShoppingList(false)} />
+      )}
+
+      {showRecipe && generatedRecipe && (
+        <RecipeModal
+          recipe={generatedRecipe}
+          onClose={() => setShowRecipe(false)}
+          onTryAnother={tryAnotherRecipe}
+          isRegenerating={isGeneratingRecipe}
+          onAddMissing={() => { void addMissingIngredientsToShoppingList(); }}
+          isAddingToShoppingList={isAddingToShoppingList}
+        />
       )}
 
       {showPantryChat && (
