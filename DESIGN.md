@@ -38,6 +38,12 @@ typography:
     fontWeight: 400
     lineHeight: 1.5
     letterSpacing: "normal"
+  caption:
+    fontFamily: "Inter, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif"
+    fontSize: "0.6875rem"
+    fontWeight: 400
+    lineHeight: 1.5
+    letterSpacing: "normal"
   label:
     fontFamily: "Inter, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif"
     fontSize: "0.625rem"
@@ -179,6 +185,13 @@ box on a lighter grey page." Depth is shadow's job.
 **The Earned Alarm Rule.** Because the body is colourless, red carries real
 weight. Never spend it on anything the user cannot act on.
 
+**The Annotation Rule.** A citation is not a reading. Regulatory notes —
+where authorities disagree about an additive — carry no readout colour at
+all; they render in neutral ink with an outline icon. Colouring them amber
+would say *danger* about a fact that only means *two regulators disagree*,
+which is precisely the overstatement this product refuses. Annotations earn
+prominence through position and type, never through alarm.
+
 ## Typography
 
 **Display / Body / Label Font:** Inter (variable, weights 100–900), with
@@ -196,6 +209,10 @@ and from tight negative tracking on large numerals, not from a second family.
 - **Title** (700, 0.9375rem): Item names, card headings.
 - **Body** (400, 0.875rem, line-height 1.5): Descriptions, recipe steps,
   chat, explanatory copy.
+- **Caption** (400, 0.6875rem / 11px, line-height 1.5): Secondary metadata,
+  fine print, chip text, source citations, and disclaimers. The workhorse of
+  this interface's supporting layer — it appears far more often than Body,
+  because most of what surrounds a reading is annotation.
 - **Label** (600, 0.625rem, tracking 0.1em, uppercase): Section eyebrows
   ("PANTRY FRESHNESS", "INGREDIENTS", "DAYS REMAINING") and status chips.
   The instrument's engraved panel markings.
