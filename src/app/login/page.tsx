@@ -83,28 +83,29 @@ export default function LoginPage() {
   };
 
   const inputClass =
-    "neu-inset w-full rounded-xl px-4 py-3.5 text-base text-white placeholder:text-white/30 " +
-    "border border-white/5 focus:outline-none focus:border-cyan-300/40 " +
-    "focus:ring-2 focus:ring-cyan-300/20 transition-all duration-300";
+    "neu-field w-full rounded-xl px-4 py-3.5 text-base text-foreground placeholder:text-foreground/35";
 
   return (
     <MotionConfig reducedMotion="user">
-      <div className="neu-scope-navy relative flex min-h-screen items-center justify-center overflow-hidden bg-[#050A16] text-foreground px-4 py-8">
+      {/* Same --background, same neumorphic tokens as the dashboard. This
+          screen used to sit on its own #050A16 navy with a cyan gradient,
+          which made signing in and using the app feel like two products. */}
+      <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background text-foreground px-4 py-8">
         {/* Drifting ambient blobs — pure decoration, non-interactive */}
         <div className="pointer-events-none absolute inset-0">
-          <div className="animate-blob absolute -top-24 -left-8 h-72 w-72 rounded-full bg-cyan-500/20 blur-3xl" />
-          <div className="animate-blob absolute -bottom-28 -right-10 h-80 w-80 rounded-full bg-indigo-500/20 blur-3xl [animation-delay:-6s]" />
-          <div className="animate-blob absolute left-1/2 top-1/2 h-80 w-80 -translate-x-1/2 -translate-y-1/2 rounded-full bg-blue-500/10 blur-3xl [animation-delay:-12s]" />
+          <div className="animate-blob absolute -top-24 -left-8 h-72 w-72 rounded-full bg-brand/12 blur-3xl" />
+          <div className="animate-blob absolute -bottom-28 -right-10 h-80 w-80 rounded-full bg-safe/12 blur-3xl [animation-delay:-6s]" />
+          <div className="animate-blob absolute left-1/2 top-1/2 h-80 w-80 -translate-x-1/2 -translate-y-1/2 rounded-full bg-brand/8 blur-3xl [animation-delay:-12s]" />
         </div>
 
         <motion.div
           variants={container}
           initial="hidden"
           animate="show"
-          className="neu-raised relative z-10 w-full max-w-lg rounded-[2rem] border border-white/10 p-8 backdrop-blur-xl"
+          className="neu-raised relative z-10 w-full max-w-lg rounded-[2rem] p-8"
         >
           <motion.div variants={rise} className="flex flex-col items-center text-center mb-8">
-            <div className="animate-float relative mb-4 rounded-3xl border border-cyan-200/40 bg-white/90 p-4 shadow-[0_0_45px_rgba(56,189,248,0.4)]">
+            <div className="animate-float neu-raised relative mb-4 rounded-3xl bg-white p-4">
               <Image
                 src="/logo.svg"
                 alt="Nutri-Trust"
@@ -114,10 +115,10 @@ export default function LoginPage() {
                 className="h-32 w-auto max-w-[320px]"
               />
             </div>
-            <h1 className="text-sheen mt-1 bg-linear-to-r from-white via-cyan-200 to-white bg-clip-text text-3xl font-bold tracking-tight text-transparent">
+            <h1 className="mt-1 text-3xl font-bold tracking-tight text-foreground">
               Nutri-Trust
             </h1>
-            <p className="mt-1 text-sm text-cyan-100/70">Your smart pantry companion</p>
+            <p className="mt-1 text-sm text-foreground/60">Your smart pantry companion</p>
           </motion.div>
 
           <AnimatePresence mode="wait" initial={false}>
@@ -138,9 +139,9 @@ export default function LoginPage() {
                 >
                   <span className="text-2xl">✉️</span>
                 </motion.div>
-                <h2 className="text-xl font-bold tracking-tight mb-2 text-white">Check your inbox</h2>
-                <p className="text-sm text-white/50 mb-6 leading-relaxed">
-                  We sent a confirmation link to <strong className="text-white/90">{email}</strong>. Click the link in the email to activate your account, then sign in here.
+                <h2 className="text-xl font-bold tracking-tight mb-2 text-foreground">Check your inbox</h2>
+                <p className="text-sm text-foreground/60 mb-6 leading-relaxed">
+                  We sent a confirmation link to <strong className="text-foreground">{email}</strong>. Click the link in the email to activate your account, then sign in here.
                 </p>
                 <motion.button
                   type="button"
@@ -151,7 +152,7 @@ export default function LoginPage() {
                     setMode("signin");
                     setError(null);
                   }}
-                  className="w-full bg-white text-black font-bold py-3 rounded-xl hover:opacity-90 transition-all"
+                  className="neu-pressable w-full text-foreground font-bold py-3 rounded-xl"
                 >
                   Back to Sign In
                 </motion.button>
@@ -176,14 +177,14 @@ export default function LoginPage() {
                         setError(null);
                       }}
                       className={`relative flex-1 text-base font-semibold py-3 rounded-xl transition-colors duration-300 ${
-                        mode === m ? "text-black" : "text-white/55 hover:text-white/85"
+                        mode === m ? "text-primary-foreground" : "text-foreground/60 hover:text-foreground"
                       }`}
                     >
                       {mode === m && (
                         <motion.span
                           layoutId="authPill"
                           transition={{ type: "spring", stiffness: 380, damping: 32 }}
-                          className="absolute inset-0 rounded-xl bg-linear-to-r from-cyan-200 to-blue-200 shadow-[0_6px_18px_rgba(103,232,249,0.3)]"
+                          className="absolute inset-0 rounded-xl bg-foreground"
                         />
                       )}
                       <span className="relative z-10">{m === "signin" ? "Sign In" : "Sign Up"}</span>
@@ -225,7 +226,7 @@ export default function LoginPage() {
                         >
                           <div className="space-y-4 pb-1">
                             <div className="space-y-1.5">
-                              <label className="text-[11px] font-semibold uppercase tracking-widest text-white/55">Full Name</label>
+                              <label className="text-[11px] font-semibold uppercase tracking-widest text-foreground/60">Full Name</label>
                               <input
                                 type="text"
                                 placeholder="Alex Smith"
@@ -237,7 +238,7 @@ export default function LoginPage() {
                             </div>
 
                             <div className="space-y-3 pt-2">
-                              <label className="text-[11px] font-semibold uppercase tracking-widest text-white/55">Dietary Preference</label>
+                              <label className="text-[11px] font-semibold uppercase tracking-widest text-foreground/60">Dietary Preference</label>
                               <div className="grid grid-cols-3 gap-2.5">
                                 {DIETARY_OPTIONS.map((opt) => {
                                   const selected = dietaryPreference === opt.id;
@@ -249,8 +250,8 @@ export default function LoginPage() {
                                       onClick={() => setDietaryPreference(opt.id)}
                                       className={`relative flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl text-xs transition-all duration-300 ${
                                         selected
-                                          ? "neu-inset text-white font-semibold"
-                                          : "neu-raised-sm text-white/70 hover:text-white"
+                                          ? "neu-inset text-foreground font-semibold"
+                                          : "neu-raised-sm text-foreground/70 hover:text-foreground"
                                       }`}
                                     >
                                       <motion.span
@@ -265,7 +266,7 @@ export default function LoginPage() {
                                         <motion.span
                                           layoutId="dietGlow"
                                           transition={{ type: "spring", stiffness: 350, damping: 30 }}
-                                          className="absolute inset-0 rounded-xl ring-1 ring-cyan-300/50"
+                                          className="absolute inset-0 rounded-xl ring-2 ring-brand"
                                         />
                                       )}
                                     </motion.button>
@@ -279,7 +280,7 @@ export default function LoginPage() {
                     </AnimatePresence>
 
                     <div className="space-y-2">
-                      <label className="text-[12px] font-semibold uppercase tracking-widest text-white/55">Email Address</label>
+                      <label className="text-[12px] font-semibold uppercase tracking-widest text-foreground/60">Email Address</label>
                       <input
                         type="email"
                         placeholder="name@example.com"
@@ -291,7 +292,7 @@ export default function LoginPage() {
                     </div>
 
                     <div className="space-y-2">
-                      <label className="text-[12px] font-semibold uppercase tracking-widest text-white/55">Password</label>
+                      <label className="text-[12px] font-semibold uppercase tracking-widest text-foreground/60">Password</label>
                       <div className="relative">
                         <input
                           type={showPassword ? "text" : "password"}
@@ -306,7 +307,7 @@ export default function LoginPage() {
                           onClick={() => setShowPassword(!showPassword)}
                           title={showPassword ? "Hide password" : "Show password"}
                           aria-label={showPassword ? "Hide password" : "Show password"}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors p-1"
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground/50 hover:text-foreground transition-colors p-1"
                         >
                           {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                         </button>
@@ -319,7 +320,7 @@ export default function LoginPage() {
                       whileHover={{ scale: loading ? 1 : 1.02 }}
                       whileTap={{ scale: loading ? 1 : 0.97 }}
                       transition={{ type: "spring", stiffness: 400, damping: 25 }}
-                      className="group w-full bg-linear-to-r from-cyan-300 to-blue-300 text-[#0A1020] font-bold py-3.5 rounded-xl flex items-center justify-center gap-2 mt-5 disabled:opacity-60 shadow-[0_8px_28px_rgba(103,232,249,0.3)] hover:shadow-[0_10px_36px_rgba(103,232,249,0.45)] transition-shadow duration-300"
+                      className="group w-full bg-foreground text-background font-bold py-3.5 rounded-xl flex items-center justify-center gap-2 mt-5 disabled:opacity-60 shadow-lg shadow-foreground/15 hover:shadow-xl hover:shadow-foreground/25 transition-shadow duration-300"
                     >
                       {loading ? (
                         <Loader2 size={16} className="animate-spin" />

@@ -118,7 +118,7 @@ export function ScanHistoryModal({ onClose }: ScanHistoryModalProps) {
   // the page instead of staying pinned.
   return createPortal(
     <div className="fixed inset-0 z-70 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
-      <div className="w-full max-w-sm bg-card border border-border rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+      <div className="neu-panel w-full max-w-sm rounded-3xl overflow-hidden flex flex-col max-h-[85vh]">
         <div className="flex items-center justify-between p-4 border-b border-border shrink-0">
           <div className="flex items-center gap-2">
             <History size={16} className="text-foreground/60" />

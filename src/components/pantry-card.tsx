@@ -1,10 +1,10 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { motion } from "framer-motion";
-import { ShieldCheck, ShieldAlert, ArrowRight, Leaf, Info, Scale, Carrot, Apple, Milk, Drumstick, Wheat, CupSoda, Croissant, Snowflake, Candy, Package } from "lucide-react";
+import { ShieldCheck, ShieldAlert, ArrowRight, Leaf, Info, Carrot, Apple, Milk, Drumstick, Wheat, CupSoda, Croissant, Snowflake, Candy, Package } from "lucide-react";
 import { inferItemCategory } from "@/lib/item-category";
 import { ALLERGEN_LABELS, type AllergenTag } from "@/lib/allergens";
-import { type AdditiveEntry } from "@/lib/additive-divergence";
 
 export type RiskLevel = "high" | "medium" | "low";
 
@@ -24,19 +24,34 @@ interface PantryCardProps {
   // [] = ingredient data exists and no common allergen keyword matched.
   // non-empty = ingredient data exists and these allergens were detected.
   detectedAllergens?: AllergenTag[] | null;
-  // Same null/[] contract as detectedAllergens: null means no ingredient
-  // data was available, [] means none of the tracked substances matched.
-  divergentAdditives?: AdditiveEntry[] | null;
   healthierAlternative?: string;
+  // Rendered in the card's own footer. These used to be free-floating
+  // buttons absolutely positioned over the card by the dashboard, which
+  // meant they overlapped whatever the card happened to render last.
+  actions?: ReactNode;
 }
 
+// The readout colours are calibrated as fills. Used as a 30px numeral on a
+// light ground they measured 2.49:1 (warning) and 2.65:1 (safe) — the
+// biggest element on the card, and the number the product exists to
+// produce, failing even the 3:1 large-text threshold. The -strong variants
+// are the same hues taken down in lightness until they clear it.
 const riskConfig = {
-  high: { label: "Critical", color: "text-danger", dot: "bg-danger" },
-  medium: { label: "Expiring Soon", color: "text-warning", dot: "bg-warning" },
-  low: { label: "Optimal", color: "text-safe", dot: "bg-safe" },
+  high: { label: "Critical", color: "text-danger-strong", bar: "bg-danger" },
+  medium: { label: "Expiring Soon", color: "text-warning-strong", bar: "bg-warning" },
+  low: { label: "Still Good", color: "text-safe-strong", bar: "bg-safe" },
 };
 
-export function PantryCard({ name, daysLeft, risk, purchaseDate, healthScore, dietMatch = true, detectedAllergens, divergentAdditives, healthierAlternative }: PantryCardProps) {
+const DAY_MS = 86_400_000;
+// dd/mm — the household convention in the product's home market. The card
+// used to print ISO ("PURCHASED 2026-08-06") in an India-first product.
+const formatDayMonth = (iso: string) => {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short" });
+};
+
+export function PantryCard({ name, daysLeft, risk, purchaseDate, healthScore, dietMatch = true, detectedAllergens, healthierAlternative, actions }: PantryCardProps) {
   const score = healthScore != null ? Number.parseFloat(healthScore) : NaN;
   const hasScore = Number.isFinite(score);
   // Same thresholds the nutrition trend chart uses, so one score reads the
@@ -66,20 +81,25 @@ export function PantryCard({ name, daysLeft, risk, purchaseDate, healthScore, di
   } as const;
 
   const ItemIcon = categoryIconMap[category];
-  const freshnessPercent = Math.max(0, Math.min(100, Math.round((daysLeft / 14) * 100)));
+  // The bar used to be daysLeft/14 — the same fixed divisor the dashboard
+  // metric documents as removed for being un-winnable. It made a 13-day
+  // item show an amber "expiring" chip beside a nearly-full bar, and an
+  // expired item show an empty grey track that read as "no data" rather
+  // than "gone". It now runs off the same thresholds as the chip beside it,
+  // so the two can never disagree.
   const freshnessWidthClass =
-    freshnessPercent >= 95 ? "w-full" :
-    freshnessPercent >= 85 ? "w-11/12" :
-    freshnessPercent >= 75 ? "w-9/12" :
-    freshnessPercent >= 65 ? "w-8/12" :
-    freshnessPercent >= 55 ? "w-7/12" :
-    freshnessPercent >= 45 ? "w-6/12" :
-    freshnessPercent >= 35 ? "w-5/12" :
-    freshnessPercent >= 25 ? "w-4/12" :
-    freshnessPercent >= 15 ? "w-3/12" :
-    freshnessPercent >= 8 ? "w-2/12" :
-    freshnessPercent > 0 ? "w-1/12" :
-    "w-0";
+    daysLeft <= 0 ? "w-full" :
+    risk === "high" ? (daysLeft <= 1 ? "w-1/12" : "w-2/12") :
+    risk === "medium" ? (daysLeft <= 5 ? "w-5/12" : "w-6/12") :
+    daysLeft >= 14 ? "w-full" : daysLeft >= 10 ? "w-10/12" : "w-8/12";
+
+  // Reading the clock during render is impure, but the expiry date is
+  // genuinely relative to now: daysLeft is already "days remaining as of
+  // this render", computed by the dashboard from purchase_date + shelf life.
+  // This card is only ever rendered on the client, after auth, so there is
+  // no server snapshot for it to disagree with.
+  // eslint-disable-next-line react-hooks/purity
+  const expiryLabel = formatDayMonth(new Date(Date.now() + daysLeft * DAY_MS).toISOString());
 
   return (
     <motion.div
@@ -102,19 +122,26 @@ export function PantryCard({ name, daysLeft, risk, purchaseDate, healthScore, di
             >
               {hasScore ? score.toFixed(1) : "—"}
             </div>
-            <h3 className="font-bold text-sm sm:text-[15px] text-foreground tracking-tight wrap-break-word leading-snug truncate">
+            <h3 title={name} className="font-bold text-sm sm:text-[15px] text-foreground tracking-tight leading-snug truncate">
               {name}
             </h3>
           </div>
-          <p className="text-[11px] text-foreground/60 uppercase tracking-wider font-medium">Purchased {purchaseDate}</p>
+          {/* An expiry tracker that never printed an expiry date. The
+              purchase date was the only date on the card — the one that
+              doesn't matter — leaving the user to hold the shelf life in
+              their head. */}
+          <p className="text-[11px] text-foreground/60 uppercase tracking-wider font-medium">
+            {daysLeft > 0 ? `Use by ${expiryLabel}` : `Was due ${expiryLabel}`}
+            <span className="text-foreground/40 normal-case tracking-normal"> · bought {formatDayMonth(purchaseDate)}</span>
+          </p>
         </div>
 
         <div className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border ${
           risk === "high"
-            ? "bg-danger/15 border-danger/30 text-danger-strong dark:text-danger"
+            ? "bg-danger/15 border-danger/30 text-danger-strong"
             : risk === "medium"
-              ? "bg-warning/15 border-warning/30 text-warning-strong dark:text-warning"
-              : "bg-safe/15 border-safe/30 text-safe-strong dark:text-safe"
+              ? "bg-warning/15 border-warning/30 text-warning-strong"
+              : "bg-safe/15 border-safe/30 text-safe-strong"
         }`}>
           {config.label}
         </div>
@@ -131,11 +158,7 @@ export function PantryCard({ name, daysLeft, risk, purchaseDate, healthScore, di
             <span className="ml-1 text-xs text-foreground/60 font-semibold">{daysLeft === 1 ? "day" : "days"} left</span>
           </p>
           <div className="w-24 h-2.5 rounded-full bg-foreground/10 overflow-hidden">
-            <div
-              className={`h-full rounded-full transition-all duration-500 ${freshnessWidthClass} ${
-                risk === "high" ? "bg-danger" : risk === "medium" ? "bg-warning" : "bg-safe"
-              }`}
-            />
+            <div className={`h-full rounded-full transition-all duration-500 ${freshnessWidthClass} ${config.bar}`} />
           </div>
         </div>
 
@@ -147,7 +170,7 @@ export function PantryCard({ name, daysLeft, risk, purchaseDate, healthScore, di
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-bold ${dietMatch ? "bg-safe/15 text-safe-strong dark:text-safe" : "bg-danger/15 text-danger-strong dark:text-danger"}`}>
+        <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-bold ${dietMatch ? "bg-safe/15 text-safe-strong" : "bg-danger/15 text-danger-strong"}`}>
           {dietMatch ? <ShieldCheck size={12} /> : <ShieldAlert size={12} />}
           {dietMatch ? "Matches Diet" : "Diet Warning"}
         </div>
@@ -161,7 +184,7 @@ export function PantryCard({ name, daysLeft, risk, purchaseDate, healthScore, di
             Allergens Unknown
           </div>
         ) : detectedAllergens.length > 0 ? (
-          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-bold bg-warning/15 text-warning-strong dark:text-warning">
+          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-bold bg-warning/15 text-warning-strong">
             <ShieldAlert size={12} />
             Contains {detectedAllergens.map((tag) => ALLERGEN_LABELS[tag]).join(", ")}
           </div>
@@ -172,21 +195,6 @@ export function PantryCard({ name, daysLeft, risk, purchaseDate, healthScore, di
           </div>
         )}
 
-        {/* Regulatory annotation, deliberately uncoloured — see The
-            Annotation Rule in DESIGN.md. A citation is not a reading, and
-            an amber chip here would read as danger when it only means two
-            authorities disagree. */}
-        {divergentAdditives && divergentAdditives.length > 0 && (
-          <div
-            title={divergentAdditives.map((a) => a.summary).join("\n\n")}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-bold bg-foreground/8 text-foreground/70"
-          >
-            <Scale size={12} />
-            {divergentAdditives.length === 1
-              ? `${divergentAdditives[0].eNumber ?? divergentAdditives[0].name} differs by region`
-              : `${divergentAdditives.length} additives differ by region`}
-          </div>
-        )}
       </div>
 
       {healthierAlternative && (
@@ -199,6 +207,8 @@ export function PantryCard({ name, daysLeft, risk, purchaseDate, healthScore, di
           </p>
         </div>
       )}
+
+      {actions && <div className="mt-4 pt-3 border-t border-border/60">{actions}</div>}
     </motion.div>
   );
 }

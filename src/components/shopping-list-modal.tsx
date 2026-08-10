@@ -19,6 +19,15 @@ interface ShoppingListRow {
 
 type ShoppingSortOption = "newest" | "name" | "recipe";
 
+// Rows added from a recipe are stored as "Fresh coriander — 1 bunch" so the
+// amount needed travels with the item without needing a schema change.
+// Anything typed by hand has no separator and comes back unchanged.
+const splitQuantity = (name: string): { item: string; quantity: string } => {
+  const at = name.indexOf(" — ");
+  if (at === -1) return { item: name, quantity: "" };
+  return { item: name.slice(0, at), quantity: name.slice(at + 3) };
+};
+
 export default function ShoppingListModal({ onClose }: ShoppingListModalProps) {
   const { user } = useAuth();
   const [rows, setRows] = useState<ShoppingListRow[]>([]);
@@ -115,7 +124,7 @@ export default function ShoppingListModal({ onClose }: ShoppingListModalProps) {
 
   return (
     <div className="fixed inset-0 z-70 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
-      <div className="w-full max-w-sm bg-card border border-border rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+      <div className="neu-panel w-full max-w-sm rounded-3xl overflow-hidden flex flex-col max-h-[85vh]">
         <div className="flex items-center justify-between p-4 border-b border-border shrink-0">
           <div className="flex items-center gap-2">
             <ShoppingCart size={16} className="text-foreground/60" />
@@ -139,7 +148,7 @@ export default function ShoppingListModal({ onClose }: ShoppingListModalProps) {
               onChange={(e) => setNewItemName(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") void addItem(); }}
               placeholder="Add an item..."
-              className="flex-1 bg-background border border-border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-foreground/20"
+              className="neu-field flex-1 rounded-xl px-3 py-2.5 text-sm"
             />
             <button
               onClick={() => { void addItem(); }}
@@ -159,7 +168,7 @@ export default function ShoppingListModal({ onClose }: ShoppingListModalProps) {
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as ShoppingSortOption)}
               title="Sort"
-              className="flex-1 bg-background border border-border rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-foreground/30"
+              className="neu-field flex-1 rounded-lg px-2 py-1.5 text-xs"
             >
               <option value="newest">Newest First</option>
               <option value="name">Name (A-Z)</option>
@@ -210,11 +219,16 @@ export default function ShoppingListModal({ onClose }: ShoppingListModalProps) {
                 {row.checked && <span className="text-[10px] font-bold">✓</span>}
               </button>
               <div className="min-w-0 flex-1">
-                <p className={`text-sm font-medium truncate ${row.checked ? "line-through text-foreground/40" : "text-foreground"}`}>
-                  {row.name}
+                <p className={`text-sm font-medium ${row.checked ? "line-through text-foreground/40" : "text-foreground"}`}>
+                  {splitQuantity(row.name).item}
+                  {splitQuantity(row.name).quantity && (
+                    <span className={`ml-1.5 text-xs font-semibold tabular-nums ${row.checked ? "text-foreground/30" : "text-foreground/60"}`}>
+                      {splitQuantity(row.name).quantity}
+                    </span>
+                  )}
                 </p>
                 {row.source_recipe && (
-                  <p className="text-[11px] text-foreground/45 truncate">From: {row.source_recipe}</p>
+                  <p className="text-[11px] text-foreground/45 truncate">For {row.source_recipe}</p>
                 )}
               </div>
               <button

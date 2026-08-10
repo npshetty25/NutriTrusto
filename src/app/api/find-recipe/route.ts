@@ -105,7 +105,9 @@ have and what they must go out and buy:
 - "fromPantry": ingredients that come from the numbered lists above. Give the
   pantry item's exact name plus the quantity to use.
 - "toBuy": ingredients that are NOT in the lists above and are NOT everyday
-  staples — things they genuinely have to buy.
+  staples — things they genuinely have to buy. ALWAYS give the amount
+  needed for this dish separately from the name, so it can go straight onto
+  a shopping list.
 - "staples": everyday Indian kitchen basics you assumed (oil/ghee, salt,
   onion, tomato, ginger, garlic, green chilli, ground spices, atta, rice).
 
@@ -115,7 +117,7 @@ Return ONLY this JSON object, no markdown fence, no commentary:
   "baseDish": "the closest well-known Indian dish this is a version of, 2-3 words, exactly as someone would type it into YouTube (e.g. Palak Paneer, Paneer Bhurji, Vegetable Khichdi)",
   "prepTime": "e.g. 25m",
   "fromPantry": [{"item": "exact name from the lists above", "quantity": "200 g, cubed"}],
-  "toBuy": ["1 bunch fresh coriander", "..."],
+  "toBuy": [{"item": "Fresh coriander", "quantity": "1 bunch"}],
   "staples": ["2 tbsp oil", "1 tsp jeera", "..."],
   "steps": ["step 1", "step 2", "..."],
   "rescueNote": "one short sentence naming which about-to-spoil items this saves"
@@ -182,7 +184,17 @@ Your previous attempt included ${lastViolations.join(", ")}, which breaks the "$
       prepTime: String(recipe.prepTime || "25m"),
       fromPantry,
       usesItems: fromPantry.map((r: { item: string }) => r.item),
-      toBuy: (Array.isArray(recipe.toBuy) ? recipe.toBuy : []).map(String).filter(Boolean),
+      // Older prompts returned toBuy as bare strings ("1 bunch fresh
+      // coriander"), which meant the shopping list had to display the amount
+      // welded onto the name or drop it. Accept both shapes so a cached or
+      // stubborn response still works.
+      toBuy: (Array.isArray(recipe.toBuy) ? recipe.toBuy : [])
+        .map((row: unknown) => {
+          if (typeof row === "string") return { item: row.trim(), quantity: "" };
+          const r = row as { item?: unknown; quantity?: unknown };
+          return { item: String(r?.item ?? "").trim(), quantity: String(r?.quantity ?? "").trim() };
+        })
+        .filter((r: { item: string }) => r.item),
       staples: (Array.isArray(recipe.staples) ? recipe.staples : []).map(String).filter(Boolean),
       steps: (Array.isArray(recipe.steps) ? recipe.steps : []).map(String).filter(Boolean),
       rescueNote: String(recipe.rescueNote || "").trim(),

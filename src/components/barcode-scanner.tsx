@@ -95,7 +95,7 @@ export default function BarcodeScanner({ onScan, onError, onClose }: BarcodeScan
 
   return (
     <div className="fixed inset-0 z-50 bg-background/90 backdrop-blur-sm flex flex-col justify-center items-center p-4 animate-in fade-in duration-200">
-      <div className="w-full max-w-sm max-h-[90vh] bg-card border border-border shadow-2xl rounded-3xl overflow-y-auto relative sleek-shadow">
+      <div className="neu-panel w-full max-w-sm max-h-[90vh] rounded-3xl overflow-y-auto relative sleek-shadow">
         <div className="p-4 border-b border-border flex justify-between items-center bg-foreground/5">
           <h3 className="font-bold tracking-tight text-foreground">Scan Barcode</h3>
           <div className="flex items-center gap-2">

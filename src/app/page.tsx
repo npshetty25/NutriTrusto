@@ -132,7 +132,6 @@ import { useAuth } from "@/context/auth-context";
 import { supabase } from "@/lib/supabase";
 import { inferItemCategory, type ItemCategory } from "@/lib/item-category";
 import { detectAllergens } from "@/lib/allergens";
-import { detectDivergentAdditives, ADDITIVE_ENTRIES, LAST_REVIEWED } from "@/lib/additive-divergence";
 import { PantryCard, RiskLevel } from "@/components/pantry-card";
 import { ProfileDropdown } from "@/components/profile-dropdown";
 import BarcodeScanner from "@/components/barcode-scanner";
@@ -143,11 +142,11 @@ import { RestockSuggestions } from "@/components/restock-suggestions";
 import { RecipeModal, type GeneratedRecipe } from "@/components/recipe-modal";
 import {
   Camera, BrainCircuit, Loader2, TrendingUp, ScanLine,
-  Clock, X, Trash2, Home as HomeIcon, Info, Activity, Zap, AlertTriangle, CheckCircle2, Search, CircleAlert, Bell, Carrot, Apple, Milk, Drumstick, Wheat, CupSoda, Croissant, Snowflake, Candy, Package, ChevronLeft, ChevronRight, CalendarClock, Pencil, Sparkles, Scale, RefreshCw
+  Clock, X, Trash2, Home as HomeIcon, Info, Activity, Zap, AlertTriangle, CheckCircle2, Search, CircleAlert, Bell, Carrot, Apple, Milk, Drumstick, Wheat, CupSoda, Croissant, Snowflake, Candy, Package, ChevronLeft, ChevronRight, CalendarClock, Pencil, Sparkles, RefreshCw, SlidersHorizontal, Leaf, UtensilsCrossed, Check
 } from "lucide-react";
 import ShoppingListModal from "@/components/shopping-list-modal";
 import { CountUp } from "@/components/count-up";
-import { motion, MotionConfig } from "framer-motion";
+import { motion, AnimatePresence, MotionConfig } from "framer-motion";
 import { toast } from "sonner";
 
 interface Item {
@@ -242,6 +241,10 @@ export default function Home() {
   const [searchQuery, setSearchQuery] = useState("");
   const [riskFilter, setRiskFilter] = useState<"all" | RiskLevel>("all");
   const [inventorySortBy, setInventorySortBy] = useState<"expiring" | "freshest" | "name">("expiring");
+  // Collapsed by default. Twelve controls used to stand between opening the
+  // app and seeing a single item, so on a phone the pantry never appeared
+  // above the fold — in a product whose whole job is "show me what's dying".
+  const [showFilters, setShowFilters] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [showNotificationsPanel, setShowNotificationsPanel] = useState(false);
   const [notifications, setNotifications] = useState<NotificationEntry[]>([]);
@@ -290,6 +293,13 @@ export default function Home() {
   // dropped already-expired items — the most urgent ones — so the bell and the
   // tile showed different numbers on the same screen.
   const urgentNotificationCount = highRiskItems.length;
+
+  const userDietPreference = normalizeDietPreference(String(user?.user_metadata?.dietary_preference || "none"));
+
+  // Counts only settings that are actually narrowing the list, so the badge
+  // on the collapsed Filter button never claims a filter that isn't applied.
+  const activeFilterCount =
+    (riskFilter !== "all" ? 1 : 0) + (isVegMode ? 1 : 0) + (inventorySortBy !== "expiring" ? 1 : 0);
 
   const severityRank: Record<NotificationEntry["severity"], number> = { high: 0, medium: 1, low: 2, info: 3 };
   const visibleNotifications = notifications
@@ -357,6 +367,25 @@ export default function Home() {
     };
   }, [user]);
 
+  // Escape closed the recipe modal but not the notifications panel, the edit
+  // dialog or any of the scanner sheets — verified live before the fix.
+  useEffect(() => {
+    const anyOverlayOpen = showNotificationsPanel || showReceiptMenu || !!editingItem;
+    if (!anyOverlayOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      setShowNotificationsPanel(false);
+      setShowReceiptMenu(false);
+      setEditingItem(null);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [showNotificationsPanel, showReceiptMenu, editingItem]);
+
+  // "day(s)" is a programmer's plural. It appeared in five user-facing
+  // strings while the item card next to them printed "1 day" correctly.
+  const days = (n: number) => `${n} ${n === 1 ? "day" : "days"}`;
+
   const notificationIconMap = {
     vegetable: Carrot,
     fruit: Apple,
@@ -391,7 +420,7 @@ export default function Home() {
       return {
         id: `${row.id}-${createdAt}`,
         title: "Spoilage warning",
-        message: `${row.name} may spoil in ${currentDays} day(s).`,
+        message: `${row.name} may spoil in ${days(currentDays)}.`,
         severity: "high",
         createdAt,
         category,
@@ -402,7 +431,7 @@ export default function Home() {
       return {
         id: `${row.id}-${createdAt}`,
         title: "Use soon",
-        message: `${row.name} is still fresh but should be used within ${currentDays} day(s).`,
+        message: `${row.name} is still fresh but should be used within ${days(currentDays)}.`,
         severity: "medium",
         createdAt,
         category,
@@ -412,7 +441,7 @@ export default function Home() {
     return {
       id: `${row.id}-${createdAt}`,
       title: "Inventory update",
-      message: `${row.name} is in good condition with ${currentDays} day(s) left.`,
+      message: `${row.name} is in good condition with ${days(currentDays)} left.`,
       severity: "info",
       createdAt,
       category,
@@ -543,7 +572,7 @@ export default function Home() {
         if (typeof window !== "undefined" && localStorage.getItem(key)) return;
 
         toast("Expiry Reminder", {
-          description: `${item.name} may spoil in ${item.daysLeft} day(s). Use it soon.`,
+          description: `${item.name} may spoil in ${days(item.daysLeft)}. Use it soon.`,
           action: { label: "Got it", onClick: () => {} },
         });
 
@@ -556,7 +585,12 @@ export default function Home() {
   }, [user, items]);
 
   // ─── Delete item ────────────────────────────────────────────────
-  const deleteItem = async (id: string) => {
+  // One removal path, two meanings. The outcome used to be *guessed* from
+  // whether days_left was still positive, so an item eaten on its last day
+  // and an item found rotten on its last day were recorded identically —
+  // and the Impact Dashboard was built on top of that guess. Now the button
+  // the user actually pressed decides it.
+  const removeItem = async (id: string, outcome: "used" | "expired") => {
     setInlineError(null);
     const itemToUndo = items.find(i => i.id === id);
     if (!itemToUndo) return;
@@ -565,43 +599,48 @@ export default function Home() {
     if (!id.startsWith("seed-")) {
       await supabase.from("pantry_items").delete().eq("id", id);
       if (user) {
-        // Best-effort impact-dashboard log — never blocks the delete, and
-        // silently no-ops if the migration adding this table hasn't run
-        // yet. Outcome is inferred from whether days_left was still
-        // positive at removal time, same heuristic the rest of the UI
-        // already uses for risk/status.
+        // Best-effort impact-dashboard log — never blocks the removal, and
+        // silently no-ops if the migration adding this table hasn't run yet.
         supabase.from("item_outcomes").insert([{
           user_id: user.id,
           name: itemToUndo.name,
           category: inferItemCategory(itemToUndo.name),
-          outcome: itemToUndo.daysLeft > 0 ? "used" : "expired",
+          outcome,
           days_left_at_removal: itemToUndo.daysLeft,
         }]).then(() => {}, () => {});
       }
     }
 
-    toast("Item removed", {
-      description: `${itemToUndo.name} was deleted.`,
-      action: {
-        label: "Undo",
-        onClick: async () => {
-          setItems(prev => [...prev, itemToUndo]);
-          if (!id.startsWith("seed-") && user) {
-            const rowToInsert = {
-               id: itemToUndo.id,
-               user_id: user.id,
-               ...householdIdField(),
-               name: itemToUndo.name,
-               days_left: itemToUndo.daysLeft,
-               risk: itemToUndo.risk,
-               purchase_date: itemToUndo.purchaseDate
-            };
-            await supabase.from("pantry_items").insert([rowToInsert]);
+    toast(
+      outcome === "used" ? `${itemToUndo.name} used up` : "Item removed",
+      {
+        description: outcome === "used"
+          ? "Saved from the bin. It counts towards your impact."
+          : `${itemToUndo.name} was deleted.`,
+        action: {
+          label: "Undo",
+          onClick: async () => {
+            setItems(prev => [...prev, itemToUndo]);
+            if (!id.startsWith("seed-") && user) {
+              const rowToInsert = {
+                 id: itemToUndo.id,
+                 user_id: user.id,
+                 ...householdIdField(),
+                 name: itemToUndo.name,
+                 days_left: itemToUndo.daysLeft,
+                 risk: itemToUndo.risk,
+                 purchase_date: itemToUndo.purchaseDate
+              };
+              await supabase.from("pantry_items").insert([rowToInsert]);
+            }
           }
         }
       }
-    });
+    );
   };
+
+  const deleteItem = (id: string) => removeItem(id, "expired");
+  const markItemUsed = (id: string) => removeItem(id, "used");
 
   // ─── Edit item ──────────────────────────────────────────────────
   const openEditItem = (item: Item) => {
@@ -669,18 +708,47 @@ export default function Home() {
       return d.toISOString();
     };
 
-    const mockPlan = [
-      { name: "Milk", shelfLifeDays: 6, purchasedDaysAgo: 5 },
-      { name: "Paneer", shelfLifeDays: 4, purchasedDaysAgo: 4 },
-      { name: "Spinach", shelfLifeDays: 5, purchasedDaysAgo: 2 },
-      { name: "Banana", shelfLifeDays: 7, purchasedDaysAgo: 1 },
+    // A demo pantry has to look like a real one, which means a spread — not
+    // nine perishables all dying at once plus a bag of frozen peas. The old
+    // plan put 6 of 10 items at critical, so freshness opened at 10% and
+    // every card was red. This spans the whole range across categories
+    // (greens, dairy, staples, fruit, ferment, frozen) and picks a random
+    // subset, so pressing the button twice does not produce the same pantry.
+    const CATALOGUE = [
+      // Critical — the items the rescue recipe exists for
+      { name: "Palak (Spinach)", shelfLifeDays: 4, purchasedDaysAgo: 3 },
+      { name: "Paneer", shelfLifeDays: 5, purchasedDaysAgo: 4 },
+      { name: "Coriander Leaves", shelfLifeDays: 4, purchasedDaysAgo: 3 },
+      { name: "Curd", shelfLifeDays: 7, purchasedDaysAgo: 6 },
       { name: "Chicken Breast", shelfLifeDays: 3, purchasedDaysAgo: 2 },
-      { name: "Tomatoes", shelfLifeDays: 10, purchasedDaysAgo: 4 },
-      { name: "Curd", shelfLifeDays: 8, purchasedDaysAgo: 6 },
-      { name: "Bread", shelfLifeDays: 5, purchasedDaysAgo: 5 },
-      { name: "Orange Juice", shelfLifeDays: 12, purchasedDaysAgo: 3 },
-      { name: "Frozen Peas", shelfLifeDays: 45, purchasedDaysAgo: 10 },
+      { name: "Mushrooms", shelfLifeDays: 5, purchasedDaysAgo: 4 },
+      // Expiring soon
+      { name: "Milk", shelfLifeDays: 6, purchasedDaysAgo: 2 },
+      { name: "Bhindi (Okra)", shelfLifeDays: 7, purchasedDaysAgo: 3 },
+      { name: "Bread", shelfLifeDays: 6, purchasedDaysAgo: 2 },
+      { name: "Bananas", shelfLifeDays: 7, purchasedDaysAgo: 3 },
+      { name: "Tomatoes", shelfLifeDays: 10, purchasedDaysAgo: 6 },
+      { name: "Eggs", shelfLifeDays: 21, purchasedDaysAgo: 16 },
+      // Comfortable
+      { name: "Carrots", shelfLifeDays: 14, purchasedDaysAgo: 4 },
+      { name: "Cabbage", shelfLifeDays: 16, purchasedDaysAgo: 3 },
+      { name: "Onions", shelfLifeDays: 30, purchasedDaysAgo: 6 },
+      { name: "Potatoes", shelfLifeDays: 28, purchasedDaysAgo: 5 },
+      { name: "Ginger", shelfLifeDays: 21, purchasedDaysAgo: 4 },
+      { name: "Toor Dal", shelfLifeDays: 180, purchasedDaysAgo: 20 },
+      { name: "Basmati Rice", shelfLifeDays: 365, purchasedDaysAgo: 30 },
+      { name: "Frozen Peas", shelfLifeDays: 90, purchasedDaysAgo: 12 },
+      { name: "Amul Butter", shelfLifeDays: 60, purchasedDaysAgo: 10 },
+      { name: "Mango Pickle", shelfLifeDays: 240, purchasedDaysAgo: 40 },
     ];
+
+    // Stratified pick so every demo still has something critical to rescue
+    // (the recipe card only appears when it does) without being all red.
+    const sample = <T,>(pool: T[], n: number) =>
+      [...pool].sort(() => Math.random() - 0.5).slice(0, n);
+    const mockPlan = sample(CATALOGUE.slice(0, 6), 3)
+      .concat(sample(CATALOGUE.slice(6, 12), 3))
+      .concat(sample(CATALOGUE.slice(12), 4));
 
     const rows = mockPlan.map((entry) => {
       const currentDays = Math.max(0, entry.shelfLifeDays - entry.purchasedDaysAgo);
@@ -718,7 +786,7 @@ export default function Home() {
 
     setItems((prev) => [...mapped, ...prev]);
     toast("Demo data added", {
-      description: `Added ${mapped.length} mock items for spoilage/risk testing.`,
+      description: `${mapped.length} sample items across every freshness level.`,
     });
     setIsSeedingMockData(false);
   };
@@ -795,9 +863,14 @@ export default function Home() {
     }
 
     setIsAddingToShoppingList(true);
-    const rows = missing.map((name) => ({
+    // The amount is written into the name with an em-dash separator rather
+    // than a new column, so this needs no migration and can never half-work
+    // against a database that hasn't been updated. ShoppingListModal splits
+    // on the same separator to lay the two parts out; a row without one
+    // (anything typed by hand, or added before this) still renders fine.
+    const rows = missing.map((row) => ({
       user_id: user.id,
-      name,
+      name: row.quantity ? `${row.item} — ${row.quantity}` : row.item,
       source_recipe: generatedRecipe.title,
     }));
 
@@ -1234,8 +1307,8 @@ if (nutritionFieldsFilled < 2) {
        });
        toast("Added to Pantry", {
          description: scannedExpiry
-           ? `Using scanned expiry date: ${initialDaysLeft} day(s) left.`
-           : `No expiry date scanned — defaulted to ${DEFAULT_SCANNED_ITEM_DAYS_LEFT} day(s). You can scan the expiry date next time for accuracy.`,
+           ? `Using scanned expiry date: ${days(initialDaysLeft)} left.`
+           : `No expiry date scanned — defaulted to ${days(DEFAULT_SCANNED_ITEM_DAYS_LEFT)}. You can scan the expiry date next time for accuracy.`,
        });
     } else if (error) {
        setInlineError("Item was analyzed, but could not be saved to cloud inventory.");
@@ -1308,8 +1381,8 @@ if (nutritionFieldsFilled < 2) {
     });
     toast("Expiry date detected", {
       description: expiry.expiry_date
-        ? `${expiry.days_left} day(s) left (expires ${expiry.expiry_date}).`
-        : `${expiry.days_left} day(s) left.`,
+        ? `${days(expiry.days_left)} left (expires ${expiry.expiry_date}).`
+        : `${days(expiry.days_left)} left.`,
     });
   };
 
@@ -1415,7 +1488,11 @@ if (nutritionFieldsFilled < 2) {
             }}
             className="neu-pressable flex-1 rounded-2xl p-4"
           >
-            <div className="flex items-center gap-2 mb-2 opacity-70">
+            {/* No wrapper opacity here: it used to multiply with the span's
+                own /70 to an effective 0.49 alpha, so this eyebrow measured
+                3.32:1 while the identical one on the Critical tile measured
+                6.55:1. Two paired labels, two different readabilities. */}
+            <div className="flex items-center gap-2 mb-2">
               <TrendingUp size={14} className="text-safe" />
               <span className="text-[10px] uppercase font-semibold tracking-widest text-foreground/70">Pantry Freshness</span>
             </div>
@@ -1463,21 +1540,26 @@ if (nutritionFieldsFilled < 2) {
 
         <RestockSuggestions currentItemNames={items.map((i) => i.name)} />
 
-        {/* AI Recipe Card */}
+      </header>
+
+        {/* Recipe prompt. Lives outside <header> — it is a suggestion, not
+            part of the site banner, and it sat above the section holding the
+            actual data. It carries its own padding now that it no longer
+            inherits the header's. */}
         {highRiskItems.length > 0 && (
-          <div className="rounded-xl border border-border bg-foreground text-background overflow-hidden">
+          <div className="mx-4 mt-5 neu-raised rounded-2xl overflow-hidden">
             {!generatedRecipe ? (
               <div className="p-4 flex flex-col gap-4">
                 <div>
                   <h2 className="font-semibold text-sm flex items-center gap-2"><BrainCircuit size={14} /> Use up what's expiring</h2>
-                  <p className="text-xs text-background/70 mt-1">Cook something using what expires first.</p>
+                  <p className="text-xs text-foreground/60 mt-1">Cook something using what expires first.</p>
                 </div>
                 <motion.button
                   whileHover={{ scale: isGeneratingRecipe ? 1 : 1.04 }}
                   whileTap={{ scale: isGeneratingRecipe ? 1 : 0.96 }}
                   onClick={() => generateRecipe()}
                   disabled={isGeneratingRecipe}
-                  className="w-full justify-center flex items-center gap-2 bg-background text-foreground text-xs font-semibold px-5 py-2.5 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-60 whitespace-nowrap"
+                  className="w-full justify-center flex items-center gap-2 bg-foreground text-background text-sm font-semibold px-5 h-11 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-60 whitespace-nowrap"
                 >
                   {isGeneratingRecipe ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
                   {isGeneratingRecipe ? "Finding..." : "Find a Recipe"}
@@ -1488,29 +1570,29 @@ if (nutritionFieldsFilled < 2) {
                 <div className="p-4 space-y-3">
                   <div>
                     <h4 className="font-bold text-lg leading-tight">{generatedRecipe.title}</h4>
-                    <div className="flex items-center gap-1.5 text-background/60 text-[11px] mt-1">
+                    <div className="flex items-center gap-1.5 text-foreground/55 text-[11px] mt-1">
                       <Clock size={11} /> {generatedRecipe.prepTime}
                     </div>
                   </div>
 
                   <div className="flex items-stretch gap-3">
                     <div className="flex-1">
-                      <p className="text-[10px] font-semibold uppercase tracking-widest text-background/50">Saves</p>
+                      <p className="text-[10px] font-semibold uppercase tracking-widest text-foreground/55">Saves</p>
                       <p className="text-xl font-bold tracking-tight tabular-nums leading-tight">
-                        {generatedRecipe.fromPantry.length}<span className="text-[11px] font-medium text-background/60 ml-1">of your items</span>
+                        {generatedRecipe.fromPantry.length}<span className="text-[11px] font-medium text-foreground/60 ml-1">of your items</span>
                       </p>
                     </div>
-                    <div className="w-px bg-background/15" />
+                    <div className="w-px bg-border" />
                     <div className="flex-1">
-                      <p className="text-[10px] font-semibold uppercase tracking-widest text-background/50">To buy</p>
+                      <p className="text-[10px] font-semibold uppercase tracking-widest text-foreground/55">To buy</p>
                       <p className="text-xl font-bold tracking-tight tabular-nums leading-tight">
-                        {generatedRecipe.toBuy.length}<span className="text-[11px] font-medium text-background/60 ml-1">{generatedRecipe.toBuy.length === 1 ? "ingredient" : "ingredients"}</span>
+                        {generatedRecipe.toBuy.length}<span className="text-[11px] font-medium text-foreground/60 ml-1">{generatedRecipe.toBuy.length === 1 ? "ingredient" : "ingredients"}</span>
                       </p>
                     </div>
                   </div>
 
                   {generatedRecipe.usesItems.length > 0 && (
-                    <p className="text-[11px] leading-relaxed text-background/70">
+                    <p className="text-[11px] leading-relaxed text-foreground/70">
                       Uses {generatedRecipe.usesItems.slice(0, 4).join(", ")}
                       {generatedRecipe.usesItems.length > 4 ? ` +${generatedRecipe.usesItems.length - 4} more` : ""}.
                     </p>
@@ -1519,14 +1601,14 @@ if (nutritionFieldsFilled < 2) {
                   <div className="flex gap-2">
                     <button
                       onClick={() => setShowRecipe(true)}
-                      className="flex-1 flex items-center justify-center gap-1.5 bg-background text-foreground text-xs font-semibold px-3 py-2.5 rounded-lg hover:opacity-90 transition-opacity"
+                      className="flex-1 flex items-center justify-center gap-1.5 bg-foreground text-background text-xs font-semibold px-3 h-11 rounded-xl hover:opacity-90 transition-opacity"
                     >
                       View recipe
                     </button>
                     <button
                       onClick={tryAnotherRecipe}
                       disabled={isGeneratingRecipe}
-                      className="flex items-center justify-center gap-1.5 border border-background/30 text-background text-xs font-semibold px-3 py-2.5 rounded-lg hover:bg-background/10 transition-all disabled:opacity-60"
+                      className="neu-raised-sm flex items-center justify-center gap-1.5 text-foreground/80 text-xs font-semibold px-3 h-11 rounded-xl transition-all disabled:opacity-60"
                     >
                       {isGeneratingRecipe ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
                       Another
@@ -1537,7 +1619,6 @@ if (nutritionFieldsFilled < 2) {
             )}
           </div>
         )}
-      </header>
 
       {showNotificationsPanel && (
         <>
@@ -1545,13 +1626,33 @@ if (nutritionFieldsFilled < 2) {
             aria-hidden="true"
             tabIndex={-1}
             onClick={() => setShowNotificationsPanel(false)}
-            className="fixed inset-0 z-40 bg-black/20 backdrop-blur-[1px]"
+            className="fixed inset-0 z-40 bg-black/25 backdrop-blur-[2px]"
           />
-          <div className="fixed top-20 left-4 right-4 z-50 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:w-105 bg-card border border-border rounded-2xl shadow-2xl overflow-hidden">
-            <div className="px-4 py-3 border-b border-border flex items-center justify-between gap-2">
-              <div className="min-w-0">
-                <h3 className="text-sm font-bold tracking-tight">Notifications</h3>
-                <p className="text-[11px] text-foreground/60">Scroll to load more</p>
+          {/* role/aria-modal/Escape were all missing: this was a plain div,
+              so a screen-reader user got no announcement and Escape did
+              nothing at all while the panel was open. */}
+          <motion.div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="notifications-heading"
+            initial={{ opacity: 0, y: -12, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ type: "spring", stiffness: 320, damping: 28 }}
+            className="neu-panel fixed top-20 left-4 right-4 z-50 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:w-105 rounded-3xl overflow-hidden"
+          >
+            <div className="px-4 py-3.5 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${urgentNotificationCount > 0 ? "bg-danger/15 text-danger-strong" : "bg-safe/15 text-safe-strong"}`}>
+                  <Bell size={16} />
+                </div>
+                <div className="min-w-0">
+                  <h3 id="notifications-heading" className="text-sm font-bold tracking-tight">Needs your attention</h3>
+                  <p className="text-[11px] text-foreground/60">
+                    {urgentNotificationCount > 0
+                      ? `${urgentNotificationCount} ${urgentNotificationCount === 1 ? "item is" : "items are"} critical`
+                      : "Nothing is critical right now"}
+                  </p>
+                </div>
               </div>
               <div className="flex items-center gap-1 shrink-0">
                 {notifications.length > 0 && (
@@ -1559,49 +1660,55 @@ if (nutritionFieldsFilled < 2) {
                     onClick={clearAllNotifications}
                     className="text-[11px] font-semibold text-foreground/60 hover:text-foreground px-2.5 py-1.5 rounded-lg hover:bg-foreground/5 transition-colors whitespace-nowrap"
                   >
-                    Clear All
+                    Clear all
                   </button>
                 )}
                 <button
                   title="Close notifications"
                   aria-label="Close notifications"
                   onClick={() => setShowNotificationsPanel(false)}
-                  className="w-8 h-8 rounded-full hover:bg-foreground/5 flex items-center justify-center shrink-0"
+                  className="neu-raised-sm w-9 h-9 rounded-xl flex items-center justify-center shrink-0 text-foreground/70"
                 >
-                  <X size={16} />
+                  <X size={15} />
                 </button>
               </div>
             </div>
 
             {notifications.length > 0 && (
-              <div className="px-3 pt-3 grid grid-cols-2 gap-2">
+              <div className="px-3 pb-3 grid grid-cols-2 gap-2">
                 <select
                   value={notificationSeverityFilter}
                   onChange={(e) => setNotificationSeverityFilter(e.target.value as typeof notificationSeverityFilter)}
-                  title="Filter by severity"
-                  className="bg-background border border-border rounded-lg px-2 py-1.5 text-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground/60 focus:border-foreground/60"
+                  aria-label="Filter notifications by severity"
+                  className="neu-field rounded-lg px-2 h-9 text-xs"
                 >
-                  <option value="all">All Severities</option>
-                  <option value="high">High</option>
-                  <option value="medium">Medium</option>
-                  <option value="low">Low</option>
+                  <option value="all">All severities</option>
+                  <option value="high">Critical</option>
+                  <option value="medium">Expiring soon</option>
+                  <option value="low">Still good</option>
                   <option value="info">Info</option>
                 </select>
                 <select
                   value={notificationSort}
                   onChange={(e) => setNotificationSort(e.target.value as typeof notificationSort)}
-                  title="Sort"
-                  className="bg-background border border-border rounded-lg px-2 py-1.5 text-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground/60 focus:border-foreground/60"
+                  aria-label="Sort notifications"
+                  className="neu-field rounded-lg px-2 h-9 text-xs"
                 >
-                  <option value="newest">Newest First</option>
-                  <option value="urgent">Most Urgent First</option>
+                  <option value="newest">Newest first</option>
+                  <option value="urgent">Most urgent first</option>
                 </select>
               </div>
             )}
 
-            <div onScroll={handleNotificationsScroll} className="max-h-96 overflow-y-auto p-3 space-y-2">
+            <div onScroll={handleNotificationsScroll} className="max-h-96 overflow-y-auto px-3 pb-3 space-y-2">
               {notifications.length === 0 && !notificationsLoading && (
-                <div className="text-center py-8 text-sm text-foreground/60">No notifications yet.</div>
+                <div className="text-center py-10 px-6">
+                  <div className="neu-raised w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-3 text-safe">
+                    <CheckCircle2 size={22} />
+                  </div>
+                  <p className="text-sm font-semibold text-foreground">All clear</p>
+                  <p className="text-xs text-foreground/60 mt-1 leading-relaxed">Nothing in your pantry needs attention today.</p>
+                </div>
               )}
 
               {notifications.length > 0 && visibleNotifications.length === 0 && (
@@ -1610,22 +1717,39 @@ if (nutritionFieldsFilled < 2) {
 
               {visibleNotifications.map((note) => {
                 const NoteIcon = notificationIconMap[note.category];
+                // The severity stripe carries the reading, so the row itself
+                // can stay quiet. Before, every row was an identical grey box
+                // with the word "high" set in small caps beside it.
+                const tone = note.severity === "high"
+                  ? { stripe: "bg-danger", chip: "bg-danger/15 text-danger-strong", label: "Critical" }
+                  : note.severity === "medium"
+                    ? { stripe: "bg-warning", chip: "bg-warning/15 text-warning-strong", label: "Soon" }
+                    : note.severity === "low"
+                      ? { stripe: "bg-safe", chip: "bg-safe/15 text-safe-strong", label: "Fine" }
+                      : { stripe: "bg-foreground/25", chip: "bg-foreground/10 text-foreground/70", label: "Info" };
 
                 return (
-                  <div key={note.id} className="rounded-xl border border-border bg-background px-3 py-2.5">
-                    <div className="flex items-center justify-between gap-2 mb-1">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <div className="w-6 h-6 rounded-md bg-foreground/6 border border-border flex items-center justify-center text-foreground/70 shrink-0">
-                          <NoteIcon size={13} />
+                  <motion.div
+                    key={note.id}
+                    initial={{ opacity: 0, x: -8 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ type: "spring", stiffness: 340, damping: 30 }}
+                    className="neu-raised-sm rounded-xl overflow-hidden flex"
+                  >
+                    <div className={`w-1 shrink-0 ${tone.stripe}`} />
+                    <div className="flex-1 min-w-0 px-3 py-2.5">
+                      <div className="flex items-center justify-between gap-2 mb-1">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <NoteIcon size={14} className="text-foreground/55 shrink-0" />
+                          <p className="text-xs font-bold text-foreground truncate">{note.title}</p>
                         </div>
-                        <p className="text-xs font-semibold text-foreground truncate">{note.title}</p>
+                        <span className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full shrink-0 ${tone.chip}`}>
+                          {tone.label}
+                        </span>
                       </div>
-                      <span className={`text-[10px] font-bold uppercase tracking-wide ${note.severity === "high" ? "text-danger" : note.severity === "medium" ? "text-warning" : "text-foreground/60"}`}>
-                        {note.severity}
-                      </span>
+                      <p className="text-xs text-foreground/70 leading-relaxed">{note.message}</p>
                     </div>
-                    <p className="text-xs text-foreground/70 leading-relaxed">{note.message}</p>
-                  </div>
+                  </motion.div>
                 );
               })}
 
@@ -1636,10 +1760,10 @@ if (nutritionFieldsFilled < 2) {
               )}
 
               {!notificationsLoading && !hasMoreNotifications && notifications.length > 0 && (
-                <p className="text-center text-[11px] text-foreground/40 py-2">No more notifications</p>
+                <p className="text-center text-[11px] text-foreground/40 py-2">That is everything</p>
               )}
             </div>
-          </div>
+          </motion.div>
         </>
       )}
 
@@ -1661,74 +1785,116 @@ if (nutritionFieldsFilled < 2) {
           </div>
         )}
 
-        <div className="flex flex-col gap-3 mb-4">
-          <h2 id="inventory-heading" className="font-semibold text-sm uppercase tracking-widest text-foreground/70">Inventory Log</h2>
-          <div className="flex items-center flex-wrap gap-2">
-            <button
-              onClick={() => { void addMockInventoryData(); }}
-              disabled={isSeedingMockData}
-              className="h-9 px-3 rounded-xl border border-border bg-card text-xs font-semibold hover:bg-foreground/5 transition-colors disabled:opacity-60 flex items-center gap-2"
-              title="Insert mock pantry items"
-            >
-              {isSeedingMockData ? <Loader2 size={14} className="animate-spin" /> : <Package size={14} />}
-              Add Demo Data
-            </button>
-            {/* A real toggle group: it silently filters the whole pantry, so
-                it needs a name and a pressed state, not two anonymous pills. */}
-            <div role="group" aria-label="Filter by diet" className="flex items-center gap-1 bg-foreground/5 p-1 rounded-full border border-border/50 w-fit">
-            <button
-              onClick={() => setIsVegMode(true)}
-              aria-pressed={isVegMode}
-              className={`px-4 h-10 text-xs font-bold rounded-full transition-all ${isVegMode ? "bg-safe/20 text-safe-strong dark:text-safe shadow-sm" : "text-foreground/70 hover:text-foreground"}`}
-            >
-              Veg only
-            </button>
-            <button
-              onClick={() => setIsVegMode(false)}
-              aria-pressed={!isVegMode}
-              className={`px-4 h-10 text-xs font-bold rounded-full transition-all ${!isVegMode ? "bg-card text-foreground shadow-sm" : "text-foreground/70 hover:text-foreground"}`}
-            >
-              All items
-            </button>
-            </div>
-          </div>
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <h2 id="inventory-heading" className="font-semibold text-sm uppercase tracking-widest text-foreground/70">Your Pantry</h2>
+          <p className="text-xs font-medium text-foreground/60 tabular-nums shrink-0">
+            {dbLoading ? "Loading…" : `${inventoryFilteredItems.length} ${inventoryFilteredItems.length === 1 ? "item" : "items"}`}
+          </p>
         </div>
-        <div className="grid grid-cols-1 gap-2 mb-4">
-          <div className="relative">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground/40" />
+
+        <div className="flex items-center gap-2 mb-3">
+          <div className="relative flex-1">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground/50 pointer-events-none" />
+            <label htmlFor="pantry-search" className="sr-only">Search your pantry</label>
             <input
+              id="pantry-search"
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search inventory..."
-              className="w-full bg-card border border-border rounded-xl pl-9 pr-3 py-2.5 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground/60 focus:border-foreground/60"
+              placeholder="Search your pantry…"
+              className="neu-field w-full rounded-xl pl-9 pr-3 h-11 text-sm"
             />
           </div>
-          <select
-            value={riskFilter}
-            onChange={(e) => setRiskFilter(e.target.value as "all" | RiskLevel)}
-            className="bg-card border border-border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground/60 focus:border-foreground/60"
-            title="Filter by risk"
+          <button
+            onClick={() => setShowFilters((v) => !v)}
+            aria-expanded={showFilters}
+            aria-controls="pantry-filters"
+            title="Filter and sort"
+            className={`neu-pressable relative h-11 w-11 shrink-0 rounded-xl flex items-center justify-center ${showFilters ? "text-brand" : "text-foreground/70"}`}
           >
-            <option value="all">All Risk</option>
-            <option value="high">High Risk</option>
-            <option value="medium">Medium Risk</option>
-            <option value="low">Low Risk</option>
-          </select>
-          <select
-            value={inventorySortBy}
-            onChange={(e) => setInventorySortBy(e.target.value as typeof inventorySortBy)}
-            className="bg-card border border-border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground/60 focus:border-foreground/60"
-            title="Sort inventory"
-          >
-            <option value="expiring">Expiring Soon</option>
-            <option value="freshest">Freshest First</option>
-            <option value="name">Name (A-Z)</option>
-          </select>
-          <div className="text-xs font-medium text-foreground/60 flex items-center justify-start px-1">
-            {dbLoading ? "Loading..." : `Showing ${inventoryFilteredItems.length} items`}
-          </div>
+            <SlidersHorizontal size={16} />
+            {/* A collapsed control must still say when it is doing something,
+                or a filtered list reads as a missing list. */}
+            {activeFilterCount > 0 && (
+              <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-brand text-white text-[10px] font-bold flex items-center justify-center leading-none tabular-nums">
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
         </div>
+
+        <AnimatePresence initial={false}>
+          {showFilters && (
+            <motion.div
+              id="pantry-filters"
+              key="filters"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+              className="overflow-hidden"
+            >
+              <div className="neu-inset rounded-2xl p-3 mb-4 flex flex-col gap-3">
+                <div role="group" aria-label="Filter by diet" className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => setIsVegMode(true)}
+                    aria-pressed={isVegMode}
+                    className={`h-11 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${isVegMode ? "bg-safe/20 text-safe-strong" : "neu-raised-sm text-foreground/70 hover:text-foreground"}`}
+                  >
+                    <Leaf size={14} /> Veg only
+                  </button>
+                  <button
+                    onClick={() => setIsVegMode(false)}
+                    aria-pressed={!isVegMode}
+                    className={`h-11 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${!isVegMode ? "bg-foreground/10 text-foreground" : "neu-raised-sm text-foreground/70 hover:text-foreground"}`}
+                  >
+                    <UtensilsCrossed size={14} /> All items
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="flex flex-col gap-1.5">
+                    <label htmlFor="risk-filter" className="text-[10px] font-semibold uppercase tracking-widest text-foreground/60">Show</label>
+                    <select
+                      id="risk-filter"
+                      value={riskFilter}
+                      onChange={(e) => setRiskFilter(e.target.value as "all" | RiskLevel)}
+                      className="neu-field rounded-xl px-3 h-11 text-sm"
+                    >
+                      <option value="all">Everything</option>
+                      <option value="high">Critical only</option>
+                      <option value="medium">Expiring soon</option>
+                      <option value="low">Still good</option>
+                    </select>
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label htmlFor="sort-order" className="text-[10px] font-semibold uppercase tracking-widest text-foreground/60">Sort by</label>
+                    <select
+                      id="sort-order"
+                      value={inventorySortBy}
+                      onChange={(e) => setInventorySortBy(e.target.value as typeof inventorySortBy)}
+                      className="neu-field rounded-xl px-3 h-11 text-sm"
+                    >
+                      <option value="expiring">Dying first</option>
+                      <option value="freshest">Freshest first</option>
+                      <option value="name">Name (A-Z)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => { void addMockInventoryData(); }}
+                  disabled={isSeedingMockData}
+                  className="neu-raised-sm h-11 rounded-xl text-xs font-semibold disabled:opacity-60 flex items-center justify-center gap-2 text-foreground/80"
+                  title="Insert a sample pantry for testing and demos"
+                >
+                  {isSeedingMockData ? <Loader2 size={14} className="animate-spin" /> : <Package size={14} />}
+                  Add Demo Data
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {dbLoading ? (
           <div className="flex items-center justify-center py-20">
@@ -1771,35 +1937,52 @@ if (nutritionFieldsFilled < 2) {
                 ? getHealthierAlternativeHint(inferItemCategory(item.name))
                 : undefined;
               const detectedAllergens = item.ingredientsText ? detectAllergens(item.ingredientsText) : null;
-              const divergentAdditives = detectDivergentAdditives(item.ingredientsText);
 
               return (
-                <div key={item.id} className="relative group">
-                  <PantryCard
-                    {...item}
-                    healthScore={item.healthScore}
-                    dietMatch={isVegMode ? true : isVegItem(item.name)}
-                    healthierAlternative={healthierAlternative}
-                    detectedAllergens={detectedAllergens}
-                    divergentAdditives={divergentAdditives}
-                  />
-                  <button
-                    onClick={() => openEditItem(item)}
-                    className="absolute bottom-3 right-[4.25rem] w-11 h-11 flex items-center justify-center bg-foreground text-background rounded-full shadow-lg z-20 active:scale-95 transition-all opacity-90 hover:opacity-100"
-                    title="Edit item"
-                    aria-label="Edit item"
-                  >
-                    <Pencil size={16} />
-                  </button>
-                  <button
-                    onClick={() => deleteItem(item.id)}
-                    className="absolute bottom-3 right-3 w-11 h-11 flex items-center justify-center bg-danger text-white rounded-full shadow-lg z-20 active:scale-95 transition-all opacity-90 hover:opacity-100"
-                    title="Remove item"
-                    aria-label={`Remove ${item.name}`}
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </div>
+                <PantryCard
+                  key={item.id}
+                  {...item}
+                  healthScore={item.healthScore}
+                  // The chip used to read `isVegMode ? true : isVegItem(name)`,
+                  // so with the "All items" view selected a chicken breast
+                  // showed a red DIET WARNING to a non-vegetarian — the view
+                  // toggle was standing in for the user's actual preference.
+                  dietMatch={userDietPreference === "veg" ? isVegItem(item.name) : true}
+                  healthierAlternative={healthierAlternative}
+                  detectedAllergens={detectedAllergens}
+                  actions={
+                    /* "Used it" is the point of the whole product and it did
+                       not exist: the only way an item ever left the pantry
+                       was a red trash can, so eating your food and wasting it
+                       were the same gesture. item_outcomes already stores the
+                       difference — only the UI was missing. */
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => { void markItemUsed(item.id); }}
+                        className="flex-1 h-11 rounded-xl bg-safe/15 text-safe-strong text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-safe/25 transition-colors"
+                        title={`Mark ${item.name} as used`}
+                      >
+                        <Check size={15} /> Used it
+                      </button>
+                      <button
+                        onClick={() => openEditItem(item)}
+                        className="neu-raised-sm w-11 h-11 shrink-0 rounded-xl flex items-center justify-center text-foreground/70 hover:text-foreground transition-colors"
+                        title="Edit item"
+                        aria-label={`Edit ${item.name}`}
+                      >
+                        <Pencil size={15} />
+                      </button>
+                      <button
+                        onClick={() => deleteItem(item.id)}
+                        className="neu-raised-sm w-11 h-11 shrink-0 rounded-xl flex items-center justify-center text-foreground/50 hover:text-danger transition-colors"
+                        title="Threw it away"
+                        aria-label={`Remove ${item.name}`}
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
+                  }
+                />
               );
             })}
 
@@ -1842,7 +2025,7 @@ if (nutritionFieldsFilled < 2) {
       <nav aria-label="Primary" className="fixed bottom-4 left-3 right-3 z-50 flex flex-col items-center">
         {/* Receipt Action Menu */}
         {showReceiptMenu && (
-          <div className="mb-4 bg-card border border-border shadow-2xl rounded-2xl p-2 flex flex-col gap-2 w-full max-w-xs animate-in slide-in-from-bottom-2 fade-in duration-200">
+          <div className="neu-panel mb-4 rounded-2xl p-2 flex flex-col gap-2 w-full max-w-xs animate-in slide-in-from-bottom-2 fade-in duration-200">
             <button 
               onClick={() => cameraInputRef.current?.click()}
               className="flex items-center gap-3 p-3 rounded-xl hover:bg-foreground/5 text-foreground font-semibold text-sm transition-colors"
@@ -1914,7 +2097,7 @@ if (nutritionFieldsFilled < 2) {
 
       {isAnalyzingFood && (
         <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center">
-          <div className="bg-card p-6 rounded-2xl border border-border shadow-2xl flex flex-col items-center gap-4">
+          <div className="neu-panel p-6 rounded-2xl flex flex-col items-center gap-4">
             <Loader2 size={32} className="animate-spin text-foreground" />
             <p className="text-sm font-medium">Analyzing Ingredients...</p>
           </div>
@@ -1923,10 +2106,10 @@ if (nutritionFieldsFilled < 2) {
 
       {scannedResult && (
         <div className="fixed inset-0 z-50 bg-background/90 backdrop-blur-sm flex items-center justify-center p-0 sm:p-4 animate-in fade-in zoom-in-95 duration-200">
-          <div className="bg-card w-full h-full sm:h-auto sm:max-h-[90vh] sm:max-w-md sm:rounded-3xl border-0 sm:border border-border shadow-2xl overflow-hidden flex flex-col">
+          <div role="dialog" aria-modal="true" aria-labelledby="scanned-result-heading" className="neu-panel w-full h-full border-0 sm:h-auto sm:max-h-[90vh] sm:max-w-md sm:rounded-3xl sm:border overflow-hidden flex flex-col">
             {/* Header */}
             <div className="sticky top-0 bg-card/80 backdrop-blur-md z-10 border-b border-border px-5 py-4 flex justify-between items-center">
-              <h3 className="font-bold text-lg text-foreground truncate pr-4">{scannedResult.name}</h3>
+              <h3 id="scanned-result-heading" className="font-bold text-lg text-foreground truncate pr-4">{scannedResult.name}</h3>
               <button onClick={() => { setScannedResult(null); setScannedExpiry(null); }} title="Close analysis" aria-label="Close analysis" className="w-8 h-8 flex items-center justify-center rounded-full bg-foreground/10 hover:bg-foreground/20 text-foreground transition-colors shrink-0">
                 <X size={18} />
               </button>
@@ -1939,7 +2122,7 @@ if (nutritionFieldsFilled < 2) {
                   <span className="text-xs font-bold uppercase tracking-widest text-foreground/60 mb-1">Expiry Date</span>
                   {scannedExpiry ? (
                     <>
-                      <span className="text-lg font-black">{scannedExpiry.daysLeft} day(s) left</span>
+                      <span className="text-lg font-black">{days(scannedExpiry.daysLeft)} left</span>
                       <span className="text-[11px] text-foreground/60 truncate">
                         {scannedExpiry.expiryDate ? `Expires ${scannedExpiry.expiryDate}` : "From printed shelf-life"}
                         {scannedExpiry.confidence !== "high" ? " · double-check label" : ""}
@@ -2030,64 +2213,6 @@ if (nutritionFieldsFilled < 2) {
                 </div>
               )}
 
-              {/* Regulatory notes — uncoloured by design (The Annotation
-                  Rule in DESIGN.md). Sits below the concerns because a
-                  citation is context for the score, not a finding that
-                  outranks it. */}
-              {(() => {
-                const divergent = detectDivergentAdditives(scannedResult.ingredients);
-                if (divergent === null) {
-                  return (
-                    <div className="space-y-3">
-                      <h4 className="font-bold flex items-center gap-2 text-foreground">
-                        <Scale size={16} className="text-foreground/60" /> Regulatory Notes
-                      </h4>
-                      <p className="text-xs leading-relaxed text-foreground/55 bg-foreground/5 rounded-2xl border border-border/50 p-3.5">
-                        No ingredient list was available for this product, so its additives
-                        could not be checked.
-                      </p>
-                    </div>
-                  );
-                }
-                return (
-                  <div className="space-y-3">
-                    <h4 className="font-bold flex items-center gap-2 text-foreground">
-                      <Scale size={16} className="text-foreground/60" /> Regulatory Notes
-                    </h4>
-                    {divergent.length === 0 ? (
-                      <p className="text-xs leading-relaxed text-foreground/55 bg-foreground/5 rounded-2xl border border-border/50 p-3.5">
-                        None of the {ADDITIVE_ENTRIES.length} substances we track were found in
-                        this ingredient list.
-                      </p>
-                    ) : (
-                      <div className="bg-foreground/5 rounded-2xl border border-border/50 divide-y divide-border/50 overflow-hidden">
-                        {divergent.map((entry) => (
-                          <div key={entry.id} className="p-3.5 space-y-1.5">
-                            <p className="text-sm font-bold text-foreground">
-                              {entry.name}
-                              {entry.eNumber && (
-                                <span className="ml-1.5 font-mono text-[11px] font-semibold text-foreground/60">
-                                  {entry.eNumber}
-                                </span>
-                              )}
-                            </p>
-                            <p className="text-[11px] leading-relaxed text-foreground/70">
-                              {entry.summary}
-                            </p>
-                            <p className="text-[10px] leading-relaxed text-foreground/40">
-                              {entry.source}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    <p className="text-[10px] leading-relaxed text-foreground/40 px-1">
-                      Records of what regulators decided, not a judgement about safety.
-                      Hand-maintained list, last checked {LAST_REVIEWED}.
-                    </p>
-                  </div>
-                );
-              })()}
 
               {/* What You'll Like */}
               {scannedResult.analysis.positives?.length > 0 && (
@@ -2146,7 +2271,7 @@ if (nutritionFieldsFilled < 2) {
                 onClick={() => { void addScannedItemToPantry(); }} 
                 className="w-full bg-foreground text-background font-bold text-sm py-4 rounded-2xl hover:opacity-90 active:scale-[0.98] transition-all shadow-xl"
               >
-                Add to Hub Inventory
+                Add to My Pantry
               </button>
             </div>
           </div>
@@ -2155,9 +2280,9 @@ if (nutritionFieldsFilled < 2) {
 
       {editingItem && (
         <div className="fixed inset-0 z-50 bg-background/85 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-card border border-border rounded-2xl shadow-2xl p-5">
+          <div role="dialog" aria-modal="true" aria-labelledby="edit-item-heading" className="neu-panel w-full max-w-md rounded-2xl p-5">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold tracking-tight">Edit Item</h3>
+              <h3 id="edit-item-heading" className="text-lg font-bold tracking-tight">Edit Item</h3>
               <button onClick={closeEditItem} title="Close edit" aria-label="Close edit" className="w-8 h-8 flex items-center justify-center rounded-full bg-foreground/10 hover:bg-foreground/20 transition-colors">
                 <X size={16} />
               </button>
@@ -2210,8 +2335,8 @@ if (nutritionFieldsFilled < 2) {
 
       {manualBarcodeEntry && (
         <div className="fixed inset-0 z-50 bg-background/85 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-card border border-border rounded-2xl shadow-2xl p-5">
-            <h3 className="text-lg font-bold tracking-tight mb-1">Item not found in global database</h3>
+          <div role="dialog" aria-modal="true" aria-labelledby="manual-barcode-heading" className="neu-panel w-full max-w-md rounded-2xl p-5">
+            <h3 id="manual-barcode-heading" className="text-lg font-bold tracking-tight mb-1">Item not found in global database</h3>
             <p className="text-sm text-foreground/60 mb-4">
               Enter the product name for barcode {manualBarcodeEntry.code} to continue AI analysis.
             </p>
@@ -2300,8 +2425,8 @@ if (nutritionFieldsFilled < 2) {
 
       {barcodeRetryPrompt && (
         <div className="fixed inset-0 z-50 bg-background/85 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-card border border-border rounded-2xl shadow-2xl p-5">
-            <h3 className="text-lg font-bold tracking-tight mb-1">Couldn&apos;t verify barcode</h3>
+          <div role="dialog" aria-modal="true" aria-labelledby="barcode-retry-heading" className="neu-panel w-full max-w-md rounded-2xl p-5">
+            <h3 id="barcode-retry-heading" className="text-lg font-bold tracking-tight mb-1">Couldn&apos;t verify barcode</h3>
             <p className="text-sm text-foreground/60 mb-4">
               We couldn&apos;t identify barcode {barcodeRetryPrompt.code} from public food databases.
               Is this a food item?

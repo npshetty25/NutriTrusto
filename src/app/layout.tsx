@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
-import { Toaster } from "sonner";
 import { AuthProvider } from "@/context/auth-context";
+import { AppToaster } from "@/components/app-toaster";
 import { THEME_INIT_SCRIPT } from "@/lib/theme";
 import "./globals.css";
 
@@ -23,7 +23,35 @@ export const viewport: Viewport = {
 // allowedDevOrigins in next.config.ts) wouldn't match "localhost" either.
 // A service worker intercepting fetches during `next dev` fights
 // Turbopack's own HMR and caches stale modules.
-const SW_REGISTER_SCRIPT = `if ('serviceWorker' in navigator) { window.addEventListener('load', () => { navigator.serviceWorker.register('/sw.js').catch(() => {}); }); }`;
+// updateViaCache:'none' forces the browser to revalidate sw.js itself on
+// every check instead of serving it from the HTTP cache — without it a new
+// worker can go unnoticed for up to 24h. The controllerchange reload is
+// guarded on there having been a controller already, because clients.claim()
+// fires the same event on a first-ever install, where a reload would be a
+// pointless flash on someone's first visit.
+const SW_REGISTER_SCRIPT = `if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function () {
+    var hadController = !!navigator.serviceWorker.controller;
+    var refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', function () {
+      if (!hadController || refreshing) return;
+      refreshing = true;
+      window.location.reload();
+    });
+    navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' }).then(function (reg) {
+      reg.update();
+      if (reg.waiting) reg.waiting.postMessage('SKIP_WAITING');
+      reg.addEventListener('updatefound', function () {
+        var next = reg.installing;
+        if (!next) return;
+        next.addEventListener('statechange', function () {
+          if (next.state === 'installed' && navigator.serviceWorker.controller) next.postMessage('SKIP_WAITING');
+        });
+      });
+      setInterval(function () { reg.update(); }, 900000);
+    }).catch(function () {});
+  });
+}`;
 
 export default function RootLayout({
   children,
@@ -45,7 +73,7 @@ export default function RootLayout({
         <AuthProvider>
           <main className="flex-1 w-full max-w-md mx-auto min-h-screen relative">
             {children}
-            <Toaster position="top-center" theme="system" style={{ zIndex: 45 }} toastOptions={{ className: 'border-foreground/10 rounded-2xl' }} />
+            <AppToaster />
           </main>
         </AuthProvider>
       </body>

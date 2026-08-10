@@ -10,7 +10,7 @@ export interface GeneratedRecipe {
   fromPantry: { item: string; quantity: string }[];
   usesItems: string[];
   baseDish: string;
-  toBuy: string[];
+  toBuy: { item: string; quantity: string }[];
   staples: string[];
   steps: string[];
   rescueNote: string;
@@ -57,7 +57,7 @@ export function RecipeModal({
         role="dialog"
         aria-modal="true"
         aria-label={recipe.title}
-        className="w-full max-w-md bg-card border border-border rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[88vh] animate-in zoom-in-95 duration-200"
+        className="neu-panel w-full max-w-md rounded-3xl overflow-hidden flex flex-col max-h-[88vh] animate-in zoom-in-95 duration-200"
       >
         <div className="flex items-start justify-between gap-3 p-4 pb-3 border-b border-border shrink-0">
           <div className="min-w-0">
@@ -121,10 +121,13 @@ export function RecipeModal({
                   You&apos;ll need to buy
                 </h4>
                 <ul className="space-y-1.5">
-                  {recipe.toBuy.map((ing, i) => (
+                  {recipe.toBuy.map((row, i) => (
                     <li key={i} className="flex items-start gap-2.5 text-[13px]">
                       <ShoppingCart size={13} className="text-foreground/40 shrink-0 mt-0.5" />
-                      <span className="text-foreground/85">{ing}</span>
+                      <span className="text-foreground/85">
+                        <span className="font-semibold text-foreground">{row.item}</span>
+                        {row.quantity && <span className="text-foreground/60"> — {row.quantity}</span>}
+                      </span>
                     </li>
                   ))}
                 </ul>

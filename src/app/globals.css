@@ -1,5 +1,22 @@
 @import "tailwindcss";
 
+/* Tailwind's stock `dark:` is media-query only, but this app has three
+   theme states (see src/lib/theme.ts): no class = follow the OS, .dark and
+   .light = an explicit choice. Without this the CSS variables would switch
+   on the class while every `dark:` utility kept switching on the OS — so
+   choosing Light on a dark-OS phone gave light surfaces with dark-mode
+   text colours on top of them. */
+@custom-variant dark {
+  @media (prefers-color-scheme: dark) {
+    &:where(:not(.light *)) {
+      @slot;
+    }
+  }
+  &:where(.dark *) {
+    @slot;
+  }
+}
+
 /* Base surface is a single mid-tone, not white — neumorphism reads as
    depth only when an element and the surface it sits on share one colour,
    so --background, --card and --neu-surface are deliberately identical.
@@ -17,6 +34,12 @@
   --danger: #e5484d;
   --warning: #f76b15;
   --safe: #30a46c;
+
+  /* Brand accent. Deliberately blue: red / amber / green are spoken for by
+     the risk readouts, so an accent in any of those hues would be read as a
+     measurement. Taken from the wordmark in logo.svg. */
+  --brand: #3b53d9;
+  --brand-soft: #8fa0ff;
 
   /* Darkened readout tones for small text on a tinted wash. The base
      readout colours are calibrated as fills and dots; measured as 10px
@@ -41,6 +64,8 @@
   --color-danger-strong: var(--danger-strong);
   --color-warning-strong: var(--warning-strong);
   --color-safe-strong: var(--safe-strong);
+  --color-brand: var(--brand);
+  --color-brand-soft: var(--brand-soft);
 }
 
 /* Dark mode lifts off pure black for the same reason: #09090b leaves no
@@ -56,6 +81,20 @@
 
     --primary: #ffffff;
     --primary-foreground: #000000;
+
+    /* The light-mode brand is too dark to read on #17171c, so dark mode
+       takes the soft variant as its base and lifts it further. */
+    --brand: #8fa0ff;
+    --brand-soft: #b9c3ff;
+
+    /* The readout hues are calibrated as fills. On the dark ground the
+       light-mode -strong variants are unreadable, and the raw hues measured
+       3.23:1 as 10px chip text — under AA. These are the same hues lifted
+       until they clear it, so `text-danger-strong` is correct in BOTH themes
+       and no component needs a dark: override. */
+    --danger-strong: #ff9ea1;
+    --warning-strong: #ffbe8a;
+    --safe-strong: #74e6ab;
   }
 }
 
@@ -71,6 +110,18 @@
 
   --primary: #ffffff;
   --primary-foreground: #000000;
+
+  --brand: #8fa0ff;
+  --brand-soft: #b9c3ff;
+
+  /* The readout hues are calibrated as fills. On the dark ground the
+     light-mode -strong variants are unreadable, and the raw hues measured
+     3.23:1 as 10px chip text — under AA. These are the same hues lifted
+     until they clear it, so `text-danger-strong` is correct in BOTH themes
+     and no component needs a dark: override. */
+  --danger-strong: #ff9ea1;
+  --warning-strong: #ffbe8a;
+  --safe-strong: #74e6ab;
 }
 
 :root.light {
@@ -82,6 +133,13 @@
 
   --primary: #111111;
   --primary-foreground: #ffffff;
+
+  --brand: #3b53d9;
+  --brand-soft: #8fa0ff;
+
+  --danger-strong: #a3161b;
+  --warning-strong: #8a3703;
+  --safe-strong: #10633c;
 }
 
 /* Flat, ungradiented base — a vignette here would stop the neumorphic
@@ -122,42 +180,34 @@ body {
    ─────────────────────────────────────────────────────────────
    Soft-UI surfaces built from a paired light/dark shadow, as if lit
    from the top-left. The effect only reads correctly when the element
-   shares its parent's background, so every token below is a variable
-   that a scope can override — see .neu-scope-navy, used on the login
-   screen, which sits on its own dark-navy backdrop rather than the
-   app's normal --background. */
+   shares its parent's background, so every token below is a variable a
+   scope can override. The login screen used to override them for its own
+   navy backdrop; it now sits on the same --background as the app, which is
+   why signing in and using the app no longer look like two products. */
 
 :root {
   --neu-surface: var(--background);
-  --neu-shadow-dark: rgba(160, 172, 196, 0.7);
-  --neu-shadow-light: rgba(255, 255, 255, 0.95);
-  --neu-dist: 6px;
-  --neu-blur: 14px;
+  --neu-shadow-dark: rgba(155, 167, 194, 0.9);
+  --neu-shadow-light: rgba(255, 255, 255, 1);
+  --neu-dist: 7px;
+  --neu-blur: 16px;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --neu-shadow-dark: rgba(0, 0, 0, 0.72);
-    --neu-shadow-light: rgba(255, 255, 255, 0.055);
+    --neu-shadow-dark: rgba(0, 0, 0, 0.85);
+    --neu-shadow-light: rgba(255, 255, 255, 0.075);
   }
 }
 
 :root.dark {
-  --neu-shadow-dark: rgba(0, 0, 0, 0.72);
-  --neu-shadow-light: rgba(255, 255, 255, 0.055);
+  --neu-shadow-dark: rgba(0, 0, 0, 0.85);
+  --neu-shadow-light: rgba(255, 255, 255, 0.075);
 }
 
 :root.light {
-  --neu-shadow-dark: rgba(160, 172, 196, 0.7);
-  --neu-shadow-light: rgba(255, 255, 255, 0.95);
-}
-
-/* Login screen sits on #050A16, so it needs navy-tinted shadows to keep
-   the "lit from top-left" illusion instead of gray-on-navy mud. */
-.neu-scope-navy {
-  --neu-surface: #101a2e;
-  --neu-shadow-dark: rgba(2, 5, 16, 0.9);
-  --neu-shadow-light: rgba(125, 175, 255, 0.085);
+  --neu-shadow-dark: rgba(155, 167, 194, 0.9);
+  --neu-shadow-light: rgba(255, 255, 255, 1);
 }
 
 .neu-raised {
@@ -204,6 +254,40 @@ body {
   box-shadow:
     inset 4px 4px 9px var(--neu-shadow-dark),
     inset -4px -4px 9px var(--neu-shadow-light);
+}
+
+/* Overlays. Every modal in the app used to be bg-card + border +
+   shadow-2xl — a drop-shadow card floating on a scrim, which is the one
+   pattern soft-UI is defined against. A panel is the same surface as the
+   page, pushed further out of it, with a hairline to hold its edge against
+   the darkened backdrop behind. */
+.neu-panel {
+  background: var(--neu-surface);
+  border: 1px solid var(--border);
+  box-shadow:
+    14px 14px 34px var(--neu-shadow-dark),
+    -12px -12px 30px var(--neu-shadow-light);
+}
+
+/* Text fields and selects read as carved into the surface rather than
+   drawn on top of it. The focus ring stays a real ring — depth alone is
+   not a visible focus indicator. */
+.neu-field {
+  background: var(--neu-surface);
+  border: 1px solid transparent;
+  box-shadow:
+    inset 3px 3px 7px var(--neu-shadow-dark),
+    inset -3px -3px 7px var(--neu-shadow-light);
+  transition: box-shadow 200ms ease;
+}
+
+.neu-field:focus,
+.neu-field:focus-visible {
+  outline: none;
+  box-shadow:
+    inset 3px 3px 7px var(--neu-shadow-dark),
+    inset -3px -3px 7px var(--neu-shadow-light),
+    0 0 0 2px var(--brand);
 }
 
 /* ── Ambient motion ── */

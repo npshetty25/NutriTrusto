@@ -5,12 +5,11 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
 import { toast } from "sonner";
-import { LogOut, Settings, Users, ChevronDown, Bell, Loader2, ShoppingCart, History, Leaf, Scale } from "lucide-react";
+import { LogOut, Settings, Users, ChevronDown, Bell, Loader2, ShoppingCart, History, Leaf } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { HouseholdModal } from "@/components/household-modal";
 import { ScanHistoryModal } from "@/components/scan-history-modal";
 import { ImpactDashboardModal } from "@/components/impact-dashboard-modal";
-import { AdditiveReferenceModal } from "@/components/additive-reference-modal";
 
 interface ProfileDropdownProps {
   onOpenShoppingList?: () => void;
@@ -24,7 +23,6 @@ export function ProfileDropdown({ onOpenShoppingList }: ProfileDropdownProps) {
   const [showHousehold, setShowHousehold] = useState(false);
   const [showScanHistory, setShowScanHistory] = useState(false);
   const [showImpactDashboard, setShowImpactDashboard] = useState(false);
-  const [showAdditiveReference, setShowAdditiveReference] = useState(false);
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -126,7 +124,7 @@ export function ProfileDropdown({ onOpenShoppingList }: ProfileDropdownProps) {
       // so a z-50 menu nested inside it still paints *behind* the main
       // content below the header. That put Sign Out underneath the inventory
       // search field, where it silently swallowed the click.
-      className="fixed w-64 max-h-[80vh] overflow-y-auto bg-card border border-border rounded-2xl shadow-xl z-70 animate-in fade-in slide-in-from-top-2 duration-200"
+      className="neu-panel fixed w-64 max-h-[80vh] overflow-y-auto rounded-2xl z-70 animate-in fade-in slide-in-from-top-2 duration-200"
     >
       <div className="px-4 py-3 border-b border-border">
         <p className="font-semibold text-sm text-foreground">{fullName}</p>
@@ -136,27 +134,24 @@ export function ProfileDropdown({ onOpenShoppingList }: ProfileDropdownProps) {
       <ThemeToggle />
 
       <div className="p-1.5 border-t border-border">
-        <button onClick={() => { setOpen(false); setShowHousehold(true); }} className={itemClass}>
+        <button onClick={() => { setOpen(false); setShowHousehold(true); }} role="menuitem" className={itemClass}>
           <Users size={15} className="text-foreground/50" /> Household Settings
         </button>
         {onOpenShoppingList && (
-          <button onClick={() => { setOpen(false); onOpenShoppingList(); }} className={itemClass}>
+          <button onClick={() => { setOpen(false); onOpenShoppingList(); }} role="menuitem" className={itemClass}>
             <ShoppingCart size={15} className="text-foreground/50" /> Shopping List
           </button>
         )}
-        <button onClick={() => { setOpen(false); setShowScanHistory(true); }} className={itemClass}>
+        <button onClick={() => { setOpen(false); setShowScanHistory(true); }} role="menuitem" className={itemClass}>
           <History size={15} className="text-foreground/50" /> Scan History
         </button>
-        <button onClick={() => { setOpen(false); setShowImpactDashboard(true); }} className={itemClass}>
+        <button onClick={() => { setOpen(false); setShowImpactDashboard(true); }} role="menuitem" className={itemClass}>
           <Leaf size={15} className="text-foreground/50" /> Impact Dashboard
         </button>
-        <button onClick={() => { setOpen(false); setShowAdditiveReference(true); }} className={itemClass}>
-          <Scale size={15} className="text-foreground/50" /> Additive Reference
-        </button>
-        <button onClick={() => showComingSoon("Notification Preferences")} className={itemClass}>
+        <button onClick={() => showComingSoon("Notification Preferences")} role="menuitem" className={itemClass}>
           <Bell size={15} className="text-foreground/50" /> Notification Preferences
         </button>
-        <button onClick={() => showComingSoon("Account Settings")} className={itemClass}>
+        <button onClick={() => showComingSoon("Account Settings")} role="menuitem" className={itemClass}>
           <Settings size={15} className="text-foreground/50" /> Account Settings
         </button>
       </div>
@@ -165,6 +160,7 @@ export function ProfileDropdown({ onOpenShoppingList }: ProfileDropdownProps) {
         <button
           onClick={handleSignOut}
           disabled={signingOut}
+          role="menuitem"
           className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-danger hover:bg-danger/5 rounded-xl transition-colors text-left disabled:opacity-60"
         >
           {signingOut ? <Loader2 size={15} className="animate-spin" /> : <LogOut size={15} />}
@@ -196,7 +192,6 @@ export function ProfileDropdown({ onOpenShoppingList }: ProfileDropdownProps) {
       {showHousehold && <HouseholdModal onClose={() => setShowHousehold(false)} />}
       {showScanHistory && <ScanHistoryModal onClose={() => setShowScanHistory(false)} />}
       {showImpactDashboard && <ImpactDashboardModal onClose={() => setShowImpactDashboard(false)} />}
-      {showAdditiveReference && <AdditiveReferenceModal onClose={() => setShowAdditiveReference(false)} />}
     </div>
   );
 }
