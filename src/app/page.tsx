@@ -2432,29 +2432,36 @@ if (nutritionFieldsFilled < 2) {
 
       {dietConflictPrompt && (
         <div className="fixed inset-0 z-60 bg-black/40 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="w-full max-w-md rounded-3xl p-px bg-linear-to-br from-red-500/60 via-red-400/20 to-white/30 shadow-[0_20px_50px_-12px_rgba(239,68,68,0.45)]">
-            <div className="relative overflow-hidden rounded-3xl border border-red-300/30 bg-linear-to-b from-red-500/12 via-card/95 to-card/95 p-5 backdrop-blur-xl">
-              <div className="pointer-events-none absolute inset-0 bg-linear-to-b from-white/20 via-transparent to-transparent" />
-
-              <div className="relative flex items-start gap-3 mb-3">
-                <div className="w-10 h-10 rounded-2xl bg-red-500/15 border border-red-400/40 text-red-500 flex items-center justify-center shadow-inner shadow-red-500/20">
-                  <AlertTriangle size={18} />
-                </div>
-                <div>
-                  <h3 className="text-lg font-extrabold tracking-tight text-red-500">Diet Warning</h3>
-                  <p className="text-xs uppercase tracking-widest font-semibold text-red-500/80">Potential mismatch</p>
-                </div>
+          {/* Was a glassmorphic red-gradient alert built on raw red-500 with
+              a bg-white/40 button — a white plate in dark mode, and the one
+              overlay in the app not on the shared surface. It also had no
+              dialog semantics. The danger reading now comes from the token
+              the rest of the product measures with. */}
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="diet-conflict-heading"
+            className="neu-panel w-full max-w-md rounded-3xl p-5"
+          >
+            <div className="flex items-start gap-3 mb-3">
+              <div className="w-11 h-11 rounded-2xl bg-danger/15 text-danger-strong flex items-center justify-center shrink-0">
+                <AlertTriangle size={18} />
               </div>
+              <div>
+                <h3 id="diet-conflict-heading" className="text-lg font-extrabold tracking-tight text-danger-strong">Diet Warning</h3>
+                <p className="text-xs uppercase tracking-widest font-semibold text-foreground/60">Potential mismatch</p>
+              </div>
+            </div>
 
-              <p className="relative text-sm text-foreground/80 mb-4 leading-relaxed">
-                <span className="font-semibold text-foreground">{dietConflictPrompt.itemName}</span> may not match your diet.
-                Add anyway?
-              </p>
+            <p className="text-sm text-foreground/80 mb-5 leading-relaxed">
+              <span className="font-semibold text-foreground">{dietConflictPrompt.itemName}</span> may not match your diet.
+              Add anyway?
+            </p>
 
-              <div className="mt-1 flex flex-col sm:flex-row gap-2">
+            <div className="flex flex-col sm:flex-row gap-2">
               <button
                 onClick={() => setDietConflictPrompt(null)}
-                  className="flex-1 border border-red-300/35 bg-white/40 rounded-xl py-2.5 text-sm font-bold hover:bg-white/60 transition-colors"
+                className="neu-raised-sm flex-1 rounded-xl h-11 text-sm font-bold text-foreground/80"
               >
                 Cancel
               </button>
@@ -2463,14 +2470,13 @@ if (nutritionFieldsFilled < 2) {
                   setDietConflictPrompt(null);
                   void addScannedItemToPantry(true);
                 }}
-                  className="flex-1 bg-linear-to-r from-red-500 to-red-600 text-white rounded-xl py-2.5 text-sm font-bold hover:brightness-105 active:scale-[0.99] transition-all shadow-lg shadow-red-500/35"
+                className="flex-1 bg-danger text-white rounded-xl h-11 text-sm font-bold hover:brightness-110 active:scale-[0.99] transition-all"
               >
                 Yes, add anyway
               </button>
             </div>
           </div>
         </div>
-      </div>
       )}
 
       {barcodeRetryPrompt && (
