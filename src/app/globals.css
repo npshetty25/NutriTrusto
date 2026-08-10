@@ -17,6 +17,14 @@
   --danger: #e5484d;
   --warning: #f76b15;
   --safe: #30a46c;
+
+  /* Darkened readout tones for small text on a tinted wash. The base
+     readout colours are calibrated as fills and dots; measured as 10px
+     chip text on a 15% wash they land at 2.5-2.9:1, well under AA. These
+     are the same hues taken down in lightness until they clear 4.5:1. */
+  --danger-strong: #a3161b;
+  --warning-strong: #8a3703;
+  --safe-strong: #10633c;
 }
 
 @theme inline {
@@ -30,6 +38,9 @@
   --color-danger: var(--danger);
   --color-warning: var(--warning);
   --color-safe: var(--safe);
+  --color-danger-strong: var(--danger-strong);
+  --color-warning-strong: var(--warning-strong);
+  --color-safe-strong: var(--safe-strong);
 }
 
 /* Dark mode lifts off pure black for the same reason: #09090b leaves no

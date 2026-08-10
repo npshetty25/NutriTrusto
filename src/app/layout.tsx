@@ -43,7 +43,7 @@ export default function RootLayout({
       </head>
       <body className="flex flex-col min-h-screen bg-background text-foreground transition-colors duration-300">
         <AuthProvider>
-          <main className="flex-1 w-full max-w-md mx-auto min-h-screen relative shadow-2xl bg-card/30">
+          <main className="flex-1 w-full max-w-md mx-auto min-h-screen relative">
             {children}
             <Toaster position="top-center" theme="system" style={{ zIndex: 45 }} toastOptions={{ className: 'border-foreground/10 rounded-2xl' }} />
           </main>

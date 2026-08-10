@@ -7,7 +7,6 @@ import { ALLERGEN_LABELS, type AllergenTag } from "@/lib/allergens";
 import { type AdditiveEntry } from "@/lib/additive-divergence";
 
 export type RiskLevel = "high" | "medium" | "low";
-export type HealthRating = "A" | "B" | "C" | "D" | "E";
 
 interface PantryCardProps {
   id: string;
@@ -15,7 +14,10 @@ interface PantryCardProps {
   daysLeft: number;
   risk: RiskLevel;
   purchaseDate: string;
-  healthRating?: HealthRating;
+  // The genuine 1-5 NutriTrust score from a barcode scan, or null/undefined
+  // when this item was never scanned. Never invent one: the card previously
+  // derived an A-E grade from the item name's character count.
+  healthScore?: string | null;
   dietMatch?: boolean;
   // null/undefined = no ingredient data was available for this item, so
   // allergen content is genuinely unknown — must not be shown as "safe".
@@ -34,11 +36,18 @@ const riskConfig = {
   low: { label: "Optimal", color: "text-safe", dot: "bg-safe" },
 };
 
-const ratingColor = {
-  A: "bg-green-500", B: "bg-green-400", C: "bg-yellow-400", D: "bg-orange-500", E: "bg-red-500"
-};
-
-export function PantryCard({ name, daysLeft, risk, purchaseDate, healthRating = "B", dietMatch = true, detectedAllergens, divergentAdditives, healthierAlternative }: PantryCardProps) {
+export function PantryCard({ name, daysLeft, risk, purchaseDate, healthScore, dietMatch = true, detectedAllergens, divergentAdditives, healthierAlternative }: PantryCardProps) {
+  const score = healthScore != null ? Number.parseFloat(healthScore) : NaN;
+  const hasScore = Number.isFinite(score);
+  // Same thresholds the nutrition trend chart uses, so one score reads the
+  // same everywhere in the app.
+  const scoreTone = !hasScore
+    ? "bg-foreground/8 text-foreground/60"
+    : score >= 3.5
+      ? "bg-safe/15 text-safe"
+      : score >= 2.5
+        ? "bg-warning/15 text-warning"
+        : "bg-danger/15 text-danger";
   const config = riskConfig[risk];
   const category = inferItemCategory(name);
 
@@ -87,22 +96,25 @@ export function PantryCard({ name, daysLeft, risk, purchaseDate, healthRating = 
             <div className="w-7 h-7 rounded-lg bg-foreground/6 border border-border flex items-center justify-center text-foreground/70 shrink-0">
               <ItemIcon size={14} />
             </div>
-            <div className={`w-6 h-6 rounded-md flex items-center justify-center text-[10px] font-black text-white ${ratingColor[healthRating]} shrink-0`}>
-              {healthRating}
+            <div
+              title={hasScore ? `NutriTrust score ${score.toFixed(1)} out of 5` : "Not scanned — no score available"}
+              className={`h-6 px-1.5 rounded-md flex items-center justify-center text-[11px] font-bold tabular-nums shrink-0 ${scoreTone}`}
+            >
+              {hasScore ? score.toFixed(1) : "—"}
             </div>
             <h3 className="font-bold text-sm sm:text-[15px] text-foreground tracking-tight wrap-break-word leading-snug truncate">
               {name}
             </h3>
           </div>
-          <p className="text-[11px] text-foreground/50 uppercase tracking-wider font-medium">Purchased {purchaseDate}</p>
+          <p className="text-[11px] text-foreground/60 uppercase tracking-wider font-medium">Purchased {purchaseDate}</p>
         </div>
 
         <div className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border ${
           risk === "high"
-            ? "bg-danger/10 border-danger/20 text-danger"
+            ? "bg-danger/15 border-danger/30 text-danger-strong dark:text-danger"
             : risk === "medium"
-              ? "bg-warning/10 border-warning/20 text-warning"
-              : "bg-safe/10 border-safe/20 text-safe"
+              ? "bg-warning/15 border-warning/30 text-warning-strong dark:text-warning"
+              : "bg-safe/15 border-safe/30 text-safe-strong dark:text-safe"
         }`}>
           {config.label}
         </div>
@@ -110,13 +122,13 @@ export function PantryCard({ name, daysLeft, risk, purchaseDate, healthRating = 
 
       <div className="rounded-xl border border-border/70 bg-background p-3 mb-3">
         <div className="flex items-end justify-between gap-2 mb-2">
-          <p className="text-[10px] uppercase tracking-widest font-semibold text-foreground/45">Days Remaining</p>
+          <p className="text-[10px] uppercase tracking-widest font-semibold text-foreground/60">Days Remaining</p>
           <p className="text-xs font-semibold text-foreground/60">Freshness</p>
         </div>
         <div className="flex items-end justify-between gap-3">
           <p className="text-sm text-foreground font-medium">
             <span className={`${config.color} font-extrabold text-3xl tracking-tight`}>{daysLeft}</span>
-            <span className="ml-1 text-xs text-foreground/60 font-semibold">day(s)</span>
+            <span className="ml-1 text-xs text-foreground/60 font-semibold">{daysLeft === 1 ? "day" : "days"} left</span>
           </p>
           <div className="w-24 h-2.5 rounded-full bg-foreground/10 overflow-hidden">
             <div
@@ -129,13 +141,13 @@ export function PantryCard({ name, daysLeft, risk, purchaseDate, healthRating = 
 
         {daysLeft === 0 && (
           <p className="mt-2 text-[11px] leading-relaxed font-semibold text-danger">
-            has likely spoiled. Remove it or use immediately if still safe.
+            {name} has likely spoiled. Remove it, or use it now if it still seems fine.
           </p>
         )}
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-bold ${dietMatch ? "bg-green-500/10 text-green-600 dark:text-green-400" : "bg-red-500/10 text-red-600 dark:text-red-400"}`}>
+        <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-bold ${dietMatch ? "bg-safe/15 text-safe-strong dark:text-safe" : "bg-danger/15 text-danger-strong dark:text-danger"}`}>
           {dietMatch ? <ShieldCheck size={12} /> : <ShieldAlert size={12} />}
           {dietMatch ? "Matches Diet" : "Diet Warning"}
         </div>
@@ -143,18 +155,18 @@ export function PantryCard({ name, daysLeft, risk, purchaseDate, healthRating = 
         {detectedAllergens == null ? (
           <div
             title="No ingredient data was available for this item, so allergen content couldn't be checked"
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-bold bg-foreground/8 text-foreground/50"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-bold bg-foreground/8 text-foreground/70"
           >
             <Info size={12} />
             Allergens Unknown
           </div>
         ) : detectedAllergens.length > 0 ? (
-          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-bold bg-orange-500/10 text-orange-600 dark:text-orange-400">
+          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-bold bg-warning/15 text-warning-strong dark:text-warning">
             <ShieldAlert size={12} />
             Contains {detectedAllergens.map((tag) => ALLERGEN_LABELS[tag]).join(", ")}
           </div>
         ) : (
-          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400">
+          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-bold bg-foreground/8 text-foreground/70">
             <ShieldCheck size={12} />
             No Common Allergens
           </div>

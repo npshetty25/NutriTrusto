@@ -29,6 +29,9 @@ interface AuthContextType {
   // to the same migration file). Independent from householdSchemaReady —
   // a user may have run the file before this column was added to it.
   ingredientsSchemaReady: boolean | null;
+  // Same pattern again, for pantry_items.health_score. Until this column
+  // exists the item card shows "not scanned" rather than inventing a grade.
+  healthScoreSchemaReady: boolean | null;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -41,6 +44,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [householdLoading, setHouseholdLoading] = useState(false);
   const [householdSchemaReady, setHouseholdSchemaReady] = useState<boolean | null>(null);
   const [ingredientsSchemaReady, setIngredientsSchemaReady] = useState<boolean | null>(null);
+  const [healthScoreSchemaReady, setHealthScoreSchemaReady] = useState<boolean | null>(null);
 
   const refreshHousehold = useCallback(async () => {
     if (!user) {
@@ -97,6 +101,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       supabase.from("pantry_items").select("household_id").limit(1).then(({ error }) => {
         setHouseholdSchemaReady(!error);
       });
+      supabase.from("pantry_items").select("health_score").limit(1).then(({ error }) => {
+        setHealthScoreSchemaReady(!error);
+      });
+
       supabase.from("pantry_items").select("ingredients_text").limit(1).then(({ error }) => {
         setIngredientsSchemaReady(!error);
       });
@@ -104,6 +112,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setHousehold(null);
       setHouseholdSchemaReady(null);
       setIngredientsSchemaReady(null);
+      setHealthScoreSchemaReady(null);
     }
   }, [user, refreshHousehold]);
 
@@ -128,7 +137,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, signIn, signUp, signOut, household, householdLoading, refreshHousehold, householdSchemaReady, ingredientsSchemaReady }}>
+    <AuthContext.Provider value={{ user, session, loading, signIn, signUp, signOut, household, householdLoading, refreshHousehold, householdSchemaReady, ingredientsSchemaReady, healthScoreSchemaReady }}>
       {children}
     </AuthContext.Provider>
   );

@@ -160,6 +160,7 @@ interface Item {
   // receipt-scanned items, or scanned before this column existed) —
   // allergen content must be shown as unknown, not assumed safe.
   ingredientsText?: string | null;
+  healthScore?: string | null;
 }
 
 interface NotificationEntry {
@@ -197,7 +198,7 @@ const INVENTORY_PAGE_SIZE = 6;
 // No fallback items — real users start with an empty pantry.
 
 export default function Home() {
-  const { user, loading: authLoading, household, householdSchemaReady, ingredientsSchemaReady } = useAuth();
+  const { user, loading: authLoading, household, householdSchemaReady, ingredientsSchemaReady, healthScoreSchemaReady } = useAuth();
 
   // Spread into a pantry_items insert payload. Omits the key entirely
   // (rather than sending null) until we've confirmed the household_id
@@ -209,6 +210,11 @@ export default function Home() {
   // Same idea for ingredients_text — see ingredientsSchemaReady in AuthContext.
   const ingredientsTextField = (ingredients: string | null | undefined): { ingredients_text?: string | null } =>
     ingredientsSchemaReady ? { ingredients_text: ingredients ?? null } : {};
+
+  // Same gate for the score column — Postgrest rejects the whole insert if
+  // the migration adding it hasn't been run yet.
+  const healthScoreField = (score: string | null | undefined): { health_score?: string | null } =>
+    healthScoreSchemaReady ? { health_score: score ?? null } : {};
   const router = useRouter();
 
   const [items, setItems] = useState<Item[]>([]);
@@ -272,14 +278,18 @@ export default function Home() {
   const totalPages = Math.max(1, Math.ceil(sortedInventoryItems.length / INVENTORY_PAGE_SIZE));
   const paginatedItems = sortedInventoryItems.slice((currentPage - 1) * INVENTORY_PAGE_SIZE, currentPage * INVENTORY_PAGE_SIZE);
   const highRiskItems = displayedItems.filter(i => i.risk === "high");
+  // Share of items that are not expiring soon. The old formula divided every
+  // item's days-left by a fixed 14, so a 6-day staple bought that morning
+  // contributed 43% and a perishable-heavy pantry could never score well —
+  // the headline number was un-winnable by construction.
   const freshnessScore = displayedItems.length === 0
     ? 0
-    : Math.round(
-        (displayedItems.reduce((sum, item) => sum + Math.max(0, Math.min(14, item.daysLeft)), 0) /
-          (displayedItems.length * 14)) *
-          100
-      );
-  const urgentNotificationCount = items.filter(i => i.daysLeft > 0 && i.daysLeft <= 3).length;
+    : Math.round((displayedItems.filter((i) => i.risk === "low").length / displayedItems.length) * 100);
+  // Derived from the same list the Critical Items tile counts. Previously the
+  // bell filtered `daysLeft > 0 && <= 3`, which used a different threshold AND
+  // dropped already-expired items — the most urgent ones — so the bell and the
+  // tile showed different numbers on the same screen.
+  const urgentNotificationCount = highRiskItems.length;
 
   const severityRank: Record<NotificationEntry["severity"], number> = { high: 0, medium: 1, low: 2, info: 3 };
   const visibleNotifications = notifications
@@ -320,6 +330,7 @@ export default function Home() {
             risk: deriveRisk(daysLeft),
             purchaseDate: row.purchase_date,
             ingredientsText: row.ingredients_text ?? null,
+            healthScore: row.health_score ?? null,
           };
         })
       );
@@ -496,6 +507,7 @@ export default function Home() {
           risk: deriveRisk(calculateCurrentDaysLeft(row.days_left, row.purchase_date)),
           purchaseDate: row.purchase_date,
           ingredientsText: row.ingredients_text ?? null,
+          healthScore: row.health_score ?? null,
         })));
       } else {
         setItems([]);
@@ -1193,6 +1205,7 @@ if (nutritionFieldsFilled < 2) {
       user_id: user.id,
       ...householdIdField(),
       ...ingredientsTextField(scannedResult.ingredients),
+      ...healthScoreField(scannedResult.analysis?.health_score),
       name: scannedResult.name,
       days_left: initialDaysLeft,
       risk: deriveRisk(initialDaysLeft),
@@ -1216,6 +1229,7 @@ if (nutritionFieldsFilled < 2) {
            risk: deriveRisk(daysLeft),
            purchaseDate: insertedRow.purchase_date,
            ingredientsText: scannedResult.ingredients ?? null,
+           healthScore: scannedResult.analysis?.health_score ?? null,
          }, ...prev];
        });
        toast("Added to Pantry", {
@@ -1306,7 +1320,7 @@ if (nutritionFieldsFilled < 2) {
   // omitting those fields from the very first insert (confirmed
   // reproducible: the probes are still in flight for a beat after a fresh
   // signup, before the dashboard would otherwise already be interactive).
-  const schemaProbesPending = !!user && (householdSchemaReady === null || ingredientsSchemaReady === null);
+  const schemaProbesPending = !!user && (householdSchemaReady === null || ingredientsSchemaReady === null || healthScoreSchemaReady === null);
   if (authLoading || (!user && !authLoading) || schemaProbesPending) {
     return (
       <div className="flex flex-col items-center justify-center gap-5 min-h-screen">
@@ -1335,7 +1349,7 @@ if (nutritionFieldsFilled < 2) {
     <MotionConfig reducedMotion="user">
     <div className="flex flex-col min-h-screen pb-32 sm:pb-28 bg-background">
       {/* Header */}
-      <header className="px-4 sm:px-6 pt-8 sm:pt-10 pb-6 border-b border-border bg-card/90 backdrop-blur-sm">
+      <header className="px-4 pt-8 pb-6 border-b border-border bg-card/90 backdrop-blur-sm">
         <motion.div
           initial={{ opacity: 0, y: -14 }}
           animate={{ opacity: 1, y: 0 }}
@@ -1360,11 +1374,11 @@ if (nutritionFieldsFilled < 2) {
               aria-label="Open notifications"
               onClick={handleNotificationPanelToggle}
               whileTap={{ scale: 0.9 }}
-              className="neu-pressable relative w-9 h-9 rounded-full flex items-center justify-center"
+              className="neu-pressable relative w-11 h-11 rounded-full flex items-center justify-center"
             >
               <motion.span
                 animate={urgentNotificationCount > 0 ? { rotate: [0, -14, 12, -8, 6, 0] } : { rotate: 0 }}
-                transition={urgentNotificationCount > 0 ? { duration: 0.9, repeat: Infinity, repeatDelay: 3.5 } : undefined}
+                transition={urgentNotificationCount > 0 ? { duration: 0.9 } : undefined}
                 className="flex"
               >
                 <Bell size={16} className="text-foreground/80" />
@@ -1392,7 +1406,7 @@ if (nutritionFieldsFilled < 2) {
             hidden: { opacity: 0 },
             show: { opacity: 1, transition: { staggerChildren: 0.09, delayChildren: 0.05 } },
           }}
-          className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-4"
+          className="grid grid-cols-2 gap-3 mb-4"
         >
           <motion.div
             variants={{
@@ -1403,7 +1417,7 @@ if (nutritionFieldsFilled < 2) {
           >
             <div className="flex items-center gap-2 mb-2 opacity-70">
               <TrendingUp size={14} className="text-safe" />
-              <span className="text-[10px] uppercase font-semibold tracking-widest">Pantry Freshness</span>
+              <span className="text-[10px] uppercase font-semibold tracking-widest text-foreground/70">Pantry Freshness</span>
             </div>
             <p className="text-3xl font-semibold tracking-tighter">
               <CountUp value={freshnessScore} suffix="%" />
@@ -1418,29 +1432,33 @@ if (nutritionFieldsFilled < 2) {
                 }`}
               />
             </div>
-            <p className="text-xs text-foreground/50 mt-1.5">Average freshness level</p>
+            <p className="text-xs text-foreground/60 mt-1.5">Items not expiring soon</p>
           </motion.div>
-          <motion.div
+          <motion.button
+            type="button"
+            onClick={() => {
+              setRiskFilter("high");
+              document.getElementById("inventory-log")?.scrollIntoView({ behavior: "smooth", block: "start" });
+            }}
+            disabled={highRiskItems.length === 0}
+            aria-label={`${highRiskItems.length} critical items. Show only these.`}
             variants={{
               hidden: { opacity: 0, y: 18 },
               show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 280, damping: 24 } },
             }}
-            className="neu-pressable flex-1 rounded-2xl p-4"
+            className="neu-pressable flex-1 rounded-2xl p-4 text-left disabled:cursor-default"
           >
-            <div className="flex items-center gap-2 mb-2 opacity-70">
-              <span className="relative flex w-2 h-2">
-                {highRiskItems.length > 0 && (
-                  <span className="absolute inline-flex h-full w-full rounded-full bg-danger opacity-70 animate-ping" />
-                )}
-                <span className={`relative inline-flex w-2 h-2 rounded-full ${highRiskItems.length > 0 ? "bg-danger" : "bg-safe"}`} />
-              </span>
-              <span className="text-[10px] uppercase font-semibold tracking-widest">Critical Items</span>
+            <div className="flex items-center gap-2 mb-2">
+              <span className={`inline-flex w-2 h-2 rounded-full ${highRiskItems.length > 0 ? "bg-danger" : "bg-safe"}`} />
+              <span className="text-[10px] uppercase font-semibold tracking-widest text-foreground/70">Critical Items</span>
             </div>
             <p className="text-3xl font-semibold tracking-tighter">
               <CountUp value={highRiskItems.length} />
             </p>
-            <p className="text-xs text-foreground/50 mt-1">Require Action</p>
-          </motion.div>
+            <p className="text-xs text-foreground/60 mt-1">
+              {highRiskItems.length > 0 ? "Tap to see just these" : "Nothing needs attention"}
+            </p>
+          </motion.button>
         </motion.div>
 
         <RestockSuggestions currentItemNames={items.map((i) => i.name)} />
@@ -1449,17 +1467,17 @@ if (nutritionFieldsFilled < 2) {
         {highRiskItems.length > 0 && (
           <div className="rounded-xl border border-border bg-foreground text-background overflow-hidden">
             {!generatedRecipe ? (
-              <div className="p-4 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+              <div className="p-4 flex flex-col gap-4">
                 <div>
-                  <h4 className="font-semibold text-sm flex items-center gap-2"><BrainCircuit size={14} /> AI Optimization</h4>
-                  <p className="text-xs text-background/70 mt-1">Find a recipe video for your critical items.</p>
+                  <h2 className="font-semibold text-sm flex items-center gap-2"><BrainCircuit size={14} /> Use up what's expiring</h2>
+                  <p className="text-xs text-background/70 mt-1">Cook something using what expires first.</p>
                 </div>
                 <motion.button
                   whileHover={{ scale: isGeneratingRecipe ? 1 : 1.04 }}
                   whileTap={{ scale: isGeneratingRecipe ? 1 : 0.96 }}
                   onClick={() => generateRecipe()}
                   disabled={isGeneratingRecipe}
-                  className="w-full sm:w-auto justify-center flex items-center gap-2 bg-background text-foreground text-xs font-semibold px-5 py-2.5 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-60 whitespace-nowrap"
+                  className="w-full justify-center flex items-center gap-2 bg-background text-foreground text-xs font-semibold px-5 py-2.5 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-60 whitespace-nowrap"
                 >
                   {isGeneratingRecipe ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
                   {isGeneratingRecipe ? "Finding..." : "Find a Recipe"}
@@ -1533,7 +1551,7 @@ if (nutritionFieldsFilled < 2) {
             <div className="px-4 py-3 border-b border-border flex items-center justify-between gap-2">
               <div className="min-w-0">
                 <h3 className="text-sm font-bold tracking-tight">Notifications</h3>
-                <p className="text-[11px] text-foreground/50">Scroll to load more</p>
+                <p className="text-[11px] text-foreground/60">Scroll to load more</p>
               </div>
               <div className="flex items-center gap-1 shrink-0">
                 {notifications.length > 0 && (
@@ -1561,7 +1579,7 @@ if (nutritionFieldsFilled < 2) {
                   value={notificationSeverityFilter}
                   onChange={(e) => setNotificationSeverityFilter(e.target.value as typeof notificationSeverityFilter)}
                   title="Filter by severity"
-                  className="bg-background border border-border rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-foreground/30"
+                  className="bg-background border border-border rounded-lg px-2 py-1.5 text-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground/60 focus:border-foreground/60"
                 >
                   <option value="all">All Severities</option>
                   <option value="high">High</option>
@@ -1573,7 +1591,7 @@ if (nutritionFieldsFilled < 2) {
                   value={notificationSort}
                   onChange={(e) => setNotificationSort(e.target.value as typeof notificationSort)}
                   title="Sort"
-                  className="bg-background border border-border rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-foreground/30"
+                  className="bg-background border border-border rounded-lg px-2 py-1.5 text-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground/60 focus:border-foreground/60"
                 >
                   <option value="newest">Newest First</option>
                   <option value="urgent">Most Urgent First</option>
@@ -1602,7 +1620,7 @@ if (nutritionFieldsFilled < 2) {
                         </div>
                         <p className="text-xs font-semibold text-foreground truncate">{note.title}</p>
                       </div>
-                      <span className={`text-[10px] font-bold uppercase tracking-wide ${note.severity === "high" ? "text-danger" : note.severity === "medium" ? "text-warning" : "text-foreground/50"}`}>
+                      <span className={`text-[10px] font-bold uppercase tracking-wide ${note.severity === "high" ? "text-danger" : note.severity === "medium" ? "text-warning" : "text-foreground/60"}`}>
                         {note.severity}
                       </span>
                     </div>
@@ -1612,7 +1630,7 @@ if (nutritionFieldsFilled < 2) {
               })}
 
               {notificationsLoading && (
-                <div className="py-4 flex items-center justify-center text-foreground/50">
+                <div className="py-4 flex items-center justify-center text-foreground/60">
                   <Loader2 size={16} className="animate-spin" />
                 </div>
               )}
@@ -1626,7 +1644,7 @@ if (nutritionFieldsFilled < 2) {
       )}
 
       {/* Inventory */}
-      <main className="flex-1 px-4 sm:px-6 py-6">
+      <section id="inventory-log" className="flex-1 px-4 py-6" aria-labelledby="inventory-heading">
         {inlineError && (
           <div className="mb-4 rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 flex items-start justify-between gap-3">
             <div className="flex items-start gap-2">
@@ -1643,8 +1661,8 @@ if (nutritionFieldsFilled < 2) {
           </div>
         )}
 
-        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
-          <h2 className="font-semibold text-sm uppercase tracking-widest text-foreground/70">Inventory Log</h2>
+        <div className="flex flex-col gap-3 mb-4">
+          <h2 id="inventory-heading" className="font-semibold text-sm uppercase tracking-widest text-foreground/70">Inventory Log</h2>
           <div className="flex items-center flex-wrap gap-2">
             <button
               onClick={() => { void addMockInventoryData(); }}
@@ -1655,23 +1673,27 @@ if (nutritionFieldsFilled < 2) {
               {isSeedingMockData ? <Loader2 size={14} className="animate-spin" /> : <Package size={14} />}
               Add Demo Data
             </button>
-            <div className="flex items-center gap-1 bg-foreground/5 p-1 rounded-full border border-border/50 w-fit">
+            {/* A real toggle group: it silently filters the whole pantry, so
+                it needs a name and a pressed state, not two anonymous pills. */}
+            <div role="group" aria-label="Filter by diet" className="flex items-center gap-1 bg-foreground/5 p-1 rounded-full border border-border/50 w-fit">
             <button
               onClick={() => setIsVegMode(true)}
-              className={`px-3 py-1.5 text-xs font-bold rounded-full transition-all ${isVegMode ? "bg-green-500/20 text-green-600 dark:text-green-400 shadow-sm" : "text-foreground/50 hover:text-foreground/80"}`}
+              aria-pressed={isVegMode}
+              className={`px-4 h-10 text-xs font-bold rounded-full transition-all ${isVegMode ? "bg-safe/20 text-safe-strong dark:text-safe shadow-sm" : "text-foreground/70 hover:text-foreground"}`}
             >
-              🌱 Veg
+              Veg only
             </button>
             <button
               onClick={() => setIsVegMode(false)}
-              className={`px-3 py-1.5 text-xs font-bold rounded-full transition-all ${!isVegMode ? "bg-card text-foreground shadow-sm" : "text-foreground/50 hover:text-foreground/80"}`}
+              aria-pressed={!isVegMode}
+              className={`px-4 h-10 text-xs font-bold rounded-full transition-all ${!isVegMode ? "bg-card text-foreground shadow-sm" : "text-foreground/70 hover:text-foreground"}`}
             >
-              🍗 All
+              All items
             </button>
             </div>
           </div>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_auto_auto] gap-2 mb-4">
+        <div className="grid grid-cols-1 gap-2 mb-4">
           <div className="relative">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground/40" />
             <input
@@ -1679,13 +1701,13 @@ if (nutritionFieldsFilled < 2) {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search inventory..."
-              className="w-full bg-card border border-border rounded-xl pl-9 pr-3 py-2.5 text-sm focus:outline-none focus:border-foreground/30"
+              className="w-full bg-card border border-border rounded-xl pl-9 pr-3 py-2.5 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground/60 focus:border-foreground/60"
             />
           </div>
           <select
             value={riskFilter}
             onChange={(e) => setRiskFilter(e.target.value as "all" | RiskLevel)}
-            className="bg-card border border-border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-foreground/30"
+            className="bg-card border border-border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground/60 focus:border-foreground/60"
             title="Filter by risk"
           >
             <option value="all">All Risk</option>
@@ -1696,14 +1718,14 @@ if (nutritionFieldsFilled < 2) {
           <select
             value={inventorySortBy}
             onChange={(e) => setInventorySortBy(e.target.value as typeof inventorySortBy)}
-            className="bg-card border border-border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-foreground/30"
+            className="bg-card border border-border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground/60 focus:border-foreground/60"
             title="Sort inventory"
           >
             <option value="expiring">Expiring Soon</option>
             <option value="freshest">Freshest First</option>
             <option value="name">Name (A-Z)</option>
           </select>
-          <div className="text-xs font-medium text-foreground/50 flex items-center justify-start sm:justify-end px-1">
+          <div className="text-xs font-medium text-foreground/60 flex items-center justify-start px-1">
             {dbLoading ? "Loading..." : `Showing ${inventoryFilteredItems.length} items`}
           </div>
         </div>
@@ -1741,10 +1763,11 @@ if (nutritionFieldsFilled < 2) {
         ) : (
           <div className="flex flex-col gap-3">
             {paginatedItems.map(item => {
-              // Deterministic assignment of mock TruthIn values based on item name character count
-              const ratingsLineup = ["A", "B", "C", "D", "E"] as const;
-              const healthRating = ratingsLineup[item.name.length % 5];
-              const healthierAlternative = ["C", "D", "E"].includes(healthRating)
+              // Only suggest an alternative when a real scan actually rated the
+              // item poorly. This used to key off a grade derived from the
+              // item name's character count.
+              const scoreValue = item.healthScore != null ? Number.parseFloat(item.healthScore) : NaN;
+              const healthierAlternative = Number.isFinite(scoreValue) && scoreValue < 2.5
                 ? getHealthierAlternativeHint(inferItemCategory(item.name))
                 : undefined;
               const detectedAllergens = item.ingredientsText ? detectAllergens(item.ingredientsText) : null;
@@ -1754,7 +1777,7 @@ if (nutritionFieldsFilled < 2) {
                 <div key={item.id} className="relative group">
                   <PantryCard
                     {...item}
-                    healthRating={healthRating}
+                    healthScore={item.healthScore}
                     dietMatch={isVegMode ? true : isVegItem(item.name)}
                     healthierAlternative={healthierAlternative}
                     detectedAllergens={detectedAllergens}
@@ -1762,7 +1785,7 @@ if (nutritionFieldsFilled < 2) {
                   />
                   <button
                     onClick={() => openEditItem(item)}
-                    className="absolute bottom-4 right-16 bg-foreground text-background p-2.5 rounded-full shadow-lg z-20 active:scale-95 transition-all opacity-90 hover:opacity-100"
+                    className="absolute bottom-3 right-[4.25rem] w-11 h-11 flex items-center justify-center bg-foreground text-background rounded-full shadow-lg z-20 active:scale-95 transition-all opacity-90 hover:opacity-100"
                     title="Edit item"
                     aria-label="Edit item"
                   >
@@ -1770,8 +1793,9 @@ if (nutritionFieldsFilled < 2) {
                   </button>
                   <button
                     onClick={() => deleteItem(item.id)}
-                    className="absolute bottom-4 right-4 bg-danger text-white p-2.5 rounded-full shadow-lg z-20 active:scale-95 transition-all opacity-90 hover:opacity-100"
+                    className="absolute bottom-3 right-3 w-11 h-11 flex items-center justify-center bg-danger text-white rounded-full shadow-lg z-20 active:scale-95 transition-all opacity-90 hover:opacity-100"
                     title="Remove item"
+                    aria-label={`Remove ${item.name}`}
                   >
                     <Trash2 size={16} />
                   </button>
@@ -1808,14 +1832,14 @@ if (nutritionFieldsFilled < 2) {
             )}
           </div>
         )}
-      </main>
+      </section>
 
       <input type="file" accept="image/*" ref={cameraInputRef} onChange={handleFileUpload} className="hidden" title="Upload receipt photo" />
       <input type="file" accept="image/*,.pdf,application/pdf" ref={galleryInputRef} onChange={handleFileUpload} className="hidden" title="Upload receipt from gallery" />
       <input type="file" accept=".pdf,application/pdf,image/*" ref={invoiceInputRef} onChange={handleFileUpload} className="hidden" title="Upload invoice file" />
 
       {/* Bottom Nav Bar */}
-      <div className="fixed bottom-4 left-3 right-3 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-50 flex flex-col items-center">
+      <nav aria-label="Primary" className="fixed bottom-4 left-3 right-3 z-50 flex flex-col items-center">
         {/* Receipt Action Menu */}
         {showReceiptMenu && (
           <div className="mb-4 bg-card border border-border shadow-2xl rounded-2xl p-2 flex flex-col gap-2 w-full max-w-xs animate-in slide-in-from-bottom-2 fade-in duration-200">
@@ -1851,35 +1875,35 @@ if (nutritionFieldsFilled < 2) {
           </div>
         )}
 
-        <div className="flex items-center justify-between w-full sm:w-auto bg-card/95 border border-border shadow-2xl rounded-2xl p-2 gap-1 sm:gap-2 backdrop-blur-md">
-          <button onClick={() => setShowBarcodeScanner(true)} className="flex-1 sm:flex-none min-w-0 flex flex-col items-center justify-center gap-1 hover:bg-foreground/5 text-foreground/80 hover:text-foreground h-16 px-2 sm:w-16 rounded-xl transition-all">
+        <div className="flex items-center justify-between w-full bg-card/95 border border-border shadow-lg rounded-2xl p-2 gap-1 backdrop-blur-md">
+          <button onClick={() => setShowBarcodeScanner(true)} className="flex-1 min-w-0 flex flex-col items-center justify-center gap-1 hover:bg-foreground/5 text-foreground/80 hover:text-foreground h-16 px-2 rounded-xl transition-all">
             <ScanLine size={18} /><span className="text-[10px] tracking-wide">Barcode</span>
           </button>
 
-          <div className="w-px h-8 bg-border hidden sm:block" />
+          <div className="w-px h-8 bg-border" />
 
-          <button onClick={() => window.scrollTo({top: 0, behavior: 'smooth'})} className="flex-1 sm:flex-none min-w-0 flex flex-col items-center justify-center gap-1 hover:bg-foreground/5 text-foreground/80 hover:text-foreground h-16 px-2 sm:w-16 rounded-xl transition-all">
+          <button onClick={() => window.scrollTo({top: 0, behavior: 'smooth'})} className="flex-1 min-w-0 flex flex-col items-center justify-center gap-1 hover:bg-foreground/5 text-foreground/80 hover:text-foreground h-16 px-2 rounded-xl transition-all">
             <HomeIcon size={18} /><span className="text-[10px] tracking-wide">Home</span>
           </button>
 
-          <div className="w-px h-8 bg-border hidden sm:block" />
+          <div className="w-px h-8 bg-border" />
 
           <button
             onClick={() => setShowReceiptMenu(!showReceiptMenu)}
             disabled={isUploading}
-            className={`flex-1 sm:flex-none min-w-0 flex flex-col items-center justify-center gap-1 hover:bg-foreground/5 h-16 px-2 sm:w-16 rounded-xl transition-all disabled:opacity-50 ${showReceiptMenu ? 'bg-foreground/10 text-foreground' : 'text-foreground/80 hover:text-foreground'}`}
+            className={`flex-1 min-w-0 flex flex-col items-center justify-center gap-1 hover:bg-foreground/5 h-16 px-2 rounded-xl transition-all disabled:opacity-50 ${showReceiptMenu ? 'bg-foreground/10 text-foreground' : 'text-foreground/80 hover:text-foreground'}`}
           >
             {isUploading ? <Loader2 size={18} className="animate-spin" /> : <Camera size={18} />}
             <span className="text-[10px] tracking-wide">{isUploading ? "Reading" : "Receipt"}</span>
           </button>
 
-          <div className="w-px h-8 bg-border hidden sm:block" />
+          <div className="w-px h-8 bg-border" />
 
-          <button onClick={() => setShowPantryChat(true)} className="flex-1 sm:flex-none min-w-0 flex flex-col items-center justify-center gap-1 hover:bg-foreground/5 text-foreground/80 hover:text-foreground h-16 px-2 sm:w-16 rounded-xl transition-all">
+          <button onClick={() => setShowPantryChat(true)} className="flex-1 min-w-0 flex flex-col items-center justify-center gap-1 hover:bg-foreground/5 text-foreground/80 hover:text-foreground h-16 px-2 rounded-xl transition-all">
             <Sparkles size={18} /><span className="text-[10px] tracking-wide">Ask AI</span>
           </button>
         </div>
-      </div>
+      </nav>
 
       {showBarcodeScanner && (
         <BarcodeScanner 
@@ -1912,17 +1936,17 @@ if (nutritionFieldsFilled < 2) {
               {/* Expiry Date Card */}
               <div className="bg-foreground/5 rounded-2xl p-4 flex items-center justify-between border border-border/50 sleek-shadow gap-3">
                 <div className="flex flex-col min-w-0">
-                  <span className="text-xs font-bold uppercase tracking-widest text-foreground/50 mb-1">Expiry Date</span>
+                  <span className="text-xs font-bold uppercase tracking-widest text-foreground/60 mb-1">Expiry Date</span>
                   {scannedExpiry ? (
                     <>
                       <span className="text-lg font-black">{scannedExpiry.daysLeft} day(s) left</span>
-                      <span className="text-[11px] text-foreground/50 truncate">
+                      <span className="text-[11px] text-foreground/60 truncate">
                         {scannedExpiry.expiryDate ? `Expires ${scannedExpiry.expiryDate}` : "From printed shelf-life"}
                         {scannedExpiry.confidence !== "high" ? " · double-check label" : ""}
                       </span>
                     </>
                   ) : (
-                    <span className="text-xs text-foreground/50">Not scanned — will default to {DEFAULT_SCANNED_ITEM_DAYS_LEFT} days</span>
+                    <span className="text-xs text-foreground/60">Not scanned — will default to {DEFAULT_SCANNED_ITEM_DAYS_LEFT} days</span>
                   )}
                 </div>
                 <button
@@ -1936,7 +1960,7 @@ if (nutritionFieldsFilled < 2) {
               {/* TruthIn Style Rating Card */}
               <div className="bg-foreground/5 rounded-2xl p-4 flex items-center justify-between border border-border/50 sleek-shadow">
                 <div className="flex flex-col">
-                  <span className="text-xs font-bold uppercase tracking-widest text-foreground/50 mb-1">Nutri-Trust Rating</span>
+                  <span className="text-xs font-bold uppercase tracking-widest text-foreground/60 mb-1">Nutri-Trust Rating</span>
                   <div className="flex items-center gap-2">
                     <span className="text-2xl font-black">{scannedResult.analysis.health_score || "N/A"}</span>
                     <span className="text-sm font-semibold text-foreground/60">/ 5.0</span>
@@ -2016,7 +2040,7 @@ if (nutritionFieldsFilled < 2) {
                   return (
                     <div className="space-y-3">
                       <h4 className="font-bold flex items-center gap-2 text-foreground">
-                        <Scale size={16} className="text-foreground/50" /> Regulatory Notes
+                        <Scale size={16} className="text-foreground/60" /> Regulatory Notes
                       </h4>
                       <p className="text-xs leading-relaxed text-foreground/55 bg-foreground/5 rounded-2xl border border-border/50 p-3.5">
                         No ingredient list was available for this product, so its additives
@@ -2028,7 +2052,7 @@ if (nutritionFieldsFilled < 2) {
                 return (
                   <div className="space-y-3">
                     <h4 className="font-bold flex items-center gap-2 text-foreground">
-                      <Scale size={16} className="text-foreground/50" /> Regulatory Notes
+                      <Scale size={16} className="text-foreground/60" /> Regulatory Notes
                     </h4>
                     {divergent.length === 0 ? (
                       <p className="text-xs leading-relaxed text-foreground/55 bg-foreground/5 rounded-2xl border border-border/50 p-3.5">
@@ -2042,7 +2066,7 @@ if (nutritionFieldsFilled < 2) {
                             <p className="text-sm font-bold text-foreground">
                               {entry.name}
                               {entry.eNumber && (
-                                <span className="ml-1.5 font-mono text-[11px] font-semibold text-foreground/45">
+                                <span className="ml-1.5 font-mono text-[11px] font-semibold text-foreground/60">
                                   {entry.eNumber}
                                 </span>
                               )}
@@ -2159,7 +2183,7 @@ if (nutritionFieldsFilled < 2) {
                   onChange={(e) => setEditDaysLeft(e.target.value)}
                   className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-foreground/20"
                 />
-                <p className="text-[11px] text-foreground/45">Saving resets the freshness clock to start counting down from today.</p>
+                <p className="text-[11px] text-foreground/60">Saving resets the freshness clock to start counting down from today.</p>
               </div>
             </div>
 

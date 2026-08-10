@@ -323,3 +323,16 @@ as $$
 $$;
 
 grant execute on function public.household_impact_leaderboard() to authenticated;
+
+-- ────────────────────────────────────────────────────────────
+-- 8. pantry_items — persist the real NutriTrust score (additive)
+-- ────────────────────────────────────────────────────────────
+-- The item card used to render an A–E grade derived from the item name's
+-- character count (name.length % 5), which meant Milk showed "E" and Bread
+-- showed "A" for no reason at all. This column stores the genuine 1–5 score
+-- that /api/analyze-food already computes at scan time, so the card can
+-- show a real reading — and honestly show nothing for items that were never
+-- scanned, rather than inventing one. No policy change needed: the existing
+-- pantry_items policy is not column-specific.
+
+alter table public.pantry_items add column if not exists health_score text;
