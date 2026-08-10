@@ -1799,7 +1799,15 @@ if (nutritionFieldsFilled < 2) {
 
         <div className="flex items-center justify-between gap-3 mb-3">
           <h2 id="inventory-heading" className="font-semibold text-sm uppercase tracking-widest text-foreground/70">Your Pantry</h2>
-          <p className="text-xs font-medium text-foreground/60 tabular-nums shrink-0">
+          {/* aria-live: tapping the Critical tile, typing in search or
+              changing a filter silently swaps the list underneath. Sighted
+              users see it; a screen-reader user got no signal at all that
+              the count had changed from 10 to 6. */}
+          <p
+            aria-live="polite"
+            aria-atomic="true"
+            className="text-xs font-medium text-foreground/60 tabular-nums shrink-0"
+          >
             {dbLoading ? "Loading…" : `${inventoryFilteredItems.length} ${inventoryFilteredItems.length === 1 ? "item" : "items"}`}
           </p>
         </div>
