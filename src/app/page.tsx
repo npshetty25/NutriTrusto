@@ -2080,7 +2080,7 @@ if (nutritionFieldsFilled < 2) {
               onClick={() => cameraInputRef.current?.click()}
               className="flex items-center gap-3 p-3 rounded-xl hover:bg-foreground/5 text-foreground font-semibold text-sm transition-colors"
             >
-              <div className="w-8 h-8 rounded-full bg-blue-500/10 text-blue-500 flex items-center justify-center shrink-0">
+              <div className="w-9 h-9 rounded-xl neu-raised-sm text-foreground/70 flex items-center justify-center shrink-0">
                 <Camera size={16} />
               </div>
               Take Photo
@@ -2090,7 +2090,7 @@ if (nutritionFieldsFilled < 2) {
               onClick={() => galleryInputRef.current?.click()}
               className="flex items-center gap-3 p-3 rounded-xl hover:bg-foreground/5 text-foreground font-semibold text-sm transition-colors"
             >
-              <div className="w-8 h-8 rounded-full bg-green-500/10 text-green-500 flex items-center justify-center shrink-0">
+              <div className="w-9 h-9 rounded-xl neu-raised-sm text-foreground/70 flex items-center justify-center shrink-0">
                 <Search size={16} />
               </div>
               Upload Gallery
@@ -2100,7 +2100,7 @@ if (nutritionFieldsFilled < 2) {
               onClick={() => invoiceInputRef.current?.click()}
               className="flex items-center gap-3 p-3 rounded-xl hover:bg-foreground/5 text-foreground font-semibold text-sm transition-colors"
             >
-              <div className="w-8 h-8 rounded-full bg-orange-500/10 text-orange-500 flex items-center justify-center shrink-0">
+              <div className="w-9 h-9 rounded-xl neu-raised-sm text-foreground/70 flex items-center justify-center shrink-0">
                 <Info size={16} />
               </div>
               Upload Invoice / PDF
