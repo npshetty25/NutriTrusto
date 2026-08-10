@@ -2031,10 +2031,10 @@ if (nutritionFieldsFilled < 2) {
             })}
 
             {sortedInventoryItems.length > INVENTORY_PAGE_SIZE && (
-              {/* 32x32 was the smallest target on the page, and the only
-                  route to items 7 and beyond. 44x44 is the documented
-                  minimum for a one-handed thumb. */}
               <div className="mt-2 flex items-center justify-between rounded-xl neu-raised-sm px-3 py-2">
+                {/* 32x32 was the smallest target on the page, and the only
+                    route to items 7 and beyond. 44x44 is the documented
+                    minimum for a one-handed thumb. */}
                 <p className="text-xs text-foreground/60 tabular-nums">
                   Page {currentPage} of {totalPages}
                 </p>
