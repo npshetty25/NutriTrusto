@@ -2065,8 +2065,11 @@ if (nutritionFieldsFilled < 2) {
       <input type="file" accept="image/*,.pdf,application/pdf" ref={galleryInputRef} onChange={handleFileUpload} className="hidden" title="Upload receipt from gallery" />
       <input type="file" accept=".pdf,application/pdf,image/*" ref={invoiceInputRef} onChange={handleFileUpload} className="hidden" title="Upload invoice file" />
 
-      {/* Bottom Nav Bar */}
-      <nav aria-label="Primary" className="fixed bottom-4 left-3 right-3 z-50 flex flex-col items-center">
+      {/* Bottom Nav Bar — capped to the same 448px column as the content it
+          belongs to. left-3/right-3 stretched it to the full viewport on
+          desktop, roughly 2.8x the column above it, which made a deliberate
+          layout cap read as a broken one. */}
+      <nav aria-label="Primary" className="fixed bottom-4 left-3 right-3 z-50 flex flex-col items-center sm:left-1/2 sm:right-auto sm:w-full sm:max-w-md sm:-translate-x-1/2 sm:px-3">
         {/* Receipt Action Menu */}
         {showReceiptMenu && (
           <div className="neu-panel mb-4 rounded-2xl p-2 flex flex-col gap-2 w-full max-w-xs animate-in slide-in-from-bottom-2 fade-in duration-200">
