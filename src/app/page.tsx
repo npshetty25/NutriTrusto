@@ -245,6 +245,7 @@ export default function Home() {
   // app and seeing a single item, so on a phone the pantry never appeared
   // above the fold — in a product whose whole job is "show me what's dying".
   const [showFilters, setShowFilters] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [showNotificationsPanel, setShowNotificationsPanel] = useState(false);
   const [notifications, setNotifications] = useState<NotificationEntry[]>([]);
@@ -1983,14 +1984,38 @@ if (nutritionFieldsFilled < 2) {
                       >
                         <Pencil size={15} />
                       </button>
-                      <button
-                        onClick={() => deleteItem(item.id)}
-                        className="neu-raised-sm w-11 h-11 shrink-0 rounded-xl flex items-center justify-center text-foreground/50 hover:text-danger transition-colors"
-                        title="Threw it away"
-                        aria-label={`Remove ${item.name}`}
-                      >
-                        <Trash2 size={15} />
-                      </button>
+                      {/* Two taps, not one. Deleting was a single tap on a
+                          destructive control whose only escape was catching a
+                          toast before it timed out. The confirm state is
+                          inline rather than a dialog so it can't be missed
+                          and costs nothing to back out of. */}
+                      {confirmDeleteId === item.id ? (
+                        <>
+                          <button
+                            onClick={() => { setConfirmDeleteId(null); void deleteItem(item.id); }}
+                            className="h-11 px-3 shrink-0 rounded-xl bg-danger text-white text-xs font-bold"
+                            title={`Confirm removing ${item.name}`}
+                          >
+                            Remove
+                          </button>
+                          <button
+                            onClick={() => setConfirmDeleteId(null)}
+                            className="neu-raised-sm h-11 px-3 shrink-0 rounded-xl text-xs font-semibold text-foreground/70"
+                            title="Keep it"
+                          >
+                            Keep
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          onClick={() => setConfirmDeleteId(item.id)}
+                          className="neu-raised-sm w-11 h-11 shrink-0 rounded-xl flex items-center justify-center text-foreground/50 hover:text-danger transition-colors"
+                          title="Threw it away"
+                          aria-label={`Remove ${item.name}`}
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      )}
                     </div>
                   }
                 />
