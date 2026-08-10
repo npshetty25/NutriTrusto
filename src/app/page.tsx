@@ -2031,28 +2031,31 @@ if (nutritionFieldsFilled < 2) {
             })}
 
             {sortedInventoryItems.length > INVENTORY_PAGE_SIZE && (
-              <div className="mt-2 flex items-center justify-between rounded-xl border border-border bg-card px-3 py-2">
-                <p className="text-xs text-foreground/60">
+              {/* 32x32 was the smallest target on the page, and the only
+                  route to items 7 and beyond. 44x44 is the documented
+                  minimum for a one-handed thumb. */}
+              <div className="mt-2 flex items-center justify-between rounded-xl neu-raised-sm px-3 py-2">
+                <p className="text-xs text-foreground/60 tabular-nums">
                   Page {currentPage} of {totalPages}
                 </p>
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                     disabled={currentPage === 1}
-                    className="h-8 w-8 rounded-lg border border-border bg-background hover:bg-foreground/5 disabled:opacity-40 flex items-center justify-center"
+                    className="h-11 w-11 rounded-xl neu-raised-sm hover:text-foreground text-foreground/70 disabled:opacity-40 flex items-center justify-center transition-colors"
                     title="Previous page"
                     aria-label="Previous page"
                   >
-                    <ChevronLeft size={14} />
+                    <ChevronLeft size={16} />
                   </button>
                   <button
                     onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                     disabled={currentPage === totalPages}
-                    className="h-8 w-8 rounded-lg border border-border bg-background hover:bg-foreground/5 disabled:opacity-40 flex items-center justify-center"
+                    className="h-11 w-11 rounded-xl neu-raised-sm hover:text-foreground text-foreground/70 disabled:opacity-40 flex items-center justify-center transition-colors"
                     title="Next page"
                     aria-label="Next page"
                   >
-                    <ChevronRight size={14} />
+                    <ChevronRight size={16} />
                   </button>
                 </div>
               </div>
