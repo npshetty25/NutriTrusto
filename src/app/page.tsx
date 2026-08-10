@@ -142,7 +142,7 @@ import { RestockSuggestions } from "@/components/restock-suggestions";
 import { RecipeModal, type GeneratedRecipe } from "@/components/recipe-modal";
 import {
   Camera, BrainCircuit, Loader2, TrendingUp, ScanLine,
-  Clock, X, Trash2, Home as HomeIcon, Info, Activity, Zap, AlertTriangle, CheckCircle2, Search, CircleAlert, Bell, Carrot, Apple, Milk, Drumstick, Wheat, CupSoda, Croissant, Snowflake, Candy, Package, ChevronLeft, ChevronRight, CalendarClock, Pencil, Sparkles, RefreshCw, SlidersHorizontal, Leaf, UtensilsCrossed, Check
+  Clock, X, Trash2, Info, Activity, Zap, AlertTriangle, CheckCircle2, Search, CircleAlert, Bell, Carrot, Apple, Milk, Drumstick, Wheat, CupSoda, Croissant, Snowflake, Candy, Package, ChevronLeft, ChevronRight, CalendarClock, Pencil, Sparkles, RefreshCw, SlidersHorizontal, Leaf, UtensilsCrossed, Check
 } from "lucide-react";
 import ShoppingListModal from "@/components/shopping-list-modal";
 import { CountUp } from "@/components/count-up";
@@ -2115,8 +2115,12 @@ if (nutritionFieldsFilled < 2) {
 
           <div className="w-px h-8 bg-border" />
 
-          <button onClick={() => window.scrollTo({top: 0, behavior: 'smooth'})} className="flex-1 min-w-0 flex flex-col items-center justify-center gap-1 hover:bg-foreground/5 text-foreground/80 hover:text-foreground h-16 px-2 rounded-xl transition-all">
-            <HomeIcon size={18} /><span className="text-[10px] tracking-wide">Home</span>
+          {/* Was labelled "Home" but only scrolled to the top of the page
+              the user was already on, while /recipes — a real route — had
+              no entry anywhere in the app. A nav slot is worth more as a
+              destination than as a scroll button. */}
+          <button onClick={() => router.push("/recipes")} className="flex-1 min-w-0 flex flex-col items-center justify-center gap-1 hover:bg-foreground/5 text-foreground/80 hover:text-foreground h-16 px-2 rounded-xl transition-all">
+            <UtensilsCrossed size={18} /><span className="text-[10px] tracking-wide">Recipes</span>
           </button>
 
           <div className="w-px h-8 bg-border" />
