@@ -571,9 +571,20 @@ export default function Home() {
         const key = `expiry-notify-${user.id}-${item.id}-${new Date().toDateString()}`;
         if (typeof window !== "undefined" && localStorage.getItem(key)) return;
 
+        // "Got it" used to be a no-op that only dismissed the toast — a
+        // button that looks like a decision and takes none. The alarm is
+        // about one specific item, so the action offers the one thing that
+        // resolves it.
         toast("Expiry Reminder", {
           description: `${item.name} may spoil in ${days(item.daysLeft)}. Use it soon.`,
-          action: { label: "Got it", onClick: () => {} },
+          action: {
+            label: "Cook it",
+            onClick: () => {
+              setRiskFilter("high");
+              setSearchQuery(item.name);
+              document.getElementById("inventory-log")?.scrollIntoView({ behavior: "smooth", block: "start" });
+            },
+          },
         });
 
         if (typeof window !== "undefined") {
