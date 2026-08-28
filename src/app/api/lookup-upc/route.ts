@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createRequestContext } from "@/lib/server-logger";
 import { getRequestUser, unauthorized } from "@/lib/api-auth";
+import { checkRateLimit, rateLimited } from "@/lib/rate-limit";
 
 const OFF_FIELDS = "product_name,product_name_en,product_name_in,generic_name,brands,brand_owner,quantity,ingredients_text,categories,nutriscore_grade,additives_n,additives_tags,nutriments";
 
@@ -9,6 +10,10 @@ export async function GET(req: Request) {
   // could spend the project's quota from a terminal.
   const user = await getRequestUser(req);
   if (!user) return unauthorized();
+
+  // Auth stops a stranger; this stops one account looping the call.
+  const limit = checkRateLimit("lookup-upc", user.id);
+  if (!limit.ok) return rateLimited(limit.retryAfterSeconds);
 
   const log = createRequestContext("api/lookup-upc");
   log.info("Request received");

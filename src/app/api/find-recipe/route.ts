@@ -3,6 +3,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { createRequestContext } from "@/lib/server-logger";
 import { findDietViolations, normalizeDiet } from "@/lib/diet-check";
 import { getRequestUser, unauthorized } from "@/lib/api-auth";
+import { checkRateLimit, rateLimited } from "@/lib/rate-limit";
 
 const apiKey = process.env.GEMINI_API_KEY;
 const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null;
@@ -43,6 +44,10 @@ export async function POST(req: Request) {
   // could spend the project's quota from a terminal.
   const user = await getRequestUser(req);
   if (!user) return unauthorized();
+
+  // Auth stops a stranger; this stops one account looping the call.
+  const limit = checkRateLimit("find-recipe", user.id);
+  if (!limit.ok) return rateLimited(limit.retryAfterSeconds);
 
   const log = createRequestContext("api/find-recipe");
   log.info("Request received");

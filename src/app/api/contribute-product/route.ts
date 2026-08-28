@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createRequestContext } from "@/lib/server-logger";
 import { getRequestUser, unauthorized } from "@/lib/api-auth";
+import { checkRateLimit, rateLimited } from "@/lib/rate-limit";
 
 // Requires a real Open Food Facts contributor account — production writes
 // are not anonymous (confirmed against their API docs). Create a free
@@ -22,6 +23,10 @@ export async function POST(req: Request) {
   // could spend the project's quota from a terminal.
   const user = await getRequestUser(req);
   if (!user) return unauthorized();
+
+  // Auth stops a stranger; this stops one account looping the call.
+  const limit = checkRateLimit("contribute-product", user.id);
+  if (!limit.ok) return rateLimited(limit.retryAfterSeconds);
 
   const log = createRequestContext("api/contribute-product");
   log.info("Request received");

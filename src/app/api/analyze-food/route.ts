@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createRequestContext } from "@/lib/server-logger";
 import { getRequestUser, unauthorized } from "@/lib/api-auth";
+import { checkRateLimit, rateLimited } from "@/lib/rate-limit";
 
 type NutriScoreGrade = "a" | "b" | "c" | "d" | "e";
 
@@ -53,6 +54,10 @@ export async function POST(req: Request) {
   // could spend the project's quota from a terminal.
   const user = await getRequestUser(req);
   if (!user) return unauthorized();
+
+  // Auth stops a stranger; this stops one account looping the call.
+  const limit = checkRateLimit("analyze-food", user.id);
+  if (!limit.ok) return rateLimited(limit.retryAfterSeconds);
 
   const log = createRequestContext("api/analyze-food");
   log.info("Request received");
