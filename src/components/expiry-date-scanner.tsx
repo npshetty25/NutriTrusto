@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { Camera, Upload, Loader2, CheckCircle2, X } from "lucide-react";
+import { apiFetch } from "@/lib/api-client";
 
 interface ExpiryResult {
   days_left: number | null;
@@ -40,7 +41,7 @@ export default function ExpiryDateScanner({ onResult, onClose }: ExpiryDateScann
       const formData = new FormData();
       formData.append("label", file);
 
-      const res = await fetch("/api/scan-expiry-date", {
+      const res = await apiFetch("/api/scan-expiry-date", {
         method: "POST",
         body: formData,
       });

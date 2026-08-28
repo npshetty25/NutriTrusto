@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { Camera, Upload, Loader2, CheckCircle2, X } from "lucide-react";
+import { apiFetch } from "@/lib/api-client";
 
 interface NutritionData {
   energy_kcal?: number | null;
@@ -46,7 +47,7 @@ export default function NutritionLabelScanner({ onResult, onClose }: NutritionLa
       const formData = new FormData();
       formData.append("label", file);
 
-      const res = await fetch("/api/scan-nutrition-label", {
+      const res = await apiFetch("/api/scan-nutrition-label", {
         method: "POST",
         body: formData,
       });

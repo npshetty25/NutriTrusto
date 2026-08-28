@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createRequestContext } from "@/lib/server-logger";
+import { getRequestUser, unauthorized } from "@/lib/api-auth";
 
 // Requires a real Open Food Facts contributor account — production writes
 // are not anonymous (confirmed against their API docs). Create a free
@@ -17,6 +18,11 @@ const OFF_WRITE_BASE_URL = process.env.OFF_USE_STAGING === "true"
   : "https://world.openfoodfacts.org";
 
 export async function POST(req: Request) {
+  // Gemini costs money per call. Without this, anyone with the URL
+  // could spend the project's quota from a terminal.
+  const user = await getRequestUser(req);
+  if (!user) return unauthorized();
+
   const log = createRequestContext("api/contribute-product");
   log.info("Request received");
 

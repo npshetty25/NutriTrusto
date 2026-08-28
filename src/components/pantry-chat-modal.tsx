@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { X, Sparkles, Send, Loader2 } from "lucide-react";
+import { apiFetch } from "@/lib/api-client";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -45,7 +46,7 @@ export default function PantryChatModal({ items, dietaryPreference, onClose }: P
     setIsSending(true);
 
     try {
-      const res = await fetch("/api/pantry-chat", {
+      const res = await apiFetch("/api/pantry-chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ question: trimmed, items, dietaryPreference }),

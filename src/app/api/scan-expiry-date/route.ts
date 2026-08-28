@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { createRequestContext } from "@/lib/server-logger";
+import { getRequestUser, unauthorized } from "@/lib/api-auth";
 
 const apiKey = process.env.GEMINI_API_KEY;
 const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null;
@@ -77,6 +78,11 @@ The "confidence" field is your honest assessment:
 - "low" = no reliable date information found`;
 
 export async function POST(req: Request) {
+  // Gemini costs money per call. Without this, anyone with the URL
+  // could spend the project's quota from a terminal.
+  const user = await getRequestUser(req);
+  if (!user) return unauthorized();
+
   const log = createRequestContext("api/scan-expiry-date");
   log.info("Request received");
 

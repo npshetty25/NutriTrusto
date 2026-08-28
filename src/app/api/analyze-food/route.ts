@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createRequestContext } from "@/lib/server-logger";
+import { getRequestUser, unauthorized } from "@/lib/api-auth";
 
 type NutriScoreGrade = "a" | "b" | "c" | "d" | "e";
 
@@ -48,6 +49,11 @@ const nutriScoreBase = (grade?: string): number => {
 };
 
 export async function POST(req: Request) {
+  // Gemini costs money per call. Without this, anyone with the URL
+  // could spend the project's quota from a terminal.
+  const user = await getRequestUser(req);
+  if (!user) return unauthorized();
+
   const log = createRequestContext("api/analyze-food");
   log.info("Request received");
 

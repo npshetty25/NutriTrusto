@@ -148,6 +148,7 @@ import ShoppingListModal from "@/components/shopping-list-modal";
 import { CountUp } from "@/components/count-up";
 import { motion, AnimatePresence, MotionConfig } from "framer-motion";
 import { toast } from "sonner";
+import { apiFetch } from "@/lib/api-client";
 
 interface Item {
   id: string;
@@ -825,7 +826,7 @@ export default function Home() {
     setInlineError(null);
 
     try {
-      const res = await fetch("/api/find-recipe", {
+      const res = await apiFetch("/api/find-recipe", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -912,7 +913,7 @@ export default function Home() {
       const formData = new FormData();
       formData.append("receipt", file);
 
-      const res = await fetch("/api/extract", { 
+      const res = await apiFetch("/api/extract", { 
         method: "POST",
         body: formData 
       });
@@ -1173,7 +1174,7 @@ if (nutritionFieldsFilled < 2) {
 
       const isEstimated = !Object.values(nutritionData).some((v) => typeof v === "number");
 
-      const aiRes = await fetch("/api/analyze-food", {
+      const aiRes = await apiFetch("/api/analyze-food", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1220,7 +1221,7 @@ if (nutritionFieldsFilled < 2) {
     setIsAnalyzingFood(true);
 
     try {
-      const aiRes = await fetch("/api/analyze-food", {
+      const aiRes = await apiFetch("/api/analyze-food", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1249,7 +1250,7 @@ if (nutritionFieldsFilled < 2) {
         });
 
         if (contributeToOFF) {
-          fetch("/api/contribute-product", {
+          apiFetch("/api/contribute-product", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ barcode: manualBarcodeEntry.code, productName: typedName }),
@@ -1350,7 +1351,7 @@ if (nutritionFieldsFilled < 2) {
         protein_g_100g: nutrition.protein_g ?? undefined,
       };
 
-      const aiRes = await fetch("/api/analyze-food", {
+      const aiRes = await apiFetch("/api/analyze-food", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
