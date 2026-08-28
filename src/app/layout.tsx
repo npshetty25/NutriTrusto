@@ -4,9 +4,38 @@ import { AppToaster } from "@/components/app-toaster";
 import { THEME_INIT_SCRIPT } from "@/lib/theme";
 import "./globals.css";
 
+// metadataBase resolves every relative URL below (canonical, OG image) to an
+// absolute one. Without it Next emits relative og:image paths, which every
+// social and chat unfurler rejects.
+const SITE_URL = "https://nutri-trusto.vercel.app";
+
 export const metadata: Metadata = {
-  title: "Nutri-Trust | Automated Pantry System",
-  description: "Stop wasting food and track your groceries intelligently.",
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: "Nutri-Trust — Smart Pantry for Indian Households",
+    template: "%s | Nutri-Trust",
+  },
+  description:
+    "Scan a barcode to understand what is in packaged food, track what is already in your pantry, and cook it before it spoils. Built for Indian kitchens.",
+  applicationName: "Nutri-Trust",
+  // Stops the www/non-www and trailing-slash variants competing with each
+  // other for the same content.
+  alternates: { canonical: "/" },
+  openGraph: {
+    type: "website",
+    siteName: "Nutri-Trust",
+    url: SITE_URL,
+    title: "Nutri-Trust — Smart Pantry for Indian Households",
+    description:
+      "Scan packaged food, track expiry, and get Indian recipes that use what is about to spoil.",
+    locale: "en_IN",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Nutri-Trust — Smart Pantry for Indian Households",
+    description:
+      "Scan packaged food, track expiry, and get Indian recipes that use what is about to spoil.",
+  },
   other: {
     // Inter font loaded via CSS link to avoid next/font/google network fetch at build time
     // (known Turbopack bug in Next.js 16.2.x)
