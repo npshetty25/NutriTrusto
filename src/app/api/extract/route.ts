@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { createRequestContext } from "@/lib/server-logger";
+import { validateUpload } from "@/lib/upload-validation";
 import { getRequestUser, unauthorized } from "@/lib/api-auth";
 import { checkRateLimit, rateLimited } from "@/lib/rate-limit";
 
@@ -71,9 +72,12 @@ export async function POST(req: Request) {
     const file = formData.get("receipt") as File | null;
     log.info("Parsed multipart form-data", { hasFile: Boolean(file) });
 
-    if (!file) {
-      log.warn("Validation failed: missing receipt file");
-      return NextResponse.json({ success: false, error: "No receipt file provided" }, { status: 400 });
+    // Size and magic-byte check before anything is paid for. file.type is
+    // copied from the client's multipart headers and cannot be trusted.
+    const upload = await validateUpload(file);
+    if (!upload.ok) {
+      log.warn("Upload rejected", { size: file?.size ?? 0, claimedType: file?.type || "none" });
+      return upload.response;
     }
 
     if (!genAI) {
@@ -82,13 +86,13 @@ export async function POST(req: Request) {
     }
 
     log.info("Receipt file accepted", {
-      fileName: file.name,
-      mimeType: file.type || "unknown",
-      fileSizeBytes: file.size,
+      fileName: upload.file.name,
+      mimeType: upload.mime,
+      fileSizeBytes: upload.file.size,
     });
 
     // Convert file to array buffer and base64
-    const arrayBuffer = await file.arrayBuffer();
+    const arrayBuffer = await upload.file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
     
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
@@ -128,7 +132,7 @@ Return ONLY the raw JSON string, with no markdown formatting.`;
       {
         inlineData: {
           data: buffer.toString("base64"),
-          mimeType: file.type || "image/jpeg",
+          mimeType: upload.mime,
         },
       },
     ];

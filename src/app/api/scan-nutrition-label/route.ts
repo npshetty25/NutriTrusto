@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { createRequestContext } from "@/lib/server-logger";
+import { validateUpload } from "@/lib/upload-validation";
 import { getRequestUser, unauthorized } from "@/lib/api-auth";
 import { checkRateLimit, rateLimited } from "@/lib/rate-limit";
 
@@ -24,15 +25,16 @@ export async function POST(req: Request) {
     const formData = await req.formData();
     const file = formData.get("label") as File | null;
 
-    if (!file) {
-      return NextResponse.json({ success: false, error: "No image provided" }, { status: 400 });
-    }
+    // Size and magic-byte check before anything is paid for. file.type is
+    // copied from the client's multipart headers and cannot be trusted.
+    const upload = await validateUpload(file);
+    if (!upload.ok) return upload.response;
 
     if (!genAI) {
       return NextResponse.json({ success: false, error: "GEMINI_API_KEY not configured" }, { status: 500 });
     }
 
-    const arrayBuffer = await file.arrayBuffer();
+    const arrayBuffer = await upload.file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
@@ -113,7 +115,7 @@ The "confidence" field is your honest assessment:
       {
         inlineData: {
           data: buffer.toString("base64"),
-          mimeType: file.type || "image/jpeg",
+          mimeType: upload.mime,
         },
       },
     ]);
