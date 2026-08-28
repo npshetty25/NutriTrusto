@@ -42,6 +42,45 @@ export const metadata: Metadata = {
   },
 };
 
+// Machine-readable facts for search and AI answer engines. Deliberately
+// SoftwareApplication and not LocalBusiness: this is a free web app built as
+// a university minor project, not a business with a storefront, and claiming
+// otherwise would put a false address and phone number into the graph.
+//
+// No aggregateRating either. The app has no reviews, and inventing one is the
+// exact failure mode the product's first principle exists to prevent.
+const STRUCTURED_DATA = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareApplication",
+      name: "Nutri-Trust",
+      url: SITE_URL,
+      applicationCategory: "LifestyleApplication",
+      operatingSystem: "Any (web browser)",
+      description:
+        "A smart pantry web app for Indian households: scan packaged food barcodes for a nutrition reading, track what is on the shelf and when it expires, and generate Indian recipes that use up what is about to spoil.",
+      inLanguage: "en-IN",
+      isAccessibleForFree: true,
+      offers: { "@type": "Offer", price: "0", priceCurrency: "INR" },
+      featureList: [
+        "Barcode scanning with nutrition interpretation",
+        "Receipt and nutrition-label scanning",
+        "Pantry expiry tracking",
+        "Allergen detection from ingredient text",
+        "Indian recipe generation from expiring items",
+        "Household sharing and shopping list",
+      ],
+    },
+    {
+      "@type": "WebSite",
+      name: "Nutri-Trust",
+      url: SITE_URL,
+      inLanguage: "en-IN",
+    },
+  ],
+};
+
 export const viewport: Viewport = {
   themeColor: "#111111",
 };
@@ -91,6 +130,10 @@ export default function RootLayout({
     <html lang="en" className="min-h-screen antialiased" suppressHydrationWarning>
       <head>
         <script suppressHydrationWarning dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(STRUCTURED_DATA) }}
+        />
         {process.env.NODE_ENV === "production" && (
           <script suppressHydrationWarning dangerouslySetInnerHTML={{ __html: SW_REGISTER_SCRIPT }} />
         )}
