@@ -86,6 +86,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
 import { supabase } from "@/lib/supabase";
 import { inferItemCategory, type ItemCategory } from "@/lib/item-category";
+import { estimateShelfLife } from "@/lib/shelf-life";
 import { detectAllergens } from "@/lib/allergens";
 import { PantryCard, RiskLevel } from "@/components/pantry-card";
 import { ProfileDropdown } from "@/components/profile-dropdown";
@@ -144,7 +145,6 @@ interface ScannedExpiryEntry {
   confidence: "high" | "medium" | "low";
 }
 
-const DEFAULT_SCANNED_ITEM_DAYS_LEFT = 30;
 const PLACEHOLDER_INGREDIENTS_TEXT = "None provided, rely purely on AI general knowledge";
 
 const NOTIFICATIONS_PAGE_SIZE = 8;
@@ -1263,7 +1263,11 @@ if (nutritionFieldsFilled < 2) {
       return;
     }
 
-    const initialDaysLeft = scannedExpiry?.daysLeft ?? DEFAULT_SCANNED_ITEM_DAYS_LEFT;
+    // Every unscanned item used to get a flat 30 days, which put palak and
+    // basmati rice on the same clock. The estimate now depends on what the
+    // item is, and carries where the number came from.
+    const shelfLife = estimateShelfLife(scannedResult.name, scannedExpiry?.daysLeft);
+    const initialDaysLeft = shelfLife.days;
     const newItem = {
       user_id: user.id,
       ...householdIdField(),
@@ -1298,10 +1302,23 @@ if (nutritionFieldsFilled < 2) {
            healthScore: scannedResult.analysis?.health_score ?? null,
          }, ...prev];
        });
-       toast("Added to Pantry", {
-         description: scannedExpiry
-           ? `Using scanned expiry date: ${days(initialDaysLeft)} left.`
-           : `No expiry date scanned — defaulted to ${days(DEFAULT_SCANNED_ITEM_DAYS_LEFT)}. You can scan the expiry date next time for accuracy.`,
+       toast(`Added — ${days(initialDaysLeft)} left`, {
+         description: shelfLife.explanation,
+         // An estimate the app is unsure about gets a way to correct it
+         // right there, rather than a note telling the user to go and find
+         // the item later.
+         action: shelfLife.wantsConfirmation
+           ? {
+               label: "Set date",
+               onClick: () => openEditItem({
+                 id: insertedRow.id,
+                 name: insertedRow.name,
+                 daysLeft,
+                 risk: deriveRisk(daysLeft),
+                 purchaseDate: insertedRow.purchase_date,
+               }),
+             }
+           : undefined,
        });
     } else if (error) {
        setInlineError("Item was analyzed, but could not be saved to cloud inventory.");
@@ -2176,7 +2193,17 @@ if (nutritionFieldsFilled < 2) {
                       </span>
                     </>
                   ) : (
-                    <span className="text-xs text-foreground/60">Not scanned — will default to {DEFAULT_SCANNED_ITEM_DAYS_LEFT} days</span>
+                    // Shows the estimate it will actually use, and where
+                    // that number came from, instead of promising a flat 30.
+                    (() => {
+                      const est = estimateShelfLife(scannedResult.name);
+                      return (
+                        <>
+                          <span className="text-lg font-black">{days(est.days)} left</span>
+                          <span className="text-[11px] text-foreground/60">{est.explanation}</span>
+                        </>
+                      );
+                    })()
                   )}
                 </div>
                 <button

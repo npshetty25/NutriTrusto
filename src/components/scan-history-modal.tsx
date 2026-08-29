@@ -6,6 +6,7 @@ import { X, History, Loader2, ScanLine, Camera, Keyboard, Plus, Search } from "l
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/auth-context";
+import { estimateShelfLife } from "@/lib/shelf-life";
 
 interface ScanHistoryModalProps {
   onClose: () => void;
@@ -25,7 +26,8 @@ const sourceIconMap = {
   manual: Keyboard,
 } as const;
 
-const DEFAULT_READDED_DAYS_LEFT = 30;
+// Re-adding used a flat 30 days regardless of what the item was, so a
+// re-added palak got four weeks.
 
 type SourceFilter = "all" | "barcode" | "receipt" | "manual";
 type SortOption = "newest" | "oldest" | "name";
@@ -94,7 +96,7 @@ export function ScanHistoryModal({ onClose }: ScanHistoryModalProps) {
       user_id: user.id,
       ...(householdSchemaReady ? { household_id: household?.id ?? null } : {}),
       name: row.product_name,
-      days_left: DEFAULT_READDED_DAYS_LEFT,
+      days_left: estimateShelfLife(row.product_name).days,
       risk: "low",
       purchase_date: new Date().toISOString(),
     }]);
@@ -106,7 +108,8 @@ export function ScanHistoryModal({ onClose }: ScanHistoryModalProps) {
       return;
     }
 
-    toast("Added to Pantry", { description: `${row.product_name} added with a ${DEFAULT_READDED_DAYS_LEFT}-day default shelf life.` });
+    const est = estimateShelfLife(row.product_name);
+    toast("Added to Pantry", { description: `${row.product_name} — ${est.days} days. ${est.explanation}` });
   };
 
   // Rendered via a portal straight into <body>: this component is triggered
