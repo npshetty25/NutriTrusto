@@ -24,7 +24,7 @@ export type DietPreference = "veg" | "eggtarian" | "non-veg" | "none";
 // sense — stock, broth, butter, cream — is deliberately absent: a false
 // "non-veg" on someone's dal is worse than a missed edge case, because it
 // trains them to ignore the warning.
-const ANIMAL_TERMS = [
+export const ANIMAL_TERMS = [
   "chicken", "mutton", "lamb", "beef", "pork", "bacon", "ham", "sausage",
   "salami", "pepperoni", "turkey", "duck", "goat", "veal", "venison",
   // Fish by name, not just the word "fish". Found by testing the recipe
@@ -35,13 +35,21 @@ const ANIMAL_TERMS = [
   "trout", "snapper", "hilsa", "rohu", "katla", "surmai", "kingfish",
   "prawn", "shrimp", "crab", "lobster", "squid", "oyster",
   "clam", "mussel", "gelatin", "gelatine", "lard", "keema", "seekh",
+  // Cured meats and seafood that appear in dish titles without any of the
+  // words above. Found by running the ingredient check across four
+  // cuisines and looking at what it removed.
+  "chorizo", "prosciutto", "pancetta", "jamon", "calamari", "gambas",
+  "hake", "liver", "offal", "brisket",
+  // NOT "kidney": kidney bean is vegetarian and common in an Indian
+  // kitchen. Same trap as "egg" in eggplant. The ingredient check catches
+  // actual offal without needing the word in the title.
   "worcestershire", "rennet",
 ];
 
 // Dishes that are egg without containing the word. "Bread omelette" was
 // being shown to vegetarians for exactly this reason. Not "bhurji" — paneer
 // bhurji is vegetarian and far more common in an Indian kitchen.
-const EGG_TERMS = [
+export const EGG_TERMS = [
   "egg", "eggs", "anda", "albumen", "mayonnaise",
   "omelette", "omelet", "frittata", "quiche",
 ];
@@ -50,7 +58,7 @@ const EGG_TERMS = [
 // contains the word "egg". Checked before the egg terms so the claim wins.
 const EGG_FREE_CLAIMS = ["eggless", "egg-free", "egg free"];
 
-const hasWord = (haystack: string, term: string) =>
+export const hasWord = (haystack: string, term: string) =>
   new RegExp(`\\b${term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(haystack);
 
 export const normalizeDietPreference = (value: string | undefined | null): DietPreference => {
@@ -66,6 +74,23 @@ export function getItemDietType(value: string): ItemDietType {
   if (ANIMAL_TERMS.some((t) => hasWord(text, t))) return "non-veg";
   if (EGG_FREE_CLAIMS.some((c) => text.includes(c))) return "veg";
   if (EGG_TERMS.some((t) => hasWord(text, t))) return "egg";
+  return "veg";
+}
+
+/**
+ * The stricter of the name reading and the ingredient reading.
+ *
+ * A pack whose name gives nothing away ("Maggi Masala", "Chef's Special")
+ * can still declare chicken fat or egg powder in its ingredients. Reading
+ * only the name lets that through. Where both are available the stricter
+ * answer wins, because for a vegetarian a false "veg" is the expensive
+ * mistake and a false "non-veg" is only an inconvenience.
+ */
+export function resolveItemDiet(name: string, ingredientsText?: string | null): ItemDietType {
+  const fromName = getItemDietType(name);
+  const fromIngredients = ingredientsText ? getItemDietType(ingredientsText) : "veg";
+  if (fromName === "non-veg" || fromIngredients === "non-veg") return "non-veg";
+  if (fromName === "egg" || fromIngredients === "egg") return "egg";
   return "veg";
 }
 

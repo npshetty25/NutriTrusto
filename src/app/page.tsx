@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import Image from "next/image";
 import {
-  getItemDietType, isDietConflict, normalizeDietPreference, dietChipLabel,
+  getItemDietType, resolveItemDiet, isDietConflict, normalizeDietPreference, dietChipLabel,
   type DietPreference, type ItemDietType,
 } from "@/lib/diet";
 
@@ -233,7 +233,9 @@ export default function Home() {
     dietFilter === "all"
       ? items
       : items.filter((i) => {
-          const t = getItemDietType(i.name);
+          // Same resolver the card uses, so the filter and the mark on the
+          // card can never disagree about the same item.
+          const t = resolveItemDiet(i.name, i.ingredientsText);
           return dietFilter === "veg" ? t === "veg" : t !== "non-veg";
         });
   const inventoryFilteredItems = displayedItems.filter((item) => {
@@ -1967,17 +1969,21 @@ if (nutritionFieldsFilled < 2) {
                 ? getHealthierAlternativeHint(inferItemCategory(item.name))
                 : undefined;
               const detectedAllergens = item.ingredientsText ? detectAllergens(item.ingredientsText) : null;
+              const itemDiet = resolveItemDiet(item.name, item.ingredientsText);
 
               return (
                 <PantryCard
                   key={item.id}
                   {...item}
                   healthScore={item.healthScore}
-                  // Reads the user's stored preference through the shared
-                  // classifier, so an eggtarian is warned about chicken but
-                  // not about eggs — a case the old boolean could not express.
-                  dietMatch={!isDietConflict(userDietPreference, getItemDietType(item.name))}
-                  dietLabel={dietChipLabel(userDietPreference, getItemDietType(item.name))}
+                  // Classified from the ingredient list when there is one,
+                  // falling back to the name. A pack whose name gives nothing
+                  // away ("Maggi Masala") can still declare chicken fat in
+                  // its ingredients, and the name-only reading missed it.
+                  dietMatch={!isDietConflict(userDietPreference, itemDiet)}
+                  dietLabel={dietChipLabel(userDietPreference, itemDiet)}
+                  itemDiet={itemDiet}
+                  dietUnverified={!item.ingredientsText}
                   healthierAlternative={healthierAlternative}
                   detectedAllergens={detectedAllergens}
                   actions={

@@ -5,6 +5,8 @@ import { motion } from "framer-motion";
 import { ShieldCheck, ShieldAlert, ArrowRight, Leaf, Info, Carrot, Apple, Milk, Drumstick, Wheat, CupSoda, Croissant, Snowflake, Candy, Package } from "lucide-react";
 import { inferItemCategory } from "@/lib/item-category";
 import { ALLERGEN_LABELS, type AllergenTag } from "@/lib/allergens";
+import { VegMark } from "@/components/veg-mark";
+import type { ItemDietType } from "@/lib/diet";
 
 export type RiskLevel = "high" | "medium" | "low";
 
@@ -23,6 +25,10 @@ interface PantryCardProps {
   // the item's own type. A boolean could only ever say "Matches Diet" or
   // "Diet Warning", which cannot distinguish "contains egg" from "is meat".
   dietLabel?: string;
+  /** Drives the Indian veg/non-veg mark. */
+  itemDiet?: ItemDietType;
+  /** True when the reading came from the name alone, with no ingredient list. */
+  dietUnverified?: boolean;
   // null/undefined = no ingredient data was available for this item, so
   // allergen content is genuinely unknown — must not be shown as "safe".
   // [] = ingredient data exists and no common allergen keyword matched.
@@ -55,7 +61,7 @@ const formatDayMonth = (iso: string) => {
   return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short" });
 };
 
-export function PantryCard({ name, daysLeft, risk, purchaseDate, healthScore, dietMatch = true, dietLabel, detectedAllergens, healthierAlternative, actions }: PantryCardProps) {
+export function PantryCard({ name, daysLeft, risk, purchaseDate, healthScore, dietMatch = true, dietLabel, itemDiet = "veg", dietUnverified = false, detectedAllergens, healthierAlternative, actions }: PantryCardProps) {
   const score = healthScore != null ? Number.parseFloat(healthScore) : NaN;
   const hasScore = Number.isFinite(score);
   // Same thresholds the nutrition trend chart uses, so one score reads the
@@ -126,6 +132,7 @@ export function PantryCard({ name, daysLeft, risk, purchaseDate, healthScore, di
             >
               {hasScore ? score.toFixed(1) : "—"}
             </div>
+            <VegMark diet={itemDiet} unverified={dietUnverified} size={15} />
             <h3 title={name} className="font-bold text-sm sm:text-[15px] text-foreground tracking-tight leading-snug truncate">
               {name}
             </h3>

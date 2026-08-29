@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
 import { ProfileDropdown } from "@/components/profile-dropdown";
 import { ArrowLeft, Search, Loader2, ExternalLink, ChevronRight, Leaf, Egg, UtensilsCrossed, CircleAlert } from "lucide-react";
-import { getItemDietType, normalizeDietPreference } from "@/lib/diet";
+import { getItemDietType, normalizeDietPreference, type ItemDietType } from "@/lib/diet";
+import { VegMark } from "@/components/veg-mark";
 import { motion } from "framer-motion";
 
 // Every entry here was checked against TheMealDB's filter endpoint on
@@ -89,6 +90,54 @@ export default function RecipesPage() {
   const userDiet = normalizeDietPreference(String(user?.user_metadata?.dietary_preference || "none"));
   const [dietFilter, setDietFilter] = useState<"veg" | "egg" | "all">("all");
   const [dietFilterTouched, setDietFilterTouched] = useState(false);
+  // idMeal -> diet resolved from the real ingredient list. A dish title is a
+  // marketing name, not a declaration: it is the only thing filter.php
+  // returns, so on a strict filter the survivors get checked properly.
+  const [verified, setVerified] = useState<Record<string, ItemDietType>>({});
+  const [verifying, setVerifying] = useState(false);
+
+  // Verify only what a strict filter is about to SHOW. Checking every dish
+  // would mean 60 lookups for British; checking the survivors of the title
+  // filter is a handful, and it is exactly the set where being wrong
+  // matters — a dish wrongly shown to a vegetarian.
+  useEffect(() => {
+    if (dietFilter === "all" || meals.length === 0) return;
+
+    const pending = meals
+      .filter((m) => {
+        const t = getItemDietType(m.strMeal);
+        const passesTitle = dietFilter === "veg" ? t === "veg" : t !== "non-veg";
+        return passesTitle && !verified[m.idMeal];
+      })
+      .slice(0, 40);
+    if (pending.length === 0) return;
+
+    let cancelled = false;
+    setVerifying(true);
+    (async () => {
+      const found: Record<string, ItemDietType> = {};
+      await Promise.all(
+        pending.map(async (m) => {
+          try {
+            const res = await fetch(`https://www.themealdb.com/api/json/v1/1/lookup.php?i=${m.idMeal}`);
+            const detail = (await res.json())?.meals?.[0];
+            if (!detail) return;
+            const ingredients = Array.from({ length: 20 }, (_, i) => detail[`strIngredient${i + 1}`] || "").join(" ");
+            found[m.idMeal] = getItemDietType(ingredients);
+          } catch {
+            // A lookup that fails leaves the dish on its title reading. It is
+            // not silently promoted to "verified vegetarian".
+          }
+        })
+      );
+      if (!cancelled) {
+        setVerified((prev) => ({ ...prev, ...found }));
+        setVerifying(false);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [meals, dietFilter, verified]);
 
   // Not a lazy useState initialiser: `user` is still null on first render
   // while auth resolves, so the initialiser would lock in "all" and never
@@ -106,13 +155,21 @@ export default function RecipesPage() {
     c.name.toLowerCase().includes(search.toLowerCase())
   );
 
-  // Classified from the dish name alone, which is all the list endpoint
-  // returns. It is a filter over a browse list, not a safety guarantee —
-  // the detail view still shows the full ingredient list.
+  // Stricter of the title reading and, once fetched, the ingredient
+  // reading. Until a dish has been verified it is judged on its title.
+  const dietOf = (m: Meal): ItemDietType => {
+    const byTitle = getItemDietType(m.strMeal);
+    const byIngredients = verified[m.idMeal];
+    if (!byIngredients) return byTitle;
+    if (byTitle === "non-veg" || byIngredients === "non-veg") return "non-veg";
+    if (byTitle === "egg" || byIngredients === "egg") return "egg";
+    return "veg";
+  };
+
   const visibleMeals = dietFilter === "all"
     ? meals
     : meals.filter((m) => {
-        const t = getItemDietType(m.strMeal);
+        const t = dietOf(m);
         return dietFilter === "veg" ? t === "veg" : t !== "non-veg";
       });
   const hiddenCount = meals.length - visibleMeals.length;
@@ -122,6 +179,7 @@ export default function RecipesPage() {
     setMeals([]);
     setSelectedMeal(null);
     setMealDetail(null);
+    setVerified({});
     setLoading(true);
     try {
       const res = await fetch(`https://www.themealdb.com/api/json/v1/1/filter.php?a=${country}`);
@@ -203,7 +261,10 @@ export default function RecipesPage() {
             ) : mealDetail ? (
               <>
                 <p className="text-[10px] uppercase tracking-widest font-semibold text-foreground/40 mb-1">{mealDetail.strCategory} · {mealDetail.strArea}</p>
-                <h2 className="text-2xl font-bold tracking-tight mb-4">{mealDetail.strMeal}</h2>
+                <h2 className="text-2xl font-bold tracking-tight mb-4 flex items-center gap-2">
+                  <VegMark diet={getItemDietType(getIngredients(mealDetail).join(" "))} size={20} />
+                  {mealDetail.strMeal}
+                </h2>
 
                 {/* Ingredients */}
                 <h3 className="text-[11px] font-semibold uppercase tracking-widest text-foreground/50 mb-3">Ingredients</h3>
@@ -280,6 +341,7 @@ export default function RecipesPage() {
                 <p className="text-xs text-foreground/50">
                   {visibleMeals.length} {visibleMeals.length === 1 ? "dish" : "dishes"}
                   {hiddenCount > 0 ? ` · ${hiddenCount} hidden by your diet filter` : ""}
+                  {verifying ? " · checking ingredients…" : ""}
                 </p>
               </div>
               <button onClick={() => { setSelectedCountry(null); setMeals([]); }}
@@ -352,7 +414,13 @@ export default function RecipesPage() {
                     <div className="h-28 w-full overflow-hidden bg-foreground/5">
                       <img src={meal.strMealThumb} alt={meal.strMeal} className="w-full h-full object-cover hover:scale-105 transition-transform duration-300" />
                     </div>
-                    <div className="p-3">
+                    <div className="p-3 flex items-start gap-1.5">
+                      <VegMark
+                        diet={dietOf(meal)}
+                        unverified={!verified[meal.idMeal]}
+                        size={13}
+                        className="mt-0.5"
+                      />
                       <p className="text-xs font-semibold leading-tight line-clamp-2 text-foreground">{meal.strMeal}</p>
                     </div>
                   </motion.button>
