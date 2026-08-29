@@ -1,27 +1,66 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
 import { ProfileDropdown } from "@/components/profile-dropdown";
-import { ArrowLeft, Search, Loader2, ExternalLink, ChevronRight } from "lucide-react";
+import { ArrowLeft, Search, Loader2, ExternalLink, ChevronRight, Leaf, Egg, UtensilsCrossed, CircleAlert } from "lucide-react";
+import { getItemDietType, normalizeDietPreference } from "@/lib/diet";
 import { motion } from "framer-motion";
 
-// 37 countries from TheMealDB with country flag emojis
+// Every entry here was checked against TheMealDB's filter endpoint on
+// 2026-08-26 and returns a non-empty result. The list is NOT taken from the
+// API's own list.php?a=list, which is out of sync with it: that endpoint
+// advertises 192 areas of which only 29 return meals, lists "Indian" (which
+// returns null), and omits "India" (which returns 15).
+//
+// The previous list used demonyms throughout, so eight of its 37 entries
+// were dead — including Indian, first in the list, in an India-first
+// product. Tapping India returned nothing at all.
+//
+// The count beside each name is what the API returned at the time of
+// checking; it is a comment, not a promise, and the UI reads the real
+// number at runtime.
 const COUNTRIES = [
-  { name: "Indian", flag: "🇮🇳" }, { name: "Italian", flag: "🇮🇹" }, { name: "Mexican", flag: "🇲🇽" },
-  { name: "Chinese", flag: "🇨🇳" }, { name: "Japanese", flag: "🇯🇵" }, { name: "American", flag: "🇺🇸" },
-  { name: "British", flag: "🇬🇧" }, { name: "French", flag: "🇫🇷" }, { name: "Thai", flag: "🇹🇭" },
-  { name: "Greek", flag: "🇬🇷" }, { name: "Turkish", flag: "🇹🇷" }, { name: "Moroccan", flag: "🇲🇦" },
-  { name: "Malaysian", flag: "🇲🇾" }, { name: "Australian", flag: "🇦🇺" }, { name: "Canadian", flag: "🇨🇦" },
-  { name: "Spanish", flag: "🇪🇸" }, { name: "Filipino", flag: "🇵🇭" }, { name: "Egyptian", flag: "🇪🇬" },
-  { name: "Jamaican", flag: "🇯🇲" }, { name: "Vietnamese", flag: "🇻🇳" }, { name: "Portuguese", flag: "🇵🇹" },
-  { name: "Russian", flag: "🇷🇺" }, { name: "Saudi Arabian", flag: "🇸🇦" }, { name: "Irish", flag: "🇮🇪" },
-  { name: "Croatian", flag: "🇭🇷" }, { name: "Dutch", flag: "🇳🇱" }, { name: "Kenyan", flag: "🇰🇪" },
-  { name: "Polish", flag: "🇵🇱" }, { name: "Norwegian", flag: "🇳🇴" }, { name: "Argentinian", flag: "🇦🇷" },
-  { name: "Algerian", flag: "🇩🇿" }, { name: "Syrian", flag: "🇸🇾" }, { name: "Tunisian", flag: "🇹🇳" },
-  { name: "Ukrainian", flag: "🇺🇦" }, { name: "Venezuelan", flag: "🇻🇪" }, { name: "Uruguayan", flag: "🇺🇾" },
-  { name: "Slovakian", flag: "🇸🇰" },
+  { name: "India", flag: "🇮🇳" },            // 15
+  { name: "Bangladesh", flag: "🇧🇩" },       // 3
+  { name: "Thai", flag: "🇹🇭" },             // 27
+  { name: "Chinese", flag: "🇨🇳" },          // 27
+  { name: "Japanese", flag: "🇯🇵" },         // 9
+  { name: "Malaysian", flag: "🇲🇾" },        // 8
+  { name: "Vietnamese", flag: "🇻🇳" },       // 27
+  { name: "Filipino", flag: "🇵🇭" },         // 8
+  { name: "Turkish", flag: "🇹🇷" },          // 30
+  { name: "Saudi Arabian", flag: "🇸🇦" },    // 12
+  { name: "Syrian", flag: "🇸🇾" },           // 6
+  { name: "Egyptian", flag: "🇪🇬" },         // 8
+  { name: "Moroccan", flag: "🇲🇦" },         // 6
+  { name: "Algerian", flag: "🇩🇿" },         // 12
+  { name: "Tunisian", flag: "🇹🇳" },         // 8
+  { name: "Kenyan", flag: "🇰🇪" },           // 5
+  { name: "Italian", flag: "🇮🇹" },          // 21
+  { name: "Spanish", flag: "🇪🇸" },          // 48
+  { name: "France", flag: "🇫🇷" },           // 28
+  { name: "Greek", flag: "🇬🇷" },            // 8
+  { name: "Portuguese", flag: "🇵🇹" },       // 8
+  { name: "British", flag: "🇬🇧" },          // 60
+  { name: "Ireland", flag: "🇮🇪" },          // 8
+  { name: "Netherlands", flag: "🇳🇱" },      // 18
+  { name: "Poland", flag: "🇵🇱" },           // 27
+  { name: "Croatian", flag: "🇭🇷" },         // 8
+  { name: "Slovakia", flag: "🇸🇰" },         // 4
+  { name: "Ukrainian", flag: "🇺🇦" },        // 7
+  { name: "Russian", flag: "🇷🇺" },          // 7
+  { name: "Norway", flag: "🇳🇴" },           // 18
+  { name: "United States", flag: "🇺🇸" },    // 34
+  { name: "Canadian", flag: "🇨🇦" },         // 22
+  { name: "Mexican", flag: "🇲🇽" },          // 6
+  { name: "Jamaican", flag: "🇯🇲" },         // 27
+  { name: "Brazil", flag: "🇧🇷" },           // 11
+  { name: "Argentina", flag: "🇦🇷" },        // 10
+  { name: "Venezuela", flag: "🇻🇪" },        // 10
+  { name: "Uruguayan", flag: "🇺🇾" },        // 9
+  { name: "Australian", flag: "🇦🇺" },       // 13
 ];
 
 interface Meal {
@@ -42,12 +81,41 @@ export default function RecipesPage() {
   const [meals, setMeals] = useState<Meal[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedMeal, setSelectedMeal] = useState<Meal | null>(null);
+  // This page browses an external catalogue that knows nothing about the
+  // user. India's 15 dishes include Beef Mandi, Lamb Rogan Josh and
+  // Tandoori Chicken — so a vegetarian opening the flagship cuisine of an
+  // India-first product met beef first. Beef in particular is not a mild
+  // mismatch here: it is restricted by law in much of the country.
+  const userDiet = normalizeDietPreference(String(user?.user_metadata?.dietary_preference || "none"));
+  const [dietFilter, setDietFilter] = useState<"veg" | "egg" | "all">("all");
+  const [dietFilterTouched, setDietFilterTouched] = useState(false);
+
+  // Not a lazy useState initialiser: `user` is still null on first render
+  // while auth resolves, so the initialiser would lock in "all" and never
+  // reconsider. Verified — a vegetarian account was still being shown Beef
+  // Mandi until this ran as an effect instead.
+  useEffect(() => {
+    if (dietFilterTouched) return;
+    if (userDiet === "veg") setDietFilter("veg");
+    else if (userDiet === "eggtarian") setDietFilter("egg");
+  }, [userDiet, dietFilterTouched]);
   const [mealDetail, setMealDetail] = useState<any | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
 
   const filteredCountries = COUNTRIES.filter(c =>
     c.name.toLowerCase().includes(search.toLowerCase())
   );
+
+  // Classified from the dish name alone, which is all the list endpoint
+  // returns. It is a filter over a browse list, not a safety guarantee —
+  // the detail view still shows the full ingredient list.
+  const visibleMeals = dietFilter === "all"
+    ? meals
+    : meals.filter((m) => {
+        const t = getItemDietType(m.strMeal);
+        return dietFilter === "veg" ? t === "veg" : t !== "non-veg";
+      });
+  const hiddenCount = meals.length - visibleMeals.length;
 
   const fetchMealsByCountry = async (country: string) => {
     setSelectedCountry(country);
@@ -105,7 +173,7 @@ export default function RecipesPage() {
             </button>
             <div>
               <h1 className="text-lg font-bold tracking-tight">Global Recipes</h1>
-              <p className="text-[11px] text-foreground/50 font-medium">37 countries · TheMealDB</p>
+              <p className="text-[11px] text-foreground/50 font-medium">{COUNTRIES.length} cuisines · TheMealDB</p>
             </div>
           </div>
           <ProfileDropdown />
@@ -209,7 +277,10 @@ export default function RecipesPage() {
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
               <div>
                 <h2 className="font-bold text-lg tracking-tight">{selectedCountry} Recipes</h2>
-                <p className="text-xs text-foreground/50">{meals.length} dishes available</p>
+                <p className="text-xs text-foreground/50">
+                  {visibleMeals.length} {visibleMeals.length === 1 ? "dish" : "dishes"}
+                  {hiddenCount > 0 ? ` · ${hiddenCount} hidden by your diet filter` : ""}
+                </p>
               </div>
               <button onClick={() => { setSelectedCountry(null); setMeals([]); }}
                 className="text-xs font-semibold text-foreground/60 hover:text-foreground border border-border px-3 py-1.5 rounded-lg transition-colors">
@@ -217,14 +288,60 @@ export default function RecipesPage() {
               </button>
             </div>
 
+            {/* A filter that hides results has to be visible, or the list
+                just looks short. Defaults to the account's preference. */}
+            <div role="group" aria-label="Filter recipes by diet" className="grid grid-cols-3 gap-2 mb-5">
+              {([
+                { id: "veg", label: "Veg", Icon: Leaf, tone: "bg-safe/20 text-safe-strong" },
+                { id: "egg", label: "Egg OK", Icon: Egg, tone: "bg-warning/20 text-warning-strong" },
+                { id: "all", label: "All", Icon: UtensilsCrossed, tone: "bg-foreground/10 text-foreground" },
+              ] as const).map(({ id, label, Icon, tone }) => (
+                <button
+                  key={id}
+                  onClick={() => { setDietFilter(id); setDietFilterTouched(true); }}
+                  aria-pressed={dietFilter === id}
+                  className={`h-10 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+                    dietFilter === id ? tone : "neu-raised-sm text-foreground/70 hover:text-foreground"
+                  }`}
+                >
+                  <Icon size={14} /> {label}
+                </button>
+              ))}
+            </div>
+
             {loading ? (
               <div className="flex flex-col items-center justify-center gap-3 py-20 text-foreground/40">
                 <Loader2 size={24} className="animate-spin" />
                 <p className="text-sm">Loading recipes...</p>
               </div>
+            ) : meals.length === 0 ? (
+              /* An external catalogue can return nothing for a cuisine. Say
+                 so, rather than rendering an empty grid that reads as a
+                 broken page. */
+              <div className="text-center py-16 px-6">
+                <div className="w-14 h-14 rounded-2xl neu-raised flex items-center justify-center mx-auto mb-3 text-foreground/40">
+                  <CircleAlert size={22} />
+                </div>
+                <p className="text-sm font-semibold">No dishes for {selectedCountry}</p>
+                <p className="text-xs text-foreground/60 mt-1 leading-relaxed">
+                  The recipe database has nothing filed under this cuisine right now. Try another,
+                  or use Find a Recipe on the dashboard, which builds one from your own pantry.
+                </p>
+              </div>
+            ) : visibleMeals.length === 0 ? (
+              <div className="text-center py-16 px-6">
+                <div className="w-14 h-14 rounded-2xl neu-raised flex items-center justify-center mx-auto mb-3 text-safe">
+                  <Leaf size={22} />
+                </div>
+                <p className="text-sm font-semibold">Nothing here matches your diet</p>
+                <p className="text-xs text-foreground/60 mt-1 leading-relaxed">
+                  All {meals.length} {selectedCountry} dishes in this catalogue contain meat or fish.
+                  Switch to All above to see them anyway.
+                </p>
+              </div>
             ) : (
               <div className="grid grid-cols-2 gap-3">
-                {meals.map((meal) => (
+                {visibleMeals.map((meal) => (
                   <motion.button
                     key={meal.idMeal}
                     initial={{ opacity: 0, scale: 0.97 }}

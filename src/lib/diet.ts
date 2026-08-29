@@ -27,13 +27,24 @@ export type DietPreference = "veg" | "eggtarian" | "non-veg" | "none";
 const ANIMAL_TERMS = [
   "chicken", "mutton", "lamb", "beef", "pork", "bacon", "ham", "sausage",
   "salami", "pepperoni", "turkey", "duck", "goat", "veal", "venison",
+  // Fish by name, not just the word "fish". Found by testing the recipe
+  // browser: "Smoked Haddock Kedgeree" passed as vegetarian because no list
+  // contained "haddock".
   "fish", "salmon", "tuna", "anchovy", "sardine", "mackerel", "pomfret",
-  "bonito", "prawn", "shrimp", "crab", "lobster", "squid", "oyster",
+  "bonito", "haddock", "cod", "tilapia", "basa", "pollock", "herring",
+  "trout", "snapper", "hilsa", "rohu", "katla", "surmai", "kingfish",
+  "prawn", "shrimp", "crab", "lobster", "squid", "oyster",
   "clam", "mussel", "gelatin", "gelatine", "lard", "keema", "seekh",
   "worcestershire", "rennet",
 ];
 
-const EGG_TERMS = ["egg", "eggs", "anda", "albumen", "mayonnaise"];
+// Dishes that are egg without containing the word. "Bread omelette" was
+// being shown to vegetarians for exactly this reason. Not "bhurji" — paneer
+// bhurji is vegetarian and far more common in an Indian kitchen.
+const EGG_TERMS = [
+  "egg", "eggs", "anda", "albumen", "mayonnaise",
+  "omelette", "omelet", "frittata", "quiche",
+];
 
 // "Eggless" is an explicit claim that the product contains no egg, and it
 // contains the word "egg". Checked before the egg terms so the claim wins.
