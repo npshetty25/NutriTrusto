@@ -7,6 +7,7 @@ import { useAuth } from "@/context/auth-context";
 import { toast } from "sonner";
 import { LogOut, Settings, Users, ChevronDown, Bell, Loader2, ShoppingCart, History, Leaf } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { DietPreferenceToggle } from "@/components/diet-preference-toggle";
 import { HouseholdModal } from "@/components/household-modal";
 import { ScanHistoryModal } from "@/components/scan-history-modal";
 import { ImpactDashboardModal } from "@/components/impact-dashboard-modal";
@@ -130,6 +131,8 @@ export function ProfileDropdown({ onOpenShoppingList }: ProfileDropdownProps) {
         <p className="font-semibold text-sm text-foreground">{fullName}</p>
         <p className="text-xs text-foreground/50 mt-0.5 truncate">{email}</p>
       </div>
+
+      <DietPreferenceToggle />
 
       <ThemeToggle />
 
