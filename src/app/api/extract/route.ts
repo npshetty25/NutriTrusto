@@ -166,7 +166,9 @@ Return ONLY the raw JSON string, with no markdown formatting.`;
       .filter((item): item is { name: string; days_left: number; risk: "high" | "medium" | "low" } => Boolean(item));
 
     const receiptDate = resolveReceiptDate(parsedData?.purchase_date_iso);
-    const purchase_date = receiptDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    // Returned to the client, which writes it straight into pantry_items.
+    // ISO so every row in that column has one shape.
+    const purchase_date = receiptDate.toISOString();
 
     log.info("Receipt extraction completed", {
       normalizedItemsCount: items.length,

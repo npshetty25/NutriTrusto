@@ -9,7 +9,12 @@ create table if not exists public.pantry_items (
   name        text not null,
   days_left   integer not null,
   risk        text check (risk in ('high', 'medium', 'low')) not null default 'low',
-  purchase_date text not null default to_char(now(), 'Mon DD, YYYY'),
+  -- A real date, not text. This was declared `text not null default
+  -- to_char(now(), 'Mon DD, YYYY')`, which meant the column collected three
+  -- different string shapes and sorted alphabetically ('Apr' before 'Jan').
+  -- The deployed database was already converted to `date`; this line brings
+  -- the file back in line with it so a fresh install matches production.
+  purchase_date date not null default current_date,
   created_at  timestamptz default now()
 );
 

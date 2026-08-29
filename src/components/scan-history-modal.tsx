@@ -96,7 +96,7 @@ export function ScanHistoryModal({ onClose }: ScanHistoryModalProps) {
       name: row.product_name,
       days_left: DEFAULT_READDED_DAYS_LEFT,
       risk: "low",
-      purchase_date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+      purchase_date: new Date().toISOString(),
     }]);
 
     setReAddingId(null);

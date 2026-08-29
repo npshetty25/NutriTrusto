@@ -1295,7 +1295,10 @@ if (nutritionFieldsFilled < 2) {
       name: scannedResult.name,
       days_left: initialDaysLeft,
       risk: deriveRisk(initialDaysLeft),
-      purchase_date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+      // ISO, not toLocaleDateString: a locale string sorts alphabetically
+      // ('Apr' before 'Jan') and cannot be range-queried. See
+      // db/supabase-schema-purchase-date.sql.
+      purchase_date: new Date().toISOString(),
     };
 
     const { data: insertedRow, error } = await supabase
