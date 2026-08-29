@@ -19,6 +19,10 @@ interface PantryCardProps {
   // derived an A-E grade from the item name's character count.
   healthScore?: string | null;
   dietMatch?: boolean;
+  // The exact wording, decided by the caller from the user's preference and
+  // the item's own type. A boolean could only ever say "Matches Diet" or
+  // "Diet Warning", which cannot distinguish "contains egg" from "is meat".
+  dietLabel?: string;
   // null/undefined = no ingredient data was available for this item, so
   // allergen content is genuinely unknown — must not be shown as "safe".
   // [] = ingredient data exists and no common allergen keyword matched.
@@ -51,7 +55,7 @@ const formatDayMonth = (iso: string) => {
   return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short" });
 };
 
-export function PantryCard({ name, daysLeft, risk, purchaseDate, healthScore, dietMatch = true, detectedAllergens, healthierAlternative, actions }: PantryCardProps) {
+export function PantryCard({ name, daysLeft, risk, purchaseDate, healthScore, dietMatch = true, dietLabel, detectedAllergens, healthierAlternative, actions }: PantryCardProps) {
   const score = healthScore != null ? Number.parseFloat(healthScore) : NaN;
   const hasScore = Number.isFinite(score);
   // Same thresholds the nutrition trend chart uses, so one score reads the
@@ -172,7 +176,7 @@ export function PantryCard({ name, daysLeft, risk, purchaseDate, healthScore, di
       <div className="flex flex-wrap gap-2">
         <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-bold ${dietMatch ? "bg-safe/15 text-safe-strong" : "bg-danger/15 text-danger-strong"}`}>
           {dietMatch ? <ShieldCheck size={12} /> : <ShieldAlert size={12} />}
-          {dietMatch ? "Matches Diet" : "Diet Warning"}
+          {dietLabel ?? (dietMatch ? "Matches Diet" : "Diet Warning")}
         </div>
 
         {detectedAllergens == null ? (

@@ -2,55 +2,10 @@
 
 import { useState, useRef, useEffect } from "react";
 import Image from "next/image";
-
-type DietPreference = "veg" | "eggtarian" | "non-veg" | "none";
-type ItemDietType = "veg" | "egg" | "non-veg";
-
-const NON_VEG_ANIMAL_KEYWORDS = [
-  "chicken", "meat", "beef", "pork", "fish", "salmon", "tuna", "mutton", "prawn", "shrimp", "crab", "bacon", "ham", "sausage", "turkey",
-  "anchovy", "gelatin", "gelatine", "lard", "pepperoni", "broth", "stock", "oyster", "sardine", "bonito", "worcestershire"
-];
-const EGG_KEYWORDS = ["egg", "eggs", "albumen", "mayonnaise"];
-const NON_VEG_KEYWORDS = [...NON_VEG_ANIMAL_KEYWORDS, ...EGG_KEYWORDS];
-
-const containsEggKeyword = (value: string) => {
-  const text = value.toLowerCase();
-  return EGG_KEYWORDS.some((kw) => text.includes(kw));
-};
-
-const containsAnimalNonVegKeyword = (value: string) => {
-  const text = value.toLowerCase();
-  return NON_VEG_ANIMAL_KEYWORDS.some((kw) => text.includes(kw));
-};
-
-const containsNonVegKeyword = (value: string) => {
-  const text = value.toLowerCase();
-  return NON_VEG_KEYWORDS.some((kw) => text.includes(kw));
-};
-
-const getItemDietType = (value: string): ItemDietType => {
-  if (containsAnimalNonVegKeyword(value)) return "non-veg";
-  if (containsEggKeyword(value)) return "egg";
-  return "veg";
-};
-
-const normalizeDietPreference = (value: string): DietPreference => {
-  const diet = value.toLowerCase().trim();
-  if (diet === "veg" || diet === "vegetarian") return "veg";
-  if (diet === "eggtarian" || diet === "eggitarian") return "eggtarian";
-  if (diet === "non-veg" || diet === "nonveg") return "non-veg";
-  return "none";
-};
-
-const isDietConflict = (userDiet: DietPreference, itemDiet: ItemDietType) => {
-  if (userDiet === "veg") return itemDiet !== "veg";
-  if (userDiet === "eggtarian") return itemDiet === "non-veg";
-  return false;
-};
-
-const isVegItem = (name: string) => {
-  return !containsNonVegKeyword(name);
-};
+import {
+  getItemDietType, isDietConflict, normalizeDietPreference, dietChipLabel,
+  type DietPreference, type ItemDietType,
+} from "@/lib/diet";
 
 const parsePurchaseDate = (purchaseDate: string) => {
   const parsed = new Date(purchaseDate);
@@ -142,7 +97,7 @@ import { RestockSuggestions } from "@/components/restock-suggestions";
 import { RecipeModal, type GeneratedRecipe } from "@/components/recipe-modal";
 import {
   Camera, BrainCircuit, Loader2, TrendingUp, ScanLine,
-  Clock, X, Trash2, Info, Activity, Zap, AlertTriangle, CheckCircle2, Search, CircleAlert, Bell, Carrot, Apple, Milk, Drumstick, Wheat, CupSoda, Croissant, Snowflake, Candy, Package, ChevronLeft, ChevronRight, CalendarClock, Pencil, Sparkles, RefreshCw, SlidersHorizontal, Leaf, UtensilsCrossed, Check
+  Clock, X, Trash2, Info, Activity, Zap, AlertTriangle, CheckCircle2, Search, CircleAlert, Bell, Carrot, Apple, Milk, Drumstick, Wheat, CupSoda, Croissant, Snowflake, Candy, Package, ChevronLeft, ChevronRight, CalendarClock, Pencil, Sparkles, RefreshCw, SlidersHorizontal, Leaf, UtensilsCrossed, Check, Egg as EggIcon
 } from "lucide-react";
 import ShoppingListModal from "@/components/shopping-list-modal";
 import { CountUp } from "@/components/count-up";
@@ -224,7 +179,10 @@ export default function Home() {
   const [generatedRecipe, setGeneratedRecipe] = useState<GeneratedRecipe | null>(null);
   const [showRecipe, setShowRecipe] = useState(false);
   const [isAddingToShoppingList, setIsAddingToShoppingList] = useState(false);
-  const [isVegMode, setIsVegMode] = useState(false);
+  // Defaults to the account's own preference once it loads (see the effect
+  // below), so a vegetarian does not have to re-filter on every visit.
+  const [dietFilter, setDietFilter] = useState<"veg" | "egg" | "all">("all");
+  const [dietFilterTouched, setDietFilterTouched] = useState(false);
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
   const [isAnalyzingFood, setIsAnalyzingFood] = useState(false);
   const [scannedResult, setScannedResult] = useState<ScannedResultEntry | null>(null);
@@ -269,7 +227,15 @@ export default function Home() {
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
   const invoiceInputRef = useRef<HTMLInputElement>(null);
-  const displayedItems = isVegMode ? items.filter(i => isVegItem(i.name)) : items;
+  // Three-way, not a veg/all binary. Eggtarian was not representable at
+  // all: the old toggle hid every egg item along with the meat.
+  const displayedItems =
+    dietFilter === "all"
+      ? items
+      : items.filter((i) => {
+          const t = getItemDietType(i.name);
+          return dietFilter === "veg" ? t === "veg" : t !== "non-veg";
+        });
   const inventoryFilteredItems = displayedItems.filter((item) => {
     const matchesSearch = item.name.toLowerCase().includes(searchQuery.trim().toLowerCase());
     const matchesRisk = riskFilter === "all" ? true : item.risk === riskFilter;
@@ -301,7 +267,7 @@ export default function Home() {
   // Counts only settings that are actually narrowing the list, so the badge
   // on the collapsed Filter button never claims a filter that isn't applied.
   const activeFilterCount =
-    (riskFilter !== "all" ? 1 : 0) + (isVegMode ? 1 : 0) + (inventorySortBy !== "expiring" ? 1 : 0);
+    (riskFilter !== "all" ? 1 : 0) + (dietFilter !== "all" ? 1 : 0) + (inventorySortBy !== "expiring" ? 1 : 0);
 
   const severityRank: Record<NotificationEntry["severity"], number> = { high: 0, medium: 1, low: 2, info: 3 };
   const visibleNotifications = notifications
@@ -313,7 +279,7 @@ export default function Home() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, riskFilter, isVegMode]);
+  }, [searchQuery, riskFilter, dietFilter]);
 
   useEffect(() => {
     if (currentPage > totalPages) {
@@ -387,6 +353,14 @@ export default function Home() {
   // "day(s)" is a programmer's plural. It appeared in five user-facing
   // strings while the item card next to them printed "1 day" correctly.
   const days = (n: number) => `${n} ${n === 1 ? "day" : "days"}`;
+
+  // Adopt the account's preference the first time it loads. Guarded on
+  // dietFilterTouched so it never overrides a choice the user just made.
+  useEffect(() => {
+    if (dietFilterTouched) return;
+    if (userDietPreference === "veg") setDietFilter("veg");
+    else if (userDietPreference === "eggtarian") setDietFilter("egg");
+  }, [userDietPreference, dietFilterTouched]);
 
   const notificationIconMap = {
     vegetable: Carrot,
@@ -1166,9 +1140,12 @@ if (nutritionFieldsFilled < 2) {
 
       const detectedItemDiet = getItemDietType(`${productName} ${productIngredients} ${productCategories}`);
 
-      if (detectedItemDiet === "non-veg" && !containsAnimalNonVegKeyword(productName)) {
+      // Only annotate when the NAME alone would not have revealed it — the
+      // diet came from the ingredient list, so the name needs to carry it.
+      const nameAloneDiet = getItemDietType(productName);
+      if (detectedItemDiet === "non-veg" && nameAloneDiet !== "non-veg") {
         productName = `${productName} (Non-Veg)`;
-      } else if (detectedItemDiet === "egg" && !containsEggKeyword(productName)) {
+      } else if (detectedItemDiet === "egg" && nameAloneDiet !== "egg") {
         productName = `${productName} (Contains Egg)`;
       }
 
@@ -1859,21 +1836,33 @@ if (nutritionFieldsFilled < 2) {
               className="overflow-hidden"
             >
               <div className="neu-inset rounded-2xl p-3 mb-4 flex flex-col gap-3">
-                <div role="group" aria-label="Filter by diet" className="grid grid-cols-2 gap-2">
-                  <button
-                    onClick={() => setIsVegMode(true)}
-                    aria-pressed={isVegMode}
-                    className={`h-11 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${isVegMode ? "bg-safe/20 text-safe-strong" : "neu-raised-sm text-foreground/70 hover:text-foreground"}`}
-                  >
-                    <Leaf size={14} /> Veg only
-                  </button>
-                  <button
-                    onClick={() => setIsVegMode(false)}
-                    aria-pressed={!isVegMode}
-                    className={`h-11 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${!isVegMode ? "bg-foreground/10 text-foreground" : "neu-raised-sm text-foreground/70 hover:text-foreground"}`}
-                  >
-                    <UtensilsCrossed size={14} /> All items
-                  </button>
+                {/* Three options, not two. "Veg only / All items" could not
+                    express eggtarian at all — it hid every egg item along
+                    with the meat, so an eggtarian user had no view that
+                    matched how they actually eat. Defaults to the
+                    preference on the account. */}
+                <div role="group" aria-label="Filter by diet" className="grid grid-cols-3 gap-2">
+                  {([
+                    { id: "veg", label: "Veg", Icon: Leaf, tone: "bg-safe/20 text-safe-strong" },
+                    { id: "egg", label: "Egg OK", Icon: EggIcon, tone: "bg-warning/20 text-warning-strong" },
+                    { id: "all", label: "All", Icon: UtensilsCrossed, tone: "bg-foreground/10 text-foreground" },
+                  ] as const).map(({ id, label, Icon, tone }) => (
+                    <button
+                      key={id}
+                      onClick={() => { setDietFilter(id); setDietFilterTouched(true); }}
+                      aria-pressed={dietFilter === id}
+                      title={
+                        id === "veg" ? "Show only vegetarian items"
+                        : id === "egg" ? "Show vegetarian items and egg"
+                        : "Show everything in your pantry"
+                      }
+                      className={`h-11 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+                        dietFilter === id ? tone : "neu-raised-sm text-foreground/70 hover:text-foreground"
+                      }`}
+                    >
+                      <Icon size={14} /> {label}
+                    </button>
+                  ))}
                 </div>
 
                 <div className="grid grid-cols-2 gap-2">
@@ -1967,11 +1956,11 @@ if (nutritionFieldsFilled < 2) {
                   key={item.id}
                   {...item}
                   healthScore={item.healthScore}
-                  // The chip used to read `isVegMode ? true : isVegItem(name)`,
-                  // so with the "All items" view selected a chicken breast
-                  // showed a red DIET WARNING to a non-vegetarian — the view
-                  // toggle was standing in for the user's actual preference.
-                  dietMatch={userDietPreference === "veg" ? isVegItem(item.name) : true}
+                  // Reads the user's stored preference through the shared
+                  // classifier, so an eggtarian is warned about chicken but
+                  // not about eggs — a case the old boolean could not express.
+                  dietMatch={!isDietConflict(userDietPreference, getItemDietType(item.name))}
+                  dietLabel={dietChipLabel(userDietPreference, getItemDietType(item.name))}
                   healthierAlternative={healthierAlternative}
                   detectedAllergens={detectedAllergens}
                   actions={
