@@ -264,6 +264,39 @@ export default function Home() {
   // tile showed different numbers on the same screen.
   const urgentNotificationCount = highRiskItems.length;
 
+  // Reading the clock during render is impure in the strict sense, but this
+  // page is client-only and the value is inherently "now".
+  // The recipe call takes roughly twenty seconds. A spinner labelled
+  // "Finding..." for that long reads as a hang, so say what is happening.
+  const [recipeProgress, setRecipeProgress] = useState("Finding...");
+  useEffect(() => {
+    if (!isGeneratingRecipe) { setRecipeProgress("Finding..."); return; }
+    const steps = [
+      "Reading your pantry...",
+      "Picking what expires first...",
+      "Writing the recipe...",
+      "Checking it fits your diet...",
+      "Almost there...",
+    ];
+    let i = 0;
+    setRecipeProgress(steps[0]);
+    const id = setInterval(() => {
+      i = Math.min(i + 1, steps.length - 1);
+      setRecipeProgress(steps[i]);
+    }, 4000);
+    return () => clearInterval(id);
+  }, [isGeneratingRecipe]);
+
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+  const firstName = String(user?.user_metadata?.full_name || "").trim().split(" ")[0];
+  const pantrySummary =
+    items.length === 0
+      ? "your pantry is empty"
+      : highRiskItems.length === 0
+        ? `${items.length} ${items.length === 1 ? "item" : "items"}, nothing urgent`
+        : `${highRiskItems.length} ${highRiskItems.length === 1 ? "item needs" : "items need"} eating soon`;
+
   const userDietPreference = normalizeDietPreference(String(user?.user_metadata?.dietary_preference || "none"));
 
   // Counts only settings that are actually narrowing the list, so the badge
@@ -1451,7 +1484,15 @@ if (nutritionFieldsFilled < 2) {
                 className="w-6 h-6 rounded-md object-contain"
               />
             </motion.div>
-            <h1 className="text-xl font-bold tracking-tight">Nutri-Trust</h1>
+            <div className="min-w-0">
+              <h1 className="text-xl font-bold tracking-tight leading-none">Nutri-Trust</h1>
+              {/* A greeting and one plain sentence. The header was a logo and
+                  two icons: it identified the app but told the user nothing,
+                  so the first thing they read was an uppercase metric label. */}
+              <p className="text-[11px] text-foreground/60 mt-1 truncate">
+                {greeting}{firstName ? `, ${firstName}` : ""} · {pantrySummary}
+              </p>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <motion.button
@@ -1574,7 +1615,7 @@ if (nutritionFieldsFilled < 2) {
                   className="w-full justify-center flex items-center gap-2 bg-foreground text-background text-sm font-semibold px-5 h-11 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-60 whitespace-nowrap"
                 >
                   {isGeneratingRecipe ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
-                  {isGeneratingRecipe ? "Finding..." : "Find a Recipe"}
+                  {isGeneratingRecipe ? recipeProgress : "Find a Recipe"}
                 </motion.button>
               </div>
             ) : (
@@ -1937,9 +1978,13 @@ if (nutritionFieldsFilled < 2) {
             <div className="w-16 h-16 rounded-full bg-background border border-border flex items-center justify-center mb-4 sleek-shadow">
               <ScanLine size={24} className="text-foreground/40" />
             </div>
-            <h3 className="font-semibold text-foreground mb-2">No items found</h3>
-            <p className="text-sm text-foreground/60 max-w-50 leading-relaxed mb-6">
-              {items.length > 0 ? "No items match the current filter." : "Scan a grocery receipt or barcode to start tracking food waste."}
+            <h3 className="font-semibold text-foreground mb-2">
+              {items.length > 0 ? "Nothing matches those filters" : "Your pantry is empty"}
+            </h3>
+            <p className="text-sm text-foreground/60 max-w-60 leading-relaxed mb-6">
+              {items.length > 0
+                ? "Try widening the diet or risk filter to see the rest of your items."
+                : "Snap a grocery receipt and we will add everything on it, or scan one barcode to start. We will tell you what to eat before it goes off."}
             </p>
             <div className="flex flex-wrap items-center justify-center gap-2">
               <button

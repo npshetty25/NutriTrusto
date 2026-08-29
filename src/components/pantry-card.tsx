@@ -46,10 +46,13 @@ interface PantryCardProps {
 // biggest element on the card, and the number the product exists to
 // produce, failing even the 3:1 large-text threshold. The -strong variants
 // are the same hues taken down in lightness until they clear it.
+// Wording a person would use, not a status enum. "Critical" is a severity
+// level; "Eat today" is an instruction, which is what the user actually
+// wants from a card telling them food is about to die.
 const riskConfig = {
-  high: { label: "Critical", color: "text-danger-strong", bar: "bg-danger" },
-  medium: { label: "Expiring Soon", color: "text-warning-strong", bar: "bg-warning" },
-  low: { label: "Still Good", color: "text-safe-strong", bar: "bg-safe" },
+  high: { label: "Eat today", color: "text-danger-strong", bar: "bg-danger" },
+  medium: { label: "Eat this week", color: "text-warning-strong", bar: "bg-warning" },
+  low: { label: "Plenty of time", color: "text-safe-strong", bar: "bg-safe" },
 };
 
 const DAY_MS = 86_400_000;
@@ -160,7 +163,7 @@ export function PantryCard({ name, daysLeft, risk, purchaseDate, healthScore, di
 
       <div className="rounded-xl border border-border/70 bg-background p-3 mb-3">
         <div className="flex items-end justify-between gap-2 mb-2">
-          <p className="text-[10px] uppercase tracking-widest font-semibold text-foreground/60">Days Remaining</p>
+          <p className="text-[10px] uppercase tracking-widest font-semibold text-foreground/60">Time left</p>
           <p className="text-xs font-semibold text-foreground/60">Freshness</p>
         </div>
         <div className="flex items-end justify-between gap-3">
