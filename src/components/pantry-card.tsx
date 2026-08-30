@@ -7,6 +7,7 @@ import { inferItemCategory } from "@/lib/item-category";
 import { ALLERGEN_LABELS, type AllergenTag } from "@/lib/allergens";
 import { VegMark } from "@/components/veg-mark";
 import type { ItemDietType } from "@/lib/diet";
+import { dietChipClasses } from "@/lib/colour-semantics";
 
 export type RiskLevel = "high" | "medium" | "low";
 
@@ -195,10 +196,6 @@ export function PantryCard({ name, daysLeft, risk, purchaseDate, healthScore, di
         {shelfLifeCitation && (
           <div className="mt-2 pt-2 border-t border-border/50">
             <p className="text-[10px] leading-relaxed text-foreground/50">
-              <span className="font-semibold text-foreground/65">
-                {shelfLifeConfidence === "high" ? "Sourced" : shelfLifeConfidence === "medium" ? "Estimated" : "Rough guess"}
-              </span>
-              {" · "}
               {shelfLifeCitation}
             </p>
             {storageDisclaimer && (
@@ -215,20 +212,10 @@ export function PantryCard({ name, daysLeft, risk, purchaseDate, healthScore, di
       </div>
 
       <div className="flex flex-wrap gap-2">
-        {/* Colour follows what the chip is SAYING, not merely whether it
-            conflicts. With no diet preference set, the chip describes the
-            item's own type — and "Non-Veg" rendered in green with a tick was
-            actively misleading, because in India green is the vegetarian
-            mark. A conflict is red; otherwise the tone follows the item. */}
-        <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-bold ${
-          !dietMatch
-            ? "bg-danger/15 text-danger-strong"
-            : itemDiet === "non-veg"
-              ? "bg-foreground/8 text-foreground/70"
-              : itemDiet === "egg"
-                ? "bg-warning/15 text-warning-strong"
-                : "bg-safe/15 text-safe-strong"
-        }`}>
+        {/* Tone comes from lib/colour-semantics. A "Non-Veg" chip rendered
+            green with a tick, which collides with the mandated Indian
+            vegetarian mark. */}
+        <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-bold ${dietChipClasses(itemDiet, !dietMatch)}`}>
           {dietMatch ? <ShieldCheck size={12} /> : <ShieldAlert size={12} />}
           {dietLabel ?? (dietMatch ? "Matches Diet" : "Diet Warning")}
         </div>

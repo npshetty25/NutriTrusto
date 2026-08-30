@@ -11,10 +11,15 @@ import type { ItemDietType } from "@/lib/diet";
  * a sentence you have to read; the mark is recognised at a glance, at the
  * size of a fingernail, in a language-independent way.
  *
- * There is no official mark for egg. The convention that has settled in
- * practice is the same square with a yellow-brown dot, so that is what is
- * used, and it is always paired with a text label rather than left to
- * stand alone.
+ * TODO — verify against the Food Safety and Standards (Packaging and
+ * Labelling) Regulations whether an official egg mark exists, before any
+ * report or UI copy claims one way or the other. We do not currently know,
+ * and the code should not imply that we do.
+ *
+ * Until then egg does NOT reuse the circle-in-square shape: that form is the
+ * vegetarian mark, and borrowing it for a different meaning is the same
+ * class of error as the green non-veg chip. Egg gets a distinct diamond,
+ * always paired with a text label rather than left to stand alone.
  */
 
 const TONE: Record<ItemDietType, { stroke: string; fill: string; label: string }> = {
@@ -59,8 +64,14 @@ export function VegMark({ diet, size = 14, unverified = false, className = "" }:
         strokeDasharray={unverified ? "3 2" : undefined}
       />
       {diet === "non-veg" ? (
+        // Filled triangle — the non-vegetarian mark.
         <path d="M10 5.2 L15 14.2 H5 Z" fill={tone.fill} />
+      ) : diet === "egg" ? (
+        // Diamond. Deliberately NOT a circle: the circle-in-square is the
+        // vegetarian mark and is reserved for it.
+        <path d="M10 4.8 L15.2 10 L10 15.2 L4.8 10 Z" fill={tone.fill} />
       ) : (
+        // Filled circle — the vegetarian mark.
         <circle cx="10" cy="10" r="4.6" fill={tone.fill} />
       )}
     </svg>

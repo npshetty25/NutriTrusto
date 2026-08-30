@@ -93,7 +93,8 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
 import { supabase } from "@/lib/supabase";
 import { inferItemCategory, type ItemCategory } from "@/lib/item-category";
-import { estimateShelfLife, findShelfLifeRow, CONFIDENCE_LABEL } from "@/lib/shelf-life";
+import { estimateShelfLife, findShelfLifeRow, formatProvenance } from "@/lib/shelf-life";
+import { positiveFindingClasses } from "@/lib/colour-semantics";
 import { deriveRiskLevel, riskLabelForDays } from "@/lib/risk-bands";
 import { detectAllergens } from "@/lib/allergens";
 import { PantryCard, RiskLevel } from "@/components/pantry-card";
@@ -2050,7 +2051,7 @@ if (nutritionFieldsFilled < 2) {
                   itemDiet={itemDiet}
                   dietUnverified={!item.ingredientsText}
                   riskLabel={riskLabelForDays(item.daysLeft)}
-                  shelfLifeCitation={shelfEstimate.citation}
+                  shelfLifeCitation={formatProvenance(shelfEstimate)}
                   shelfLifeConfidence={shelfEstimate.confidence}
                   storageDisclaimer={shelfEstimate.disclaimer}
                   healthierAlternative={healthierAlternative}
@@ -2279,7 +2280,7 @@ if (nutritionFieldsFilled < 2) {
                           {/* Where the number came from, verbatim. An
                               examiner or a sceptical user can check it. */}
                           <span className="text-[10px] text-foreground/45 mt-1">
-                            {CONFIDENCE_LABEL[est.confidence]} · {est.citation}
+                            {formatProvenance(est)}
                           </span>
                           {est.disclaimer && (
                             <span className="text-[10px] text-foreground/40 mt-0.5">{est.disclaimer}</span>
@@ -2307,7 +2308,7 @@ if (nutritionFieldsFilled < 2) {
                   </div>
                 </div>
                 <div className={`px-4 py-2 rounded-xl border flex flex-col items-center justify-center min-w[80px] ${
-                  parseFloat(scannedResult.analysis.health_score) >= 4 ? "bg-green-500/10 border-green-500/20 text-green-600 dark:text-green-400" :
+                  parseFloat(scannedResult.analysis.health_score) >= 4 ? "bg-safe/10 border-safe/20 text-safe-strong" :
                   parseFloat(scannedResult.analysis.health_score) >= 2.5 ? "bg-yellow-500/10 border-yellow-500/20 text-yellow-600 dark:text-yellow-400" :
                   "bg-danger/10 border-danger/20 text-danger"
                 }`}>
@@ -2377,20 +2378,32 @@ if (nutritionFieldsFilled < 2) {
                   <h4 className="font-bold flex items-center gap-2 text-foreground">
                     What You'll Like <span className="text-xl">🙂</span>
                   </h4>
-                  <div className="bg-green-500/5 rounded-2xl border border-green-500/20 divide-y divide-green-500/20 overflow-hidden">
-                    {scannedResult.analysis.positives.map((pos: any, i: number) => (
-                       <div key={i} className="p-3.5 flex flex-col gap-1.5 bg-green-500/5">
-                         <div className="flex justify-between items-center">
-                           <div className="flex items-center gap-2.5">
-                             <CheckCircle2 size={16} className="text-green-600 dark:text-green-400" />
-                             <span className="text-sm font-bold text-green-700 dark:text-green-300">{pos.title}</span>
-                           </div>
-                           <span className="text-[10px] font-bold text-green-700 dark:text-green-300 px-2 py-0.5 rounded-full bg-green-500/20 uppercase tracking-widest">{pos.level}</span>
-                         </div>
-                         {pos.details && <p className="text-[11px] text-green-700/70 dark:text-green-300/70 pl-6 leading-relaxed">{pos.details}</p>}
-                       </div>
-                    ))}
-                  </div>
+                  {/* Raw green-500/600/700 here was the second instance of
+                      the non-veg-in-green defect: it painted a scanned
+                      product's positives green whatever the product was, and
+                      bypassed the design tokens entirely. Now tokenised and
+                      gated on the item's diet type. */}
+                  {(() => {
+                    const tone = positiveFindingClasses(
+                      resolveItemDiet(scannedResult.name, scannedResult.ingredients)
+                    );
+                    return (
+                      <div className={`rounded-2xl border divide-y divide-border/50 overflow-hidden ${tone.container}`}>
+                        {scannedResult.analysis.positives.map((pos: any, i: number) => (
+                          <div key={i} className="p-3.5 flex flex-col gap-1.5">
+                            <div className="flex justify-between items-center">
+                              <div className="flex items-center gap-2.5">
+                                <CheckCircle2 size={16} className={tone.icon} />
+                                <span className={`text-sm font-bold ${tone.title}`}>{pos.title}</span>
+                              </div>
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-widest ${tone.badge}`}>{pos.level}</span>
+                            </div>
+                            {pos.details && <p className="text-[11px] text-foreground/60 pl-6 leading-relaxed">{pos.details}</p>}
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
 
@@ -2401,7 +2414,7 @@ if (nutritionFieldsFilled < 2) {
                   <div className="flex gap-3 overflow-x-auto pb-4 snap-x hide-scrollbar">
                     {scannedResult.analysis.alternatives.map((alt: any, i: number) => (
                       <div key={i} className="min-w-35 snap-center bg-card border border-border p-3 rounded-2xl shrink-0 flex flex-col sleek-shadow">
-                        <div className="w-8 h-8 rounded-full bg-green-500/10 text-green-600 dark:text-green-400 flex items-center justify-center font-black text-xs mb-2">
+                        <div className="w-8 h-8 rounded-full bg-foreground/8 text-foreground/70 flex items-center justify-center font-black text-xs mb-2">
                            {alt.score}
                         </div>
                         <span className="text-xs font-bold text-foreground leading-tight">{alt.name}</span>
