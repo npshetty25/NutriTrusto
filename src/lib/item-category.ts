@@ -1,3 +1,5 @@
+import { matchesTerm, isExcluded, FALSE_FRIENDS } from "@/lib/text-match";
+
 export type ItemCategory =
   | "vegetable"
   | "fruit"
@@ -45,24 +47,45 @@ const categoryKeywords: Record<ItemCategory, string[]> = {
   unknown: [],
 };
 
-export const inferItemCategory = (name: string): ItemCategory => {
-  const value = name.toLowerCase();
+/**
+ * Categories are tried in this order, so a more specific reading wins over a
+ * broader one. Bakery is deliberately ahead of vegetable and dairy: "garlic
+ * bread" is bread, and "cream bun" is a bun. Frozen is ahead of dairy for
+ * the same reason — "ice cream" is frozen, not a dairy liquid.
+ */
+const orderedCategories: ItemCategory[] = [
+  "frozen",
+  "bakery",
+  "snack",
+  "beverage",
+  "vegetable",
+  "fruit",
+  "dairy",
+  "meat",
+  "grain",
+  "pantry",
+];
 
-  const orderedCategories: ItemCategory[] = [
-    "vegetable",
-    "fruit",
-    "dairy",
-    "meat",
-    "grain",
-    "beverage",
-    "bakery",
-    "frozen",
-    "snack",
-    "pantry",
-  ];
+/**
+ * Infers a broad category from an item name.
+ *
+ * Used by the tier-4 shelf-life fallback and by the card's category icon.
+ *
+ * This used a bare `value.includes(keyword)` with no word boundaries and no
+ * exclusions — the exact defect that was fixed in the tier-3 shelf-life
+ * matcher and left in place here, so the fallback path still misread the
+ * same seven products. Both matchers now share `matchesTerm` and the same
+ * FALSE_FRIENDS phrases.
+ */
+export const inferItemCategory = (name: string): ItemCategory => {
+  const value = (name || "").toLowerCase();
+  if (!value.trim()) return "unknown";
 
   for (const category of orderedCategories) {
-    if (categoryKeywords[category].some((keyword) => value.includes(keyword))) {
+    // A phrase listed against this category is a product that merely
+    // contains the word — "coconut milk" is not dairy.
+    if (isExcluded(value, FALSE_FRIENDS[category])) continue;
+    if (categoryKeywords[category].some((keyword) => matchesTerm(value, keyword))) {
       return category;
     }
   }
