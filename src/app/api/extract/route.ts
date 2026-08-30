@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { createRequestContext } from "@/lib/server-logger";
+import { deriveRiskFromDaysOnly } from "@/lib/risk-bands";
 import { validateUpload } from "@/lib/upload-validation";
 import { getRequestUser, unauthorized } from "@/lib/api-auth";
 import { checkRateLimit, rateLimited } from "@/lib/rate-limit";
@@ -48,11 +49,10 @@ const normalizeDaysLeft = (value: number | string | undefined): number => {
   return Math.max(1, Math.min(3650, Math.round(raw)));
 };
 
-const deriveRiskFromDays = (daysLeft: number): "high" | "medium" | "low" => {
-  if (daysLeft <= 4) return "high";
-  if (daysLeft <= 13) return "medium";
-  return "low";
-};
+// Was a byte-identical copy of the rule in page.tsx. Both now call the one
+// definition in lib/risk-bands.ts.
+const deriveRiskFromDays = (daysLeft: number): "high" | "medium" | "low" =>
+  deriveRiskFromDaysOnly(daysLeft);
 
 export async function POST(req: Request) {
   // Gemini costs money per call. Without this, anyone with the URL

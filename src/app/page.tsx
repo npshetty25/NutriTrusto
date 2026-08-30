@@ -21,11 +21,18 @@ const calculateCurrentDaysLeft = (initialDaysLeft: number, purchaseDate: string)
   return Math.max(0, initialDaysLeft - daysElapsed);
 };
 
-const deriveRisk = (daysLeft: number): RiskLevel => {
-  if (daysLeft <= 4) return "high";
-  if (daysLeft <= 13) return "medium";
-  return "low";
-};
+// One definition, in lib/risk-bands.ts. This was a byte-identical copy of
+// the rule in api/extract/route.ts — the same duplication that let the
+// vegetarian term lists drift apart.
+//
+// Passing the item's own shelf life and tier is what makes the band
+// meaningful: without them this falls back to absolute day floors only.
+const deriveRisk = (daysLeft: number, totalShelfLifeDays?: number, name?: string): RiskLevel =>
+  deriveRiskLevel({
+    daysLeft,
+    totalShelfLifeDays,
+    tier: name ? findShelfLifeRow(name)?.row.tier : undefined,
+  });
 
 const normalizeLabel = (value: string) => value.replace(/\s+/g, " ").trim();
 
@@ -86,7 +93,8 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
 import { supabase } from "@/lib/supabase";
 import { inferItemCategory, type ItemCategory } from "@/lib/item-category";
-import { estimateShelfLife } from "@/lib/shelf-life";
+import { estimateShelfLife, findShelfLifeRow, CONFIDENCE_LABEL } from "@/lib/shelf-life";
+import { deriveRiskLevel, riskLabelForDays } from "@/lib/risk-bands";
 import { detectAllergens } from "@/lib/allergens";
 import { PantryCard, RiskLevel } from "@/components/pantry-card";
 import { ProfileDropdown } from "@/components/profile-dropdown";
@@ -340,7 +348,7 @@ export default function Home() {
             id: row.id,
             name: row.name,
             daysLeft,
-            risk: deriveRisk(daysLeft),
+            risk: deriveRisk(daysLeft, row.days_left, row.name),
             purchaseDate: row.purchase_date,
             ingredientsText: row.ingredients_text ?? null,
             healthScore: row.health_score ?? null,
@@ -544,7 +552,7 @@ export default function Home() {
           id: row.id,
           name: row.name,
           daysLeft: calculateCurrentDaysLeft(row.days_left, row.purchase_date),
-          risk: deriveRisk(calculateCurrentDaysLeft(row.days_left, row.purchase_date)),
+          risk: deriveRisk(calculateCurrentDaysLeft(row.days_left, row.purchase_date), row.days_left, row.name),
           purchaseDate: row.purchase_date,
           ingredientsText: row.ingredients_text ?? null,
           healthScore: row.health_score ?? null,
@@ -700,7 +708,7 @@ export default function Home() {
 
     const { error } = await supabase
       .from("pantry_items")
-      .update({ name: trimmedName, days_left: clampedDaysLeft, purchase_date: newPurchaseDate, risk: deriveRisk(clampedDaysLeft) })
+      .update({ name: trimmedName, days_left: clampedDaysLeft, purchase_date: newPurchaseDate, risk: deriveRisk(clampedDaysLeft, clampedDaysLeft, trimmedName) })
       .eq("id", editingItem.id);
 
     setIsSavingEdit(false);
@@ -711,7 +719,7 @@ export default function Home() {
     }
 
     setItems(prev => prev.map(i => i.id === editingItem.id
-      ? { ...i, name: trimmedName, daysLeft: clampedDaysLeft, risk: deriveRisk(clampedDaysLeft), purchaseDate: newPurchaseDate }
+      ? { ...i, name: trimmedName, daysLeft: clampedDaysLeft, risk: deriveRisk(clampedDaysLeft, clampedDaysLeft, trimmedName), purchaseDate: newPurchaseDate }
       : i));
     toast("Item updated");
     closeEditItem();
@@ -736,32 +744,40 @@ export default function Home() {
     // every card was red. This spans the whole range across categories
     // (greens, dairy, staples, fruit, ferment, frozen) and picks a random
     // subset, so pressing the button twice does not produce the same pantry.
+    // Shelf life is NOT written here. It comes from the sourced table via
+    // estimateShelfLife(), so the demo can never drift from the real
+    // numbers — which it already had: these were tuned against the old
+    // figures, and once dairy and meat were converted to a 7 °C Indian
+    // fridge, three items landed dead on arrival at 0 days.
+    //
+    // Only "how long ago it was bought" lives here, chosen so the pantry
+    // shows a genuine spread rather than nine perishables dying at once.
     const CATALOGUE = [
-      // Critical — the items the rescue recipe exists for
-      { name: "Palak (Spinach)", shelfLifeDays: 4, purchasedDaysAgo: 3 },
-      { name: "Paneer", shelfLifeDays: 5, purchasedDaysAgo: 4 },
-      { name: "Coriander Leaves", shelfLifeDays: 4, purchasedDaysAgo: 3 },
-      { name: "Curd", shelfLifeDays: 7, purchasedDaysAgo: 6 },
-      { name: "Chicken Breast", shelfLifeDays: 3, purchasedDaysAgo: 2 },
-      { name: "Mushrooms", shelfLifeDays: 5, purchasedDaysAgo: 4 },
-      // Expiring soon
-      { name: "Milk", shelfLifeDays: 6, purchasedDaysAgo: 2 },
-      { name: "Bhindi (Okra)", shelfLifeDays: 7, purchasedDaysAgo: 3 },
-      { name: "Bread", shelfLifeDays: 6, purchasedDaysAgo: 2 },
-      { name: "Bananas", shelfLifeDays: 7, purchasedDaysAgo: 3 },
-      { name: "Tomatoes", shelfLifeDays: 10, purchasedDaysAgo: 6 },
-      { name: "Eggs", shelfLifeDays: 21, purchasedDaysAgo: 16 },
+      // Should land critical — the items the rescue recipe exists for
+      { name: "Palak (Spinach)", daysIntoShelfLife: 3 },
+      { name: "Paneer", daysIntoShelfLife: 1 },
+      { name: "Coriander Leaves", daysIntoShelfLife: 3 },
+      { name: "Curd", daysIntoShelfLife: 4 },
+      { name: "Chicken Breast", daysIntoShelfLife: 0 },
+      { name: "Mushrooms", daysIntoShelfLife: 4 },
+      // Should land "eat soon"
+      { name: "Milk", daysIntoShelfLife: 2 },
+      { name: "Bhindi (Okra)", daysIntoShelfLife: 3 },
+      { name: "Bread", daysIntoShelfLife: 1 },
+      { name: "Bananas", daysIntoShelfLife: 2 },
+      { name: "Tomatoes", daysIntoShelfLife: 4 },
+      { name: "Eggs", daysIntoShelfLife: 16 },
       // Comfortable
-      { name: "Carrots", shelfLifeDays: 14, purchasedDaysAgo: 4 },
-      { name: "Cabbage", shelfLifeDays: 16, purchasedDaysAgo: 3 },
-      { name: "Onions", shelfLifeDays: 30, purchasedDaysAgo: 6 },
-      { name: "Potatoes", shelfLifeDays: 28, purchasedDaysAgo: 5 },
-      { name: "Ginger", shelfLifeDays: 21, purchasedDaysAgo: 4 },
-      { name: "Toor Dal", shelfLifeDays: 180, purchasedDaysAgo: 20 },
-      { name: "Basmati Rice", shelfLifeDays: 365, purchasedDaysAgo: 30 },
-      { name: "Frozen Peas", shelfLifeDays: 90, purchasedDaysAgo: 12 },
-      { name: "Amul Butter", shelfLifeDays: 60, purchasedDaysAgo: 10 },
-      { name: "Mango Pickle", shelfLifeDays: 240, purchasedDaysAgo: 40 },
+      { name: "Carrots", daysIntoShelfLife: 4 },
+      { name: "Cabbage", daysIntoShelfLife: 3 },
+      { name: "Onions", daysIntoShelfLife: 6 },
+      { name: "Potatoes", daysIntoShelfLife: 5 },
+      { name: "Ginger", daysIntoShelfLife: 4 },
+      { name: "Toor Dal", daysIntoShelfLife: 20 },
+      { name: "Basmati Rice", daysIntoShelfLife: 30 },
+      { name: "Frozen Peas", daysIntoShelfLife: 12 },
+      { name: "Amul Butter", daysIntoShelfLife: 10 },
+      { name: "Mango Pickle", daysIntoShelfLife: 40 },
     ];
 
     // Stratified pick so every demo still has something critical to rescue
@@ -773,14 +789,15 @@ export default function Home() {
       .concat(sample(CATALOGUE.slice(12), 4));
 
     const rows = mockPlan.map((entry) => {
-      const currentDays = Math.max(0, entry.shelfLifeDays - entry.purchasedDaysAgo);
+      const shelfLifeDays = estimateShelfLife(entry.name).days;
+      const currentDays = Math.max(0, shelfLifeDays - entry.daysIntoShelfLife);
       return {
         user_id: user.id,
         ...householdIdField(),
         name: entry.name,
-        days_left: entry.shelfLifeDays,
-        risk: deriveRisk(currentDays),
-        purchase_date: getPurchaseDate(entry.purchasedDaysAgo),
+        days_left: shelfLifeDays,
+        risk: deriveRisk(currentDays, shelfLifeDays, entry.name),
+        purchase_date: getPurchaseDate(entry.daysIntoShelfLife),
       };
     });
 
@@ -801,7 +818,7 @@ export default function Home() {
         id: row.id,
         name: row.name,
         daysLeft,
-        risk: deriveRisk(daysLeft),
+        risk: deriveRisk(daysLeft, row.days_left, row.name),
         purchaseDate: row.purchase_date,
       };
     });
@@ -939,7 +956,7 @@ export default function Home() {
             return {
               name,
               days_left: daysLeft,
-              risk: deriveRisk(daysLeft),
+              risk: deriveRisk(daysLeft, daysLeft, name),
             };
           })
           .filter((item): item is { name: string; days_left: number; risk: RiskLevel } => Boolean(item));
@@ -984,7 +1001,7 @@ export default function Home() {
                 id: insertedRow.id,
                 name: insertedRow.name,
                 daysLeft,
-                risk: deriveRisk(daysLeft),
+                risk: deriveRisk(daysLeft, insertedRow.days_left, insertedRow.name),
                 purchaseDate: insertedRow.purchase_date,
               });
               logScanHistory(insertedRow.name, "receipt");
@@ -1310,7 +1327,7 @@ if (nutritionFieldsFilled < 2) {
       ...healthScoreField(scannedResult.analysis?.health_score),
       name: scannedResult.name,
       days_left: initialDaysLeft,
-      risk: deriveRisk(initialDaysLeft),
+      risk: deriveRisk(initialDaysLeft, initialDaysLeft, scannedResult.name),
       // ISO, not toLocaleDateString: a locale string sorts alphabetically
       // ('Apr' before 'Jan') and cannot be range-queried. See
       // db/supabase-schema-purchase-date.sql.
@@ -2015,6 +2032,9 @@ if (nutritionFieldsFilled < 2) {
                 : undefined;
               const detectedAllergens = item.ingredientsText ? detectAllergens(item.ingredientsText) : null;
               const itemDiet = resolveItemDiet(item.name, item.ingredientsText);
+              // Same resolver the estimate came from, so the card's provenance
+              // line always matches the number beside it.
+              const shelfEstimate = estimateShelfLife(item.name);
 
               return (
                 <PantryCard
@@ -2029,6 +2049,10 @@ if (nutritionFieldsFilled < 2) {
                   dietLabel={dietChipLabel(userDietPreference, itemDiet)}
                   itemDiet={itemDiet}
                   dietUnverified={!item.ingredientsText}
+                  riskLabel={riskLabelForDays(item.daysLeft)}
+                  shelfLifeCitation={shelfEstimate.citation}
+                  shelfLifeConfidence={shelfEstimate.confidence}
+                  storageDisclaimer={shelfEstimate.disclaimer}
                   healthierAlternative={healthierAlternative}
                   detectedAllergens={detectedAllergens}
                   actions={
@@ -2252,6 +2276,14 @@ if (nutritionFieldsFilled < 2) {
                         <>
                           <span className="text-lg font-black">{days(est.days)} left</span>
                           <span className="text-[11px] text-foreground/60">{est.explanation}</span>
+                          {/* Where the number came from, verbatim. An
+                              examiner or a sceptical user can check it. */}
+                          <span className="text-[10px] text-foreground/45 mt-1">
+                            {CONFIDENCE_LABEL[est.confidence]} · {est.citation}
+                          </span>
+                          {est.disclaimer && (
+                            <span className="text-[10px] text-foreground/40 mt-0.5">{est.disclaimer}</span>
+                          )}
                         </>
                       );
                     })()

@@ -35,6 +35,19 @@ interface PantryCardProps {
   // non-empty = ingredient data exists and these allergens were detected.
   detectedAllergens?: AllergenTag[] | null;
   healthierAlternative?: string;
+  /**
+   * What the chip says. Derived from the literal day count, not the risk
+   * band: once the bands became relative, a long-life staple in its last
+   * tenth banded "high", and a chip reading "Eat today" on a sealed bag of
+   * rice with a month left would be plainly wrong. Colour still comes from
+   * the band; the words come from the deadline.
+   */
+  riskLabel?: string;
+  /** Where the shelf-life figure came from, shown verbatim. */
+  shelfLifeCitation?: string;
+  shelfLifeConfidence?: "high" | "medium" | "low";
+  /** "Estimates based on typical Indian storage conditions". */
+  storageDisclaimer?: string;
   // Rendered in the card's own footer. These used to be free-floating
   // buttons absolutely positioned over the card by the dashboard, which
   // meant they overlapped whatever the card happened to render last.
@@ -64,7 +77,7 @@ const formatDayMonth = (iso: string) => {
   return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short" });
 };
 
-export function PantryCard({ name, daysLeft, risk, purchaseDate, healthScore, dietMatch = true, dietLabel, itemDiet = "veg", dietUnverified = false, detectedAllergens, healthierAlternative, actions }: PantryCardProps) {
+export function PantryCard({ name, daysLeft, risk, purchaseDate, healthScore, dietMatch = true, dietLabel, itemDiet = "veg", dietUnverified = false, riskLabel, shelfLifeCitation, shelfLifeConfidence, storageDisclaimer, detectedAllergens, healthierAlternative, actions }: PantryCardProps) {
   const score = healthScore != null ? Number.parseFloat(healthScore) : NaN;
   const hasScore = Number.isFinite(score);
   // Same thresholds the nutrition trend chart uses, so one score reads the
@@ -157,7 +170,7 @@ export function PantryCard({ name, daysLeft, risk, purchaseDate, healthScore, di
               ? "bg-warning/15 border-warning/30 text-warning-strong"
               : "bg-safe/15 border-safe/30 text-safe-strong"
         }`}>
-          {config.label}
+          {riskLabel ?? config.label}
         </div>
       </div>
 
@@ -176,6 +189,24 @@ export function PantryCard({ name, daysLeft, risk, purchaseDate, healthScore, di
           </div>
         </div>
 
+        {/* Provenance for the number above it. "Sourced" and "Rough guess"
+            must not look alike — the same reason the allergen badge says
+            "unknown" instead of "safe". */}
+        {shelfLifeCitation && (
+          <div className="mt-2 pt-2 border-t border-border/50">
+            <p className="text-[10px] leading-relaxed text-foreground/50">
+              <span className="font-semibold text-foreground/65">
+                {shelfLifeConfidence === "high" ? "Sourced" : shelfLifeConfidence === "medium" ? "Estimated" : "Rough guess"}
+              </span>
+              {" · "}
+              {shelfLifeCitation}
+            </p>
+            {storageDisclaimer && (
+              <p className="text-[10px] leading-relaxed text-foreground/40 mt-0.5">{storageDisclaimer}</p>
+            )}
+          </div>
+        )}
+
         {daysLeft === 0 && (
           <p className="mt-2 text-[11px] leading-relaxed font-semibold text-danger">
             {name} has likely spoiled. Remove it, or use it now if it still seems fine.
@@ -184,7 +215,20 @@ export function PantryCard({ name, daysLeft, risk, purchaseDate, healthScore, di
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-bold ${dietMatch ? "bg-safe/15 text-safe-strong" : "bg-danger/15 text-danger-strong"}`}>
+        {/* Colour follows what the chip is SAYING, not merely whether it
+            conflicts. With no diet preference set, the chip describes the
+            item's own type — and "Non-Veg" rendered in green with a tick was
+            actively misleading, because in India green is the vegetarian
+            mark. A conflict is red; otherwise the tone follows the item. */}
+        <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-bold ${
+          !dietMatch
+            ? "bg-danger/15 text-danger-strong"
+            : itemDiet === "non-veg"
+              ? "bg-foreground/8 text-foreground/70"
+              : itemDiet === "egg"
+                ? "bg-warning/15 text-warning-strong"
+                : "bg-safe/15 text-safe-strong"
+        }`}>
           {dietMatch ? <ShieldCheck size={12} /> : <ShieldAlert size={12} />}
           {dietLabel ?? (dietMatch ? "Matches Diet" : "Diet Warning")}
         </div>
