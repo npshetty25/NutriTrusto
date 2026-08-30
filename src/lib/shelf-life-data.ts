@@ -41,6 +41,10 @@ export type PerishTier = "highly-perishable" | "perishable" | "semi-perishable" 
 export type Confidence = "high" | "medium" | "low";
 
 export interface ShelfLifeRow {
+  /** Stable identity, derived from the first key. What tests assert on. */
+  id: string;
+  data_version: string;
+  effective_date: string;
   /** Terms matched against the item name, on word boundaries. */
   keys: string[];
   /**
@@ -59,14 +63,50 @@ export interface ShelfLifeRow {
   lookupOnly?: boolean;
   source: string;
   confidence: Confidence;
+  /**
+   * Set where a source is being applied beyond the subject it studied, or
+   * outside the temperature range it was fitted on. Rendered so the stretch
+   * is visible rather than implied.
+   */
+  extrapolation_warning?: string;
+  /** Why this source is weaker than its presence in the table suggests. */
+  source_caveat?: string;
+  /**
+   * Tropical and subtropical produce suffers chilling injury well above
+   * freezing: below a threshold it degrades FASTER in a fridge, not slower.
+   * The temperature model assumes colder is always longer, which is false
+   * for these rows.
+   */
+  chilling_sensitive?: {
+    /** Below this, injury dominates. null = not yet sourced; see CITATIONS_NEEDED.md. */
+    min_safe_temp_c: number | null;
+    injury_mode: string;
+    source: string;
+    confidence: Confidence;
+  };
+  /**
+   * Set when the dominant failure mode is not microbial growth. Bread stales
+   * by starch retrogradation, which runs FASTEST just above freezing, so
+   * refrigeration extends mould-free life while accelerating the failure a
+   * person actually notices. Such rows must not go through Arrhenius or Q10.
+   */
+  degradation_mode?: "starch_retrogradation";
 }
+
+/**
+ * Bumped whenever any figure in this file changes. Every row is stamped with
+ * it at export, so a value can always be traced to the revision it came from.
+ * See CHANGELOG.md for what moved and why.
+ */
+export const DATA_VERSION = "2026-08-31";
+export const EFFECTIVE_DATE = "2026-08-31";
 
 const USDA = "USDA FoodKeeper";
 const FSIS = "USDA FSIS";
 const FAO = "FAO Quality and Quality Changes in Fresh Fish (v7180e)";
 const IN_HOUSEHOLD = "Typical Indian household storage";
 
-export const SHELF_LIFE_ROWS: ShelfLifeRow[] = [
+const RAW_ROWS: Omit<ShelfLifeRow, "id" | "data_version" | "effective_date">[] = [
   // ── Dairy ──────────────────────────────────────────────────────────
   // Quoted at 4 °C and converted down; these are the most-wasted items and
   // the ones where the old flat numbers were furthest out.
@@ -76,7 +116,14 @@ export const SHELF_LIFE_ROWS: ShelfLifeRow[] = [
     exclude: ["coconut milk", "milk powder", "milk chocolate", "soy milk", "soya milk",
               "almond milk", "oat milk", "milkmaid", "condensed milk", "milk shake", "milkshake"],
     days: 6, refTempC: 4, storage: "fridge", tier: "highly-perishable",
-    eaKJ: 66.7, source: `${USDA}; Ea from Xu & Sun, J. Emerging Investigators 2022`, confidence: "high",
+    eaKJ: 66.7, source: `${USDA}; Ea from Xu & Sun, J. Emerging Investigators 2022`,
+    // Demoted from "high". The Journal of Emerging Investigators is a real
+    // journal, but it publishes secondary-school research reviewed by
+    // graduate-student volunteers — too weak an anchor for the single number
+    // the whole temperature model leans on. Kept rather than deleted, and
+    // kept visible rather than quietly relied on. See CITATIONS_NEEDED.md.
+    confidence: "low",
+    source_caveat: "Journal of Emerging Investigators publishes secondary-school student research; anchor value pending replacement with a mainstream food-science source.",
   },
   {
     keys: ["curd", "dahi", "yogurt", "yoghurt"],
@@ -124,14 +171,21 @@ export const SHELF_LIFE_ROWS: ShelfLifeRow[] = [
     keys: ["chicken", "murgh"],
     exclude: ["chicken masala", "butter chicken", "chicken curry masala"],
     days: 2, refTempC: 4, storage: "fridge", tier: "highly-perishable",
-    eaKJ: 82, source: `${FSIS}; Ea from Kritikos et al., Food Microbiology 55 (2016)`, confidence: "high",
+    eaKJ: 82,
+    // The study is on pomegranate-marinated chicken breast fillets, not
+    // poultry in general. Stated as a proxy so the scope is not overstated.
+    source: `${FSIS}; Ea from marinated chicken breast (Kritikos et al., Food Microbiology 55 (2016) 25-31); applied as poultry proxy`,
+    extrapolation_warning: "Ea fitted on pomegranate-marinated chicken breast; applied to raw poultry generally",
+    confidence: "medium",
   },
   {
     keys: ["fish", "machli", "prawn", "shrimp", "jhinga", "pomfret", "surmai",
            "rohu", "katla", "hilsa", "bangda", "crab"],
     exclude: ["fish curry masala", "fish masala", "fish oil"],
     days: 2, refTempC: 4, storage: "fridge", tier: "highly-perishable",
-    eaKJ: 100, source: `${FAO}; Ea range 49–154 kJ/mol, 100 used as working value`, confidence: "medium",
+    eaKJ: 100, source: `${FAO}; Ea range 49-154 kJ/mol across species, 100 used as working value`,
+    extrapolation_warning: "Single working Ea applied across species whose spoilage flora differ; FAO documents different microflora at 0-5 C and 15-30 C",
+    confidence: "low",
   },
   {
     keys: ["mutton", "lamb", "goat meat", "keema"],
@@ -165,24 +219,24 @@ export const SHELF_LIFE_ROWS: ShelfLifeRow[] = [
 
   // ── Other vegetables ───────────────────────────────────────────────
   {
-    keys: ["tomato", "tamatar"],
+    keys: ["tomato", "tamatar"], chilling_sensitive: { min_safe_temp_c: null, injury_mode: "mealy texture, flavour loss, pitting", source: "TODO", confidence: "low" },
     exclude: ["tomato ketchup", "tomato sauce", "tomato puree"],
     days: 7, refTempC: 29, storage: "counter", tier: "perishable",
     source: USDA, confidence: "medium",
   },
-  { keys: ["bhindi", "okra", "lady finger"], days: 6, refTempC: 29, storage: "counter", tier: "perishable", source: USDA, confidence: "medium" },
+  { keys: ["bhindi", "okra", "lady finger"], chilling_sensitive: { min_safe_temp_c: null, injury_mode: "pitting, water-soaked lesions, blackening", source: "TODO", confidence: "low" }, days: 6, refTempC: 29, storage: "counter", tier: "perishable", source: USDA, confidence: "medium" },
   { keys: ["capsicum", "bell pepper", "shimla mirch"], days: 10, refTempC: 29, storage: "counter", tier: "perishable", source: USDA, confidence: "medium" },
   { keys: ["cauliflower", "gobi", "broccoli"], days: 8, refTempC: 29, storage: "counter", tier: "perishable", source: USDA, confidence: "medium" },
   { keys: ["cabbage", "patta gobi"], days: 14, refTempC: 29, storage: "counter", tier: "semi-perishable", source: USDA, confidence: "medium" },
   { keys: ["beans", "french beans"], exclude: ["kidney beans", "rajma beans", "baked beans", "coffee beans"], days: 7, refTempC: 29, storage: "counter", tier: "perishable", source: USDA, confidence: "medium" },
-  { keys: ["brinjal", "baingan", "eggplant", "aubergine"], days: 7, refTempC: 29, storage: "counter", tier: "perishable", source: USDA, confidence: "medium" },
-  { keys: ["cucumber", "kheera"], days: 7, refTempC: 29, storage: "counter", tier: "perishable", source: USDA, confidence: "medium" },
+  { keys: ["brinjal", "baingan", "eggplant", "aubergine"], chilling_sensitive: { min_safe_temp_c: null, injury_mode: "pitting, surface bronzing, seed browning", source: "TODO", confidence: "low" }, days: 7, refTempC: 29, storage: "counter", tier: "perishable", source: USDA, confidence: "medium" },
+  { keys: ["cucumber", "kheera"], chilling_sensitive: { min_safe_temp_c: null, injury_mode: "pitting, water-soaked areas, accelerated decay", source: "TODO", confidence: "low" }, days: 7, refTempC: 29, storage: "counter", tier: "perishable", source: USDA, confidence: "medium" },
   { keys: ["carrot", "gajar"], days: 14, refTempC: 29, storage: "counter", tier: "semi-perishable", source: USDA, confidence: "medium" },
   { keys: ["beetroot", "chukandar"], days: 14, refTempC: 29, storage: "counter", tier: "semi-perishable", source: USDA, confidence: "low" },
   { keys: ["peas", "matar"], exclude: ["frozen peas"], days: 5, refTempC: 29, storage: "counter", tier: "perishable", source: USDA, confidence: "medium" },
   { keys: ["lauki", "bottle gourd", "tinda", "tori"], days: 10, refTempC: 29, storage: "counter", tier: "perishable", source: IN_HOUSEHOLD, confidence: "low" },
-  { keys: ["pumpkin", "kaddu"], days: 21, refTempC: 29, storage: "counter", tier: "semi-perishable", source: USDA, confidence: "low" },
-  { keys: ["ginger", "adrak"], exclude: ["ginger garlic paste", "ginger powder", "dry ginger"], days: 21, refTempC: 29, storage: "counter", tier: "semi-perishable", source: IN_HOUSEHOLD, confidence: "medium" },
+  { keys: ["pumpkin", "kaddu"], chilling_sensitive: { min_safe_temp_c: null, injury_mode: "pitting, internal breakdown", source: "TODO", confidence: "low" }, days: 21, refTempC: 29, storage: "counter", tier: "semi-perishable", source: USDA, confidence: "low" },
+  { keys: ["ginger", "adrak"], chilling_sensitive: { min_safe_temp_c: null, injury_mode: "surface pitting and decay", source: "TODO", confidence: "low" }, exclude: ["ginger garlic paste", "ginger powder", "dry ginger"], days: 21, refTempC: 29, storage: "counter", tier: "semi-perishable", source: IN_HOUSEHOLD, confidence: "medium" },
   {
     keys: ["garlic", "lehsun"],
     // "Garlic bread" was matching garlic and getting 30 days. It is bread.
@@ -191,26 +245,32 @@ export const SHELF_LIFE_ROWS: ShelfLifeRow[] = [
     source: "FAO Farm Structures Ch. 9", confidence: "medium",
   },
   { keys: ["onion", "pyaz", "pyaaz"], exclude: ["onion pickle", "spring onion", "onion powder"], days: 30, refTempC: 29, storage: "counter", tier: "semi-perishable", source: "FAO Farm Structures Ch. 9", confidence: "medium" },
-  { keys: ["potato", "aloo"], exclude: ["potato chips", "sweet potato", "potato wafers"], days: 28, refTempC: 29, storage: "counter", tier: "semi-perishable", source: "FAO Farm Structures Ch. 9", confidence: "medium" },
-  { keys: ["sweet potato", "shakarkandi"], days: 21, refTempC: 29, storage: "counter", tier: "semi-perishable", source: USDA, confidence: "low" },
+  { keys: ["potato", "aloo"], chilling_sensitive: { min_safe_temp_c: null, injury_mode: "cold-induced sweetening; darkens when fried", source: "TODO", confidence: "low" }, exclude: ["potato chips", "sweet potato", "potato wafers"], days: 28, refTempC: 29, storage: "counter", tier: "semi-perishable", source: "FAO Farm Structures Ch. 9", confidence: "medium" },
+  { keys: ["sweet potato", "shakarkandi"], chilling_sensitive: { min_safe_temp_c: null, injury_mode: "internal browning, hardcore, decay", source: "TODO", confidence: "low" }, days: 21, refTempC: 29, storage: "counter", tier: "semi-perishable", source: USDA, confidence: "low" },
 
   // ── Fruit ──────────────────────────────────────────────────────────
-  { keys: ["banana", "kela"], days: 5, refTempC: 29, storage: "counter", tier: "perishable", source: USDA, confidence: "medium" },
-  { keys: ["papaya"], days: 5, refTempC: 29, storage: "counter", tier: "perishable", source: USDA, confidence: "low" },
-  { keys: ["mango", "aam"], exclude: ["mango pickle", "aam achar", "mango juice"], days: 6, refTempC: 29, storage: "counter", tier: "perishable", source: USDA, confidence: "medium" },
+  { keys: ["banana", "kela"], chilling_sensitive: { min_safe_temp_c: null, injury_mode: "peel blackening, ripening arrest", source: "TODO", confidence: "low" }, days: 5, refTempC: 29, storage: "counter", tier: "perishable", source: USDA, confidence: "medium" },
+  { keys: ["papaya"], chilling_sensitive: { min_safe_temp_c: null, injury_mode: "pitting, failure to ripen, flavour loss", source: "TODO", confidence: "low" }, days: 5, refTempC: 29, storage: "counter", tier: "perishable", source: USDA, confidence: "low" },
+  { keys: ["mango", "aam"], chilling_sensitive: { min_safe_temp_c: null, injury_mode: "pitting, uneven ripening, flavour loss", source: "TODO", confidence: "low" }, exclude: ["mango pickle", "aam achar", "mango juice"], days: 6, refTempC: 29, storage: "counter", tier: "perishable", source: USDA, confidence: "medium" },
   { keys: ["grapes", "angoor"], days: 7, refTempC: 29, storage: "counter", tier: "perishable", source: USDA, confidence: "medium" },
-  { keys: ["guava", "amrood"], days: 7, refTempC: 29, storage: "counter", tier: "perishable", source: IN_HOUSEHOLD, confidence: "low" },
+  { keys: ["guava", "amrood"], chilling_sensitive: { min_safe_temp_c: null, injury_mode: "pitting, flesh browning", source: "TODO", confidence: "low" }, days: 7, refTempC: 29, storage: "counter", tier: "perishable", source: IN_HOUSEHOLD, confidence: "low" },
   { keys: ["pomegranate", "anar"], days: 14, refTempC: 29, storage: "counter", tier: "semi-perishable", source: USDA, confidence: "low" },
-  { keys: ["orange", "mosambi", "santra"], exclude: ["orange juice"], days: 14, refTempC: 29, storage: "counter", tier: "semi-perishable", source: USDA, confidence: "medium" },
+  { keys: ["orange", "mosambi", "santra"], chilling_sensitive: { min_safe_temp_c: null, injury_mode: "rind pitting and staining", source: "TODO", confidence: "low" }, exclude: ["orange juice"], days: 14, refTempC: 29, storage: "counter", tier: "semi-perishable", source: USDA, confidence: "medium" },
   { keys: ["apple", "seb"], exclude: ["apple juice", "custard apple", "pineapple"], days: 21, refTempC: 29, storage: "counter", tier: "semi-perishable", source: USDA, confidence: "medium" },
-  { keys: ["lemon", "nimbu", "lime"], days: 21, refTempC: 29, storage: "counter", tier: "semi-perishable", source: USDA, confidence: "medium" },
+  { keys: ["lemon", "nimbu", "lime"], chilling_sensitive: { min_safe_temp_c: null, injury_mode: "rind pitting and staining", source: "TODO", confidence: "low" }, days: 21, refTempC: 29, storage: "counter", tier: "semi-perishable", source: USDA, confidence: "medium" },
 
   // ── Bakery ─────────────────────────────────────────────────────────
   {
     keys: ["bread", "pav", "bun", "garlic bread"],
     exclude: ["bread crumbs", "breadcrumb"],
     days: 4, refTempC: 29, storage: "counter", tier: "perishable",
-    source: IN_HOUSEHOLD, confidence: "medium",
+    // Bread does not fail microbially first. Starch retrogradation runs
+    // FASTEST just above freezing, so a fridge extends mould-free life while
+    // accelerating the staling a person actually notices. Neither Arrhenius
+    // nor Q10 describes that, so this row is lookup-only.
+    degradation_mode: "starch_retrogradation",
+    lookupOnly: true,
+    source: IN_HOUSEHOLD, confidence: "low",
   },
   { keys: ["roti", "chapati", "paratha", "naan"], days: 2, refTempC: 29, storage: "counter", tier: "highly-perishable", source: IN_HOUSEHOLD, confidence: "low" },
   { keys: ["cake", "pastry", "muffin"], days: 5, refTempC: 29, storage: "counter", tier: "perishable", source: USDA, confidence: "low" },
@@ -226,10 +286,10 @@ export const SHELF_LIFE_ROWS: ShelfLifeRow[] = [
   { keys: ["besan", "gram flour"], days: 120, refTempC: 29, storage: "counter", tier: "shelf-stable", lookupOnly: true, source: "USDA dry-goods storage", confidence: "medium" },
   { keys: ["poha", "suji", "rava", "semolina"], days: 120, refTempC: 29, storage: "counter", tier: "shelf-stable", lookupOnly: true, source: "USDA dry-goods storage", confidence: "medium" },
   { keys: ["oats"], days: 180, refTempC: 29, storage: "counter", tier: "shelf-stable", lookupOnly: true, source: "USDA dry-goods storage", confidence: "medium" },
-  { keys: ["sugar", "cheeni"], days: 540, refTempC: 29, storage: "counter", tier: "shelf-stable", lookupOnly: true, source: "Food-science general (indefinite if dry)", confidence: "high" },
-  { keys: ["salt", "namak"], days: 1080, refTempC: 29, storage: "counter", tier: "shelf-stable", lookupOnly: true, source: "Food-science general (indefinite)", confidence: "high" },
+  { keys: ["sugar", "cheeni"], days: 540, refTempC: 29, storage: "counter", tier: "shelf-stable", lookupOnly: true, source: "Food-science general (indefinite if dry)", confidence: "medium" },
+  { keys: ["salt", "namak"], days: 1080, refTempC: 29, storage: "counter", tier: "shelf-stable", lookupOnly: true, source: "Food-science general (indefinite)", confidence: "medium" },
   { keys: ["oil", "tel"], exclude: ["fish oil", "oil pulling"], days: 270, refTempC: 29, storage: "counter", tier: "shelf-stable", lookupOnly: true, source: "Food-science general (rancidity-limited)", confidence: "medium" },
-  { keys: ["honey", "shahad"], days: 720, refTempC: 29, storage: "counter", tier: "shelf-stable", lookupOnly: true, source: "Food-science general (indefinite)", confidence: "high" },
+  { keys: ["honey", "shahad"], days: 720, refTempC: 29, storage: "counter", tier: "shelf-stable", lookupOnly: true, source: "Food-science general (indefinite)", confidence: "medium" },
 
   // ── Preserved, frozen, packaged ────────────────────────────────────
   { keys: ["pickle", "achar", "achaar"], days: 240, refTempC: 29, storage: "counter", tier: "shelf-stable", lookupOnly: true, source: "Food-science general (sealed)", confidence: "medium" },
@@ -250,6 +310,19 @@ export const SHELF_LIFE_ROWS: ShelfLifeRow[] = [
   },
   { keys: ["juice"], days: 7, refTempC: 4, storage: "fridge", tier: "perishable", source: USDA, confidence: "low" },
 ];
+
+/**
+ * Every row carries a stable id and the data version it came from. The id is
+ * what tests assert on: a test that checks only the returned day count
+ * passes when the WRONG row is matched but happens to hold the same number,
+ * which is exactly how the "Tomatoes" plural bug stayed hidden.
+ */
+export const SHELF_LIFE_ROWS: ShelfLifeRow[] = RAW_ROWS.map((row) => ({
+  ...row,
+  id: row.keys[0].toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+  data_version: DATA_VERSION,
+  effective_date: EFFECTIVE_DATE,
+}));
 
 /**
  * Longest key first, so "toor dal" beats "dal" and "sweet potato" beats

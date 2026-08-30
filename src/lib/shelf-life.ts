@@ -1,4 +1,5 @@
 import { inferItemCategory, type ItemCategory } from "@/lib/item-category";
+import { matchesTerm, isExcluded } from "@/lib/text-match";
 import {
   ROWS_BY_KEY_LENGTH,
   type Confidence,
@@ -60,9 +61,22 @@ export interface ShelfLifeEstimate {
   storage: StorageLocation;
   assumedTempC: number;
   /** The same item kept elsewhere, for the "if stored differently" line. */
-  ifStoredDifferently: { fridge: number; counter: number; freezer: number };
+  /**
+   * null means "we will not advise" — either the item suffers chilling
+   * injury and we have no sourced threshold, or its failure mode is not
+   * temperature-modelled. The UI shows "storage guidance unavailable".
+   */
+  ifStoredDifferently: { fridge: number | null; counter: number; freezer: number | null; suppressedReason?: string };
   /** Shown wherever an adjusted number appears. */
   disclaimer: string;
+  /**
+   * Why this source is weaker than its presence in the table suggests.
+   * Rendered, not just stored: a low-confidence anchor must not be presented
+   * as though it were sourced.
+   */
+  sourceCaveat?: string;
+  /** Where a source is applied beyond the subject or range it was fitted on. */
+  extrapolationWarning?: string;
 }
 
 const CATEGORY_SHELF_LIFE: Record<ItemCategory, { days: number; tier: PerishTier; storage: StorageLocation }> = {
@@ -105,23 +119,6 @@ const DOWNGRADE: Record<Confidence, Confidence> = { high: "medium", medium: "low
  * spell out "egg" and "eggs" separately), and widening it there would risk
  * the eggplant class of bug, so this is a separate matcher.
  */
-const WORD_CHAR = /[a-z0-9]/i;
-const matchesTerm = (text: string, term: string): boolean => {
-  for (let from = 0; ; ) {
-    const at = text.indexOf(term, from);
-    if (at === -1) return false;
-    let end = at + term.length;
-    // Accept a trailing plural, so "onion" matches "Onions" and "tomato"
-    // matches "Tomatoes".
-    if (text.slice(end, end + 2) === "es") end += 2;
-    else if (text[end] === "s") end += 1;
-    const before = at === 0 ? "" : text[at - 1];
-    const after = text[end] ?? "";
-    if (!WORD_CHAR.test(before) && !WORD_CHAR.test(after)) return true;
-    from = at + 1;
-  }
-};
-
 /**
  * Finds the sourced row for a name, honouring exclusions.
  *
@@ -134,7 +131,7 @@ export function findShelfLifeRow(name: string): { key: string; row: ShelfLifeRow
   if (!text.trim()) return null;
 
   for (const entry of ROWS_BY_KEY_LENGTH) {
-    if (entry.row.exclude?.some((phrase) => text.includes(phrase.toLowerCase()))) continue;
+    if (isExcluded(text, entry.row.exclude)) continue;
     // Multi-word keys are phrases, so a plain substring test is right for
     // them; single words need the boundary check.
     const matched = entry.key.includes(" ") ? text.includes(entry.key) : matchesTerm(text, entry.key);
@@ -143,13 +140,55 @@ export function findShelfLifeRow(name: string): { key: string; row: ShelfLifeRow
   return null;
 }
 
-const storedElsewhere = (days: number, fromC: number, row?: Pick<ShelfLifeRow, "eaKJ" | "lookupOnly">) => ({
-  fridge: Math.max(0, Math.round(adjustDays(days, fromC, ASSUMED_STORAGE_C.fridge, row) * 10) / 10),
-  counter: Math.max(0, Math.round(adjustDays(days, fromC, ASSUMED_STORAGE_C.counter, row) * 10) / 10),
-  // Freezing is outside both models, so this is the honest answer: we do not
-  // extrapolate a microbial rate across a phase change.
-  freezer: 0,
-});
+type StoredElsewhereRow = Pick<ShelfLifeRow, "eaKJ" | "lookupOnly" | "chilling_sensitive" | "degradation_mode">;
+
+/**
+ * What this item would keep for if stored somewhere else.
+ *
+ * The temperature model assumes colder is always longer. For tropical and
+ * subtropical produce that is false well above freezing: below a threshold,
+ * chilling injury dominates and the item degrades FASTER in a fridge. Left
+ * unguarded, a naive Q10 extrapolation across a 22 °C span reported a banana
+ * keeping 56 days in the fridge against 5 on the counter, and a potato 314.
+ * Advising someone to refrigerate a banana is worse than saying nothing.
+ *
+ * A row with no sourced threshold gets `null` back rather than a number,
+ * and the caller renders "storage guidance unavailable".
+ */
+const storedElsewhere = (
+  days: number,
+  fromC: number,
+  row?: StoredElsewhereRow
+): { fridge: number | null; counter: number; freezer: number | null; suppressedReason?: string } => {
+  const counter = Math.max(0, Math.round(adjustDays(days, fromC, ASSUMED_STORAGE_C.counter, row) * 10) / 10);
+
+  const chilling = row?.chilling_sensitive;
+  if (chilling) {
+    // Threshold unsourced: we know the item suffers chilling injury but not
+    // at what temperature, so we decline to advise rather than guess.
+    if (chilling.min_safe_temp_c === null) {
+      return { fridge: null, counter, freezer: null, suppressedReason: chilling.injury_mode };
+    }
+    if (ASSUMED_STORAGE_C.fridge < chilling.min_safe_temp_c) {
+      // Never report an extension into the injury range. The ambient figure
+      // is the honest ceiling.
+      return { fridge: counter, counter, freezer: null, suppressedReason: chilling.injury_mode };
+    }
+  }
+
+  // Non-microbial failure (bread staling) is not described by either model.
+  if (row?.degradation_mode) {
+    return { fridge: null, counter, freezer: null, suppressedReason: "stales fastest just above freezing" };
+  }
+
+  return {
+    fridge: Math.max(0, Math.round(adjustDays(days, fromC, ASSUMED_STORAGE_C.fridge, row) * 10) / 10),
+    counter,
+    // Freezing is outside both models, so this is the honest answer: we do
+    // not extrapolate a microbial rate across a phase change.
+    freezer: null,
+  };
+};
 
 /**
  * @param name        the item's name as the user will see it
@@ -170,7 +209,7 @@ export function estimateShelfLife(name: string, scannedDays?: number | null): Sh
       tier: "perishable",
       storage: "counter",
       assumedTempC: ASSUMED_STORAGE_C.counter,
-      ifStoredDifferently: { fridge: days, counter: days, freezer: days },
+      ifStoredDifferently: { fridge: days, counter: days, freezer: null },
       // A printed date is a manufacturer's statement, not our estimate, so
       // the storage disclaimer would be a false qualifier here.
       disclaimer: "",
@@ -198,6 +237,8 @@ export function estimateShelfLife(name: string, scannedDays?: number | null): Sh
       wantsConfirmation: row.confidence === "low",
       confidence: wasAdjusted ? DOWNGRADE[row.confidence] : row.confidence,
       citation: row.source,
+      sourceCaveat: row.source_caveat,
+      extrapolationWarning: row.extrapolation_warning,
       tier: row.tier,
       storage: row.storage,
       assumedTempC: targetC,
@@ -248,6 +289,18 @@ export const SHELF_LIFE_SOURCE_LABEL: Record<ShelfLifeSource, string> = {
   category: "Estimated",
   fallback: "Guessed",
 };
+
+/**
+ * The provenance line, built in exactly one place.
+ *
+ * It was assembled twice — CONFIDENCE_LABEL in the scan result, a duplicated
+ * inline ternary in the pantry card. They agreed by coincidence, which is
+ * how the diet term lists started too.
+ */
+export function formatProvenance(estimate: Pick<ShelfLifeEstimate, "confidence" | "citation" | "sourceCaveat">): string {
+  const base = `${CONFIDENCE_LABEL[estimate.confidence]} · ${estimate.citation}`;
+  return estimate.sourceCaveat ? `${base} — ${estimate.sourceCaveat}` : base;
+}
 
 export const CONFIDENCE_LABEL: Record<Confidence, string> = {
   high: "Sourced",
