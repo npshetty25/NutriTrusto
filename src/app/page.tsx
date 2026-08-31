@@ -98,6 +98,7 @@ import { positiveFindingClasses } from "@/lib/colour-semantics";
 import { deriveRiskLevel, riskLabelForDays } from "@/lib/risk-bands";
 import { detectAllergens } from "@/lib/allergens";
 import { PantryCard, RiskLevel } from "@/components/pantry-card";
+import { StoragePanel } from "@/components/storage-panel";
 import { ProfileDropdown } from "@/components/profile-dropdown";
 import BarcodeScanner from "@/components/barcode-scanner";
 import NutritionLabelScanner from "@/components/nutrition-label-scanner";
@@ -2036,6 +2037,10 @@ if (nutritionFieldsFilled < 2) {
               // Same resolver the estimate came from, so the card's provenance
               // line always matches the number beside it.
               const shelfEstimate = estimateShelfLife(item.name);
+              // The row's own assumed storage, so the "if stored differently"
+              // panel can highlight where this item is actually assumed to
+              // live rather than showing three equally-weighted options.
+              const shelfRow = findShelfLifeRow(item.name)?.row;
 
               return (
                 <PantryCard
@@ -2054,6 +2059,8 @@ if (nutritionFieldsFilled < 2) {
                   shelfLifeCitation={formatProvenance(shelfEstimate)}
                   shelfLifeConfidence={shelfEstimate.confidence}
                   storageDisclaimer={shelfEstimate.disclaimer}
+                  ifStoredDifferently={shelfEstimate.ifStoredDifferently}
+                  currentStorage={shelfRow?.storage}
                   healthierAlternative={healthierAlternative}
                   detectedAllergens={detectedAllergens}
                   actions={
@@ -2273,6 +2280,7 @@ if (nutritionFieldsFilled < 2) {
                     // that number came from, instead of promising a flat 30.
                     (() => {
                       const est = estimateShelfLife(scannedResult.name);
+                      const scanRow = findShelfLifeRow(scannedResult.name)?.row;
                       return (
                         <>
                           <span className="text-lg font-black">{days(est.days)} left</span>
@@ -2282,9 +2290,13 @@ if (nutritionFieldsFilled < 2) {
                           <span className="text-[10px] text-foreground/45 mt-1">
                             {formatProvenance(est)}
                           </span>
-                          {est.disclaimer && (
-                            <span className="text-[10px] text-foreground/40 mt-0.5">{est.disclaimer}</span>
-                          )}
+                          {/* Second of the two surfaces this renders on — the
+                              other is the pantry card. Same component, so
+                              the two can't drift the way the provenance
+                              string once did. */}
+                          <div className="w-full">
+                            <StoragePanel data={est.ifStoredDifferently} currentStorage={scanRow?.storage} />
+                          </div>
                         </>
                       );
                     })()

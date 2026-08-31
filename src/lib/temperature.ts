@@ -51,6 +51,21 @@ export const STORAGE_LABEL: Record<StorageLocation, string> = {
 /** Shown wherever an adjusted number is displayed. */
 export const STORAGE_DISCLAIMER = "Estimates based on typical Indian storage conditions";
 
+/**
+ * Widest temperature gap the model may be extrapolated across.
+ *
+ * Q10 and Arrhenius are empirical fits over modest ranges. Stretched from a
+ * 29 C counter to a 7 C fridge — a 22 C span — Q10 = 3 returns a factor of
+ * about 11, which is how a potato came out at 314 days in the fridge. No
+ * one would defend that number, and the research this is built on says
+ * plainly that neither model should be extrapolated far outside its fitted
+ * range.
+ *
+ * Beyond this span the honest answer is that we do not know, not a number
+ * with three significant figures.
+ */
+export const MAX_EXTRAPOLATION_SPAN_C = 12;
+
 export interface AdjustOptions {
   /** Published activation energy, kJ/mol. Omit to use the Q10 fallback. */
   eaKJ?: number;

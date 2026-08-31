@@ -11,6 +11,7 @@ import {
   STORAGE_DISCLAIMER,
   STORAGE_LABEL,
   adjustDays,
+  MAX_EXTRAPOLATION_SPAN_C,
   type StorageLocation,
 } from "@/lib/temperature";
 
@@ -160,7 +161,11 @@ const storedElsewhere = (
   fromC: number,
   row?: StoredElsewhereRow
 ): { fridge: number | null; counter: number; freezer: number | null; suppressedReason?: string } => {
-  const counter = Math.max(0, Math.round(adjustDays(days, fromC, ASSUMED_STORAGE_C.counter, row) * 10) / 10);
+  const counterSpanOk =
+    !!row?.eaKJ || Math.abs(fromC - ASSUMED_STORAGE_C.counter) <= MAX_EXTRAPOLATION_SPAN_C;
+  const counter = counterSpanOk
+    ? Math.max(0, Math.round(adjustDays(days, fromC, ASSUMED_STORAGE_C.counter, row) * 10) / 10)
+    : days;
 
   const chilling = row?.chilling_sensitive;
   if (chilling) {
@@ -179,6 +184,21 @@ const storedElsewhere = (
   // Non-microbial failure (bread staling) is not described by either model.
   if (row?.degradation_mode) {
     return { fridge: null, counter, freezer: null, suppressedReason: "stales fastest just above freezing" };
+  }
+
+  // Even with no chilling risk, a 29 °C → 7 °C conversion is a 22 °C
+  // extrapolation. Sourcing the real thresholds exposed this: potato's
+  // lowest safe temperature is 3 °C, below our 7 °C fridge, so the chilling
+  // guard correctly lets it through — and Q10 then returned 314 days.
+  //
+  // The cap applies to the generic Q10 = 3 fallback, which is fitted to
+  // nothing in particular. A row with a PUBLISHED activation energy was
+  // fitted across a real temperature range (milk's, for instance, over
+  // 4–50 °C), so it may be carried further. That distinction is the whole
+  // reason to prefer a measured Ea over a rule of thumb.
+  const usingGenericFallback = !row?.eaKJ;
+  if (usingGenericFallback && Math.abs(fromC - ASSUMED_STORAGE_C.fridge) > MAX_EXTRAPOLATION_SPAN_C) {
+    return { fridge: null, counter, freezer: null, suppressedReason: "too far outside the model's range to estimate" };
   }
 
   return {

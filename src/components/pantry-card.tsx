@@ -8,6 +8,7 @@ import { ALLERGEN_LABELS, type AllergenTag } from "@/lib/allergens";
 import { VegMark } from "@/components/veg-mark";
 import type { ItemDietType } from "@/lib/diet";
 import { dietChipClasses } from "@/lib/colour-semantics";
+import { StoragePanel, type IfStoredDifferently } from "@/components/storage-panel";
 
 export type RiskLevel = "high" | "medium" | "low";
 
@@ -49,6 +50,15 @@ interface PantryCardProps {
   shelfLifeConfidence?: "high" | "medium" | "low";
   /** "Estimates based on typical Indian storage conditions". */
   storageDisclaimer?: string;
+  /**
+   * What this item would keep for in the fridge / on the shelf / in the
+   * freezer. The engine has computed this since the shelf-life hardening
+   * pass; until now nothing rendered it — the largest gap between what the
+   * app can do and what it does.
+   */
+  ifStoredDifferently?: IfStoredDifferently;
+  /** Where this item is actually assumed to be kept, to highlight that column. */
+  currentStorage?: "fridge" | "counter" | "freezer";
   // Rendered in the card's own footer. These used to be free-floating
   // buttons absolutely positioned over the card by the dashboard, which
   // meant they overlapped whatever the card happened to render last.
@@ -78,7 +88,7 @@ const formatDayMonth = (iso: string) => {
   return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short" });
 };
 
-export function PantryCard({ name, daysLeft, risk, purchaseDate, healthScore, dietMatch = true, dietLabel, itemDiet = "veg", dietUnverified = false, riskLabel, shelfLifeCitation, shelfLifeConfidence, storageDisclaimer, detectedAllergens, healthierAlternative, actions }: PantryCardProps) {
+export function PantryCard({ name, daysLeft, risk, purchaseDate, healthScore, dietMatch = true, dietLabel, itemDiet = "veg", dietUnverified = false, riskLabel, shelfLifeCitation, shelfLifeConfidence, storageDisclaimer, ifStoredDifferently, currentStorage, detectedAllergens, healthierAlternative, actions }: PantryCardProps) {
   const score = healthScore != null ? Number.parseFloat(healthScore) : NaN;
   const hasScore = Number.isFinite(score);
   // Same thresholds the nutrition trend chart uses, so one score reads the
@@ -195,13 +205,29 @@ export function PantryCard({ name, daysLeft, risk, purchaseDate, healthScore, di
             "unknown" instead of "safe". */}
         {shelfLifeCitation && (
           <div className="mt-2 pt-2 border-t border-border/50">
-            <p className="text-[10px] leading-relaxed text-foreground/50">
+            {/* Low confidence gets a dashed underline rather than a colour —
+                the same "guess, not a label" convention VegMark uses for an
+                unverified diet reading, so the two don't invent two visual
+                languages for the same idea. */}
+            <p
+              className={`text-[10px] leading-relaxed text-foreground/50 ${
+                shelfLifeConfidence === "low" ? "underline decoration-dashed decoration-foreground/30 underline-offset-2" : ""
+              }`}
+            >
               {shelfLifeCitation}
             </p>
-            {storageDisclaimer && (
-              <p className="text-[10px] leading-relaxed text-foreground/40 mt-0.5">{storageDisclaimer}</p>
-            )}
           </div>
+        )}
+
+        {/* The disclaimer used to render bare here as a second paragraph.
+            StoragePanel carries it now, alongside the numbers it actually
+            describes, so it reads as "here's what these figures assume"
+            rather than a stray legal line. */}
+        {ifStoredDifferently && <StoragePanel data={ifStoredDifferently} currentStorage={currentStorage} />}
+        {!ifStoredDifferently && storageDisclaimer && (
+          <p className="mt-2 pt-2 border-t border-border/50 text-[10px] leading-relaxed text-foreground/40">
+            {storageDisclaimer}
+          </p>
         )}
 
         {daysLeft === 0 && (

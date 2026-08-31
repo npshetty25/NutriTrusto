@@ -151,17 +151,51 @@ describe("chilling injury — colder must never look longer", () => {
     }
   );
 
-  it("suppresses fridge advice entirely while the threshold is unsourced", () => {
-    for (const row of chillingRows.filter((r) => r.chilling_sensitive!.min_safe_temp_c === null)) {
-      const e = estimateShelfLife(row.keys[0]);
-      expect(e.ifStoredDifferently.fridge).toBeNull();
-      expect(e.ifStoredDifferently.suppressedReason).toBeTruthy();
+  it("every chilling threshold is now sourced to Handbook 66", () => {
+    for (const row of chillingRows) {
+      const c = row.chilling_sensitive!;
+      expect(c.min_safe_temp_c).not.toBeNull();
+      expect(c.source).toMatch(/Handbook 66/);
+      expect(c.confidence).toBe("high");
     }
   });
 
-  it("banana specifically no longer claims weeks in the fridge", () => {
+  it("gives a reason whenever the fridge figure is withheld or capped", () => {
+    for (const row of chillingRows) {
+      const e = estimateShelfLife(row.keys[0]);
+      const { fridge, counter, suppressedReason } = e.ifStoredDifferently;
+      // Either we decline, or we cap at ambient — never an extension.
+      if (fridge === null || fridge <= counter) {
+        expect(suppressedReason).toBeTruthy();
+      }
+    }
+  });
+
+  it("banana no longer claims weeks in the fridge", () => {
+    // 56.1 days before the guard. Its threshold is 13 °C (AH-66) and our
+    // fridge is 7 °C, so refrigeration is capped at the ambient figure and
+    // the injury is named rather than a longer life implied.
     const e = estimateShelfLife("Banana");
+    const { fridge, counter, suppressedReason } = e.ifStoredDifferently;
+    expect(fridge).not.toBeNull();
+    expect(fridge!).toBeLessThanOrEqual(counter);
+    expect(suppressedReason).toMatch(/dull colour/i);
+  });
+
+  it("potato is not saved by the chilling guard alone", () => {
+    // Its threshold is 3 °C, BELOW our 7 °C fridge, so the chilling guard
+    // correctly lets it through. Q10 then returned 314 days. The
+    // extrapolation cap is what stops it.
+    const e = estimateShelfLife("Potato");
     expect(e.ifStoredDifferently.fridge).toBeNull();
+    expect(e.ifStoredDifferently.suppressedReason).toMatch(/outside the model/i);
+  });
+
+  it("a published Ea may be carried further than the generic Q10 fallback", () => {
+    // Milk's Ea was fitted across a real range, so its counter figure is
+    // allowed; potato is on the rule-of-thumb fallback and is not.
+    expect(estimateShelfLife("Milk").ifStoredDifferently.fridge).not.toBeNull();
+    expect(estimateShelfLife("Potato").ifStoredDifferently.fridge).toBeNull();
   });
 });
 
