@@ -31,25 +31,38 @@ whole temperature model rests on.
 **On close:** replace `eaKJ`, remove `source_caveat`, raise `confidence`,
 bump `DATA_VERSION`, record old → new in `CHANGELOG.md`.
 
-## 2. Chilling-injury thresholds — 14 rows, all unsourced
+## 2. Chilling-injury thresholds — CLOSED
 
-The mechanism is not in dispute; the temperatures are. Every row below has
-`chilling_sensitive.min_safe_temp_c: null`, and the app **declines to give
-fridge or freezer advice** for them until a threshold is sourced.
+Sourced to **USDA Agriculture Handbook 66, Table 1** ("Fresh produce
+susceptible to chilling injury when stored at low but nonfreezing
+temperatures"), fetched and extracted directly rather than cited from memory.
+All 14 rows now carry `min_safe_temp_c`, `confidence: "high"`.
 
-Rows: banana, tomato, mango, potato, brinjal, bhindi/okra, cucumber, orange,
-lemon, sweet potato, ginger, pumpkin, papaya, guava.
+Where the handbook gives a range, the **higher** figure is used — injury may
+occur below it, so the higher end is the conservative choice:
 
-**Search:** `chilling injury threshold temperature <commodity> postharvest storage`
+| Commodity | Threshold | Injury (Handbook 66) |
+|---|---|---|
+| Banana | 13 °C | Dull colour when ripened |
+| Tomato (ripe) | 10 °C | Water soaking and softening, decay |
+| Mango | 13 °C | Greyish scald-like discolouration, uneven ripening |
+| Potato | 3 °C | Mahogany browning, cold-induced sweetening |
+| Brinjal (Eggplant) | 7 °C | Surface scald, alternaria rot, blackened seeds |
+| Bhindi (Okra) | 7 °C | Discolouration, water-soaked areas, pitting, decay |
+| Cucumber | 7 °C | Pitting, water-soaked spots, decay |
+| Orange | 3 °C | Pitting, brown stain |
+| Lemon | 13 °C | Pitting, membranous staining, red blotch |
+| Sweet potato | 13 °C | Decay, pitting, internal discolouration, hardcore |
+| Ginger | 7 °C | Softening, tissue breakdown, decay |
+| Pumpkin | 10 °C | Decay, especially alternaria rot |
+| Papaya | 7 °C | Pitting, failure to ripen, off flavours, decay |
+| Guava | 4.5 °C | Pulp injury, decay |
 
-**Starting points — verify before quoting, do not cite from memory:**
-- USDA Agriculture Handbook 66, *The Commercial Storage of Fruits,
-  Vegetables, and Florist and Nursery Stocks* — has chilling-injury tables.
-- FAO postharvest handling guidance.
-
-**On close:** set `min_safe_temp_c`, replace `source: "TODO"`, set a real
-confidence. The engine then compares it against the 7 °C fridge assumption
-automatically; no code change needed.
+**Consequence found while closing this item, not before:** potato's
+threshold (3 °C) is *below* our 7 °C fridge assumption, so the chilling
+guard correctly allows a fridge estimate through — and the generic Q10 = 3
+fallback then returned **314 days**, an 11× extrapolation across a 22 °C
+span neither model is fitted to defend. See §7 below.
 
 ## 3. Bread staling rate — currently an unsourced household figure
 
@@ -100,3 +113,17 @@ unverified journal.
 **On close:** if no sound source is found, consider removing `eaKJ` entirely
 and letting the row fall back to Q10 = 3, which is more conservative than an
 Ea we cannot stand behind.
+
+## 7. Extrapolation cap — no citation needed, recorded for completeness
+
+Not an open item, but worth recording alongside the others: `temperature.ts`
+now defines `MAX_EXTRAPOLATION_SPAN_C = 12`. A row on the generic Q10 = 3
+fallback is not converted across a wider gap than this — the honest answer
+beyond it is "we don't know," not a number with three significant figures.
+A row with a **published** activation energy (milk, chicken, fish, mutton)
+is exempt, since a measured Ea is fitted across a real experimental range and
+a rule of thumb is not.
+
+This is a modelling decision, not a fact requiring a citation, but it exists
+specifically because the potato case (item 2) proved the rule of thumb alone
+was not enough.

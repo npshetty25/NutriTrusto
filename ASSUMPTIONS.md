@@ -114,11 +114,20 @@ Weak provenance is recorded rather than laundered:
   chicken breast fillets*. Stated as a proxy, with an extrapolation warning.
 - **Fish Ea (100 kJ/mol)** — a working value across a 49–154 kJ/mol range
   spanning species whose spoilage flora differ.
-- **Chilling-injury thresholds** — the mechanism is not in dispute, the
-  temperatures are unsourced. All 14 rows carry `min_safe_temp_c: null` and
-  the app **declines to give fridge advice** for them rather than guessing.
+- **Chilling-injury thresholds** — sourced to **USDA Agriculture Handbook 66,
+  Table 1**. All 14 rows carry a real `min_safe_temp_c` at `confidence:
+  "high"`. Where the handbook gives a range, the higher figure is used, since
+  injury may occur below it.
 
-See `CITATIONS_NEEDED.md` for the open items and the exact searches to run.
+Sourcing these exposed a second gap the `null` placeholders had been
+protecting against: potato's threshold (3 °C) sits *below* our 7 °C fridge
+assumption, so the chilling guard correctly lets a fridge estimate through —
+and the generic Q10 = 3 fallback then returned 314 days, an 11× stretch
+neither model is fitted to defend. `temperature.ts` now caps how far the
+generic fallback may be extrapolated (`MAX_EXTRAPOLATION_SPAN_C = 12`,
+exempting rows with a published Ea, which are fitted across a real range).
+
+See `CITATIONS_NEEDED.md` for what remains open and the exact searches to run.
 
 ## 8. Data layer: typed modules, remote config deferred
 
