@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { AuthProvider } from "@/context/auth-context";
 import { AppToaster } from "@/components/app-toaster";
-import { SiteFooter } from "@/components/site-footer";
 import { THEME_INIT_SCRIPT } from "@/lib/theme";
 import "./globals.css";
 
@@ -146,7 +145,6 @@ export default function RootLayout({
         <AuthProvider>
           <main className="flex-1 w-full max-w-md mx-auto min-h-screen relative flex flex-col">
             {children}
-            <SiteFooter />
             <AppToaster />
           </main>
         </AuthProvider>

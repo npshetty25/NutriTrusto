@@ -108,7 +108,7 @@ import { RestockSuggestions } from "@/components/restock-suggestions";
 import { RecipeModal, type GeneratedRecipe } from "@/components/recipe-modal";
 import {
   Camera, BrainCircuit, Loader2, TrendingUp, ScanLine,
-  Clock, X, Trash2, Info, Activity, Zap, AlertTriangle, CheckCircle2, Search, CircleAlert, Bell, Carrot, Apple, Milk, Drumstick, Wheat, CupSoda, Croissant, Snowflake, Candy, Package, ChevronLeft, ChevronRight, CalendarClock, Pencil, Sparkles, RefreshCw, SlidersHorizontal, Leaf, UtensilsCrossed, Check, Egg as EggIcon
+  Clock, X, Trash2, Info, Activity, Zap, AlertTriangle, CheckCircle2, Search, CircleAlert, Bell, Carrot, Apple, Milk, Drumstick, Wheat, CupSoda, Croissant, Snowflake, Candy, Package, ChevronLeft, ChevronRight, CalendarClock, Pencil, Sparkles, RefreshCw, SlidersHorizontal, Leaf, UtensilsCrossed, Check, Egg as EggIcon, Images, FileText
 } from "lucide-react";
 import ShoppingListModal from "@/components/shopping-list-modal";
 import { CountUp } from "@/components/count-up";
@@ -1493,8 +1493,17 @@ if (nutritionFieldsFilled < 2) {
           transition={{ type: "spring", stiffness: 300, damping: 26 }}
           className="flex justify-between items-center mb-8"
         >
-          <div className="flex items-center gap-2">
-            <motion.div whileHover={{ rotate: [0, -12, 12, 0], scale: 1.1 }} transition={{ duration: 0.5 }}>
+          {/* min-w-0 has to live on the flex CHILD, not two levels deep on a
+              grandchild — a nested min-w-0 zeroes out that branch's own
+              min-content contribution, but the outer container here had no
+              override, so its default min-width:auto still floored it at
+              its full intrinsic size. Measured: the greeting block was
+              never actually shrinking, and the header row ran 78px wider
+              than the viewport on a 390px phone — the "gap on the right"
+              was that unreachable strip, revealed once the page could
+              scroll past its own content. */}
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <motion.div whileHover={{ rotate: [0, -12, 12, 0], scale: 1.1 }} transition={{ duration: 0.5 }} className="shrink-0">
               <Image
                 src="/logo.svg"
                 alt="Nutri-Trust logo"
@@ -1503,7 +1512,7 @@ if (nutritionFieldsFilled < 2) {
                 className="w-6 h-6 rounded-md object-contain"
               />
             </motion.div>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <h1 className="text-xl font-bold tracking-tight leading-none">Nutri-Trust</h1>
               {/* A greeting and one plain sentence. The header was a logo and
                   two icons: it identified the app but told the user nothing,
@@ -1513,7 +1522,7 @@ if (nutritionFieldsFilled < 2) {
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             <motion.button
               title="Open notifications"
               aria-label="Open notifications"
@@ -2157,9 +2166,18 @@ if (nutritionFieldsFilled < 2) {
         )}
       </section>
 
-      <input type="file" accept="image/*" ref={cameraInputRef} onChange={handleFileUpload} className="hidden" title="Upload receipt photo" />
-      <input type="file" accept="image/*,.pdf,application/pdf" ref={galleryInputRef} onChange={handleFileUpload} className="hidden" title="Upload receipt from gallery" />
-      <input type="file" accept=".pdf,application/pdf,image/*" ref={invoiceInputRef} onChange={handleFileUpload} className="hidden" title="Upload invoice file" />
+      {/* capture="environment" is the whole fix for "Take Photo opens the
+          picker instead of the camera": without it, a plain <input
+          type="file" accept="image/*"> is indistinguishable from the
+          Gallery input below, so mobile browsers show the exact same
+          chooser for both — which is also why Gallery looked like it was
+          "asking for camera": that chooser's first option often IS the
+          camera, since nothing told the OS this button meant gallery-only.
+          Gallery and Invoice intentionally have no capture attribute, so
+          they open the normal file/photo picker rather than the camera. */}
+      <input type="file" accept="image/*" capture="environment" ref={cameraInputRef} onChange={handleFileUpload} className="hidden" title="Take a photo of the receipt" />
+      <input type="file" accept="image/*,.pdf,application/pdf" ref={galleryInputRef} onChange={handleFileUpload} className="hidden" title="Choose a receipt photo from your gallery" />
+      <input type="file" accept=".pdf,application/pdf,image/*" ref={invoiceInputRef} onChange={handleFileUpload} className="hidden" title="Choose an invoice or PDF file" />
 
       {/* Bottom Nav Bar — capped to the same 448px column as the content it
           belongs to. left-3/right-3 stretched it to the full viewport on
@@ -2169,34 +2187,46 @@ if (nutritionFieldsFilled < 2) {
         {/* Receipt Action Menu */}
         {showReceiptMenu && (
           <div className="neu-panel mb-4 rounded-2xl p-2 flex flex-col gap-2 w-full max-w-xs animate-in slide-in-from-bottom-2 fade-in duration-200">
-            <button 
+            <button
               onClick={() => cameraInputRef.current?.click()}
-              className="flex items-center gap-3 p-3 rounded-xl hover:bg-foreground/5 text-foreground font-semibold text-sm transition-colors"
+              className="flex items-center gap-3 p-3 rounded-xl hover:bg-foreground/5 text-foreground text-left transition-colors"
             >
               <div className="w-9 h-9 rounded-xl neu-raised-sm text-foreground/70 flex items-center justify-center shrink-0">
                 <Camera size={16} />
               </div>
-              Take Photo
+              <div>
+                <p className="font-semibold text-sm leading-tight">Take Photo</p>
+                <p className="text-[11px] text-foreground/50 leading-tight mt-0.5">Opens your camera</p>
+              </div>
             </button>
             <div className="h-px w-full bg-border" />
-            <button 
+            <button
               onClick={() => galleryInputRef.current?.click()}
-              className="flex items-center gap-3 p-3 rounded-xl hover:bg-foreground/5 text-foreground font-semibold text-sm transition-colors"
+              className="flex items-center gap-3 p-3 rounded-xl hover:bg-foreground/5 text-foreground text-left transition-colors"
             >
               <div className="w-9 h-9 rounded-xl neu-raised-sm text-foreground/70 flex items-center justify-center shrink-0">
-                <Search size={16} />
+                <Images size={16} />
               </div>
-              Upload Gallery
+              <div>
+                <p className="font-semibold text-sm leading-tight">Choose from Gallery</p>
+                <p className="text-[11px] text-foreground/50 leading-tight mt-0.5">Pick an existing photo</p>
+              </div>
             </button>
             <div className="h-px w-full bg-border" />
             <button
               onClick={() => invoiceInputRef.current?.click()}
-              className="flex items-center gap-3 p-3 rounded-xl hover:bg-foreground/5 text-foreground font-semibold text-sm transition-colors"
+              className="flex items-center gap-3 p-3 rounded-xl hover:bg-foreground/5 text-foreground text-left transition-colors"
             >
               <div className="w-9 h-9 rounded-xl neu-raised-sm text-foreground/70 flex items-center justify-center shrink-0">
-                <Info size={16} />
+                <FileText size={16} />
               </div>
-              Upload Invoice / PDF
+              <div>
+                {/* Reads either a photographed printed bill or a soft-copy
+                    PDF invoice — same Gemini extraction either way, so the
+                    label says so rather than leaving it to guesswork. */}
+                <p className="font-semibold text-sm leading-tight">Invoice or PDF</p>
+                <p className="text-[11px] text-foreground/50 leading-tight mt-0.5">Reads a photo of a bill or a PDF file</p>
+              </div>
             </button>
           </div>
         )}
@@ -2319,7 +2349,7 @@ if (nutritionFieldsFilled < 2) {
                     <span className="text-sm font-semibold text-foreground/60">/ 5.0</span>
                   </div>
                 </div>
-                <div className={`px-4 py-2 rounded-xl border flex flex-col items-center justify-center min-w[80px] ${
+                <div className={`px-4 py-2 rounded-xl border flex flex-col items-center justify-center min-w-20 ${
                   parseFloat(scannedResult.analysis.health_score) >= 4 ? "bg-safe/10 border-safe/20 text-safe-strong" :
                   parseFloat(scannedResult.analysis.health_score) >= 2.5 ? "bg-yellow-500/10 border-yellow-500/20 text-yellow-600 dark:text-yellow-400" :
                   "bg-danger/10 border-danger/20 text-danger"
