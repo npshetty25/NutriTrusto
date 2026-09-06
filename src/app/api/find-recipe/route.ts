@@ -282,12 +282,17 @@ Your previous attempt included ${lastViolations.join(", ")}, which breaks the "$
       .filter((name: string) => RAW_PROTEIN_TERMS.some((t) => matchesTerm(name.toLowerCase(), t)));
 
     if (rawProteins.length > 0) {
-      const named =
-        rawProteins.length === 1
-          ? rawProteins[0]
-          : `${rawProteins.slice(0, -1).join(", ")} and ${rawProteins[rawProteins.length - 1]}`;
+      const one = rawProteins.length === 1;
+      const named = one
+        ? rawProteins[0]
+        : `${rawProteins.slice(0, -1).join(", ")} and ${rawProteins[rawProteins.length - 1]}`;
+      // Agreement matters here: the first live run produced "check the
+      // Chicken Breast and Eggs is cooked", which reads like a bug and
+      // undermines a line whose whole job is to be taken seriously.
       steps.push(
-        `Before serving, check the ${named} is cooked all the way through. If you are not sure it is done, give it longer.`
+        one
+          ? `Before serving, check the ${named} is cooked all the way through. If you are not sure it is done, give it longer.`
+          : `Before serving, check the ${named} are cooked all the way through. If you are not sure they are done, give them longer.`
       );
     }
 
