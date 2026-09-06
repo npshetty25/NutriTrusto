@@ -156,3 +156,55 @@ oversight.** Until then, updating a value is a code change with a
   kitchen. One national baseline is an average.
 - **Shelf life as a distribution.** The true spoilage time is a spread;
   a single day count is our summary of it.
+
+## 10. Provenance is never stored, only recomputed
+
+A pantry card once showed a provenance line for Chicken that did not match
+what the code produced at the time. The suspicion was that provenance had been
+snapshotted onto the item row when it was created, so edits to
+`shelf-life-data.ts` would not reach items already in the pantry.
+
+**It is not stored, and there is nowhere for it to be stored.** Every column
+`pantry_items` has ever had:
+
+| Column | Added in |
+|---|---|
+| `user_id`, `name`, `days_left`, `risk`, `purchase_date` | `db/supabase-schema.sql` |
+| `household_id` | `db/supabase-schema-additions.sql:152` |
+| `ingredients_text` | `db/supabase-schema-additions.sql:239` |
+| `health_score` | `db/supabase-schema-additions.sql:338` |
+
+No `source`, `citation`, `confidence` or `provenance` column exists. (The two
+`source` identifiers in the schema are unrelated: `source_recipe` on the
+shopping list, and `source in ('barcode','receipt','manual')` on scan
+history.) All three insert paths — `page.tsx` on scan-add, `page.tsx` on
+undo-delete, and `scan-history-modal.tsx` on re-add — write only the columns
+above.
+
+Provenance is assembled at render time by `formatProvenance()` from whatever
+`findShelfLifeRow(name)` returns *now*. Editing a row in
+`shelf-life-data.ts` therefore changes every existing pantry item
+immediately. This was confirmed independently: a Milk caveat added several
+sessions after that item was created rendered in full on the existing card.
+
+**What actually explains a stale reading: the app-shell cache.**
+`public/sw.js` keys its cache on `CACHE_VERSION`, which has been `"v3"` since
+commit `277616e` and is not bumped per deploy. Its `activate` handler evicts
+only caches whose key differs from the current `CACHE_NAME` — and that name
+never changes — so hashed chunks from *every* build since then accumulate in
+one cache and are never evicted. Separately, the document fetch is
+network-first with `.catch(() => caches.match(request))`. So on any failed or
+flaky network request for the HTML, the browser is served the last cached
+document, whose hashed chunk URLs are all still resident. The result is a
+complete, internally consistent *older build* rendering with no error shown.
+
+That is a mechanism sufficient to produce the observation; it is not proof of
+what happened on that particular day, and no third explanation has been
+invented to cover the gap. The snapshotting hypothesis is disproved either
+way, since the store it requires does not exist.
+
+**This is a real defect and it is still present.** The fix is to include the
+build id in `CACHE_NAME` so each deploy starts a fresh cache and the eviction
+in `activate` does its job. Left open deliberately — it changes caching
+behaviour for every user and belongs in its own reviewed change, not folded
+into a data-provenance investigation.
