@@ -97,6 +97,12 @@ export const viewport: Viewport = {
 // guarded on there having been a controller already, because clients.claim()
 // fires the same event on a first-ever install, where a reload would be a
 // pointless flash on someone's first visit.
+// The build id rides in on the registration URL. public/sw.js is a static
+// file served verbatim, so it cannot be templated at build time — but the
+// script URL is part of the worker's identity, so a new id both names the new
+// cache and makes the browser treat this as a new worker to install.
+const BUILD_ID = process.env.NEXT_PUBLIC_BUILD_ID || "dev";
+
 const SW_REGISTER_SCRIPT = `if ('serviceWorker' in navigator) {
   window.addEventListener('load', function () {
     var hadController = !!navigator.serviceWorker.controller;
@@ -106,7 +112,7 @@ const SW_REGISTER_SCRIPT = `if ('serviceWorker' in navigator) {
       refreshing = true;
       window.location.reload();
     });
-    navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' }).then(function (reg) {
+    navigator.serviceWorker.register('/sw.js?v=${BUILD_ID}', { updateViaCache: 'none' }).then(function (reg) {
       reg.update();
       if (reg.waiting) reg.waiting.postMessage('SKIP_WAITING');
       reg.addEventListener('updatefound', function () {

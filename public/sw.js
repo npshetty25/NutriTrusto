@@ -10,7 +10,25 @@
 // seeing the old build, and the deploy looks like it failed. skipWaiting
 // plus clients.claim plus the reload handler in layout.tsx removes that
 // window entirely.
-const CACHE_VERSION = "v3";
+// Cache identity, and the reason this is not a hand-bumped constant.
+//
+// It was `"v3"`, and had been since the file was last touched. `activate`
+// only deletes caches whose key differs from the CURRENT name, so a name that
+// never changes means nothing is ever evicted: hashed chunks from every build
+// since accumulated in one cache. On their own those are harmless, because
+// fresh HTML asks for fresh URLs — but the document fetch below falls back to
+// `caches.match(request)` when the network fails, and that returns the last
+// cached HTML, whose chunk URLs were all still resident. One flaky request
+// served a complete, internally consistent OLDER BUILD with no error shown.
+// That is the most likely explanation for a provenance string that read stale
+// while the code produced the correct one (see ASSUMPTIONS.md §10).
+//
+// A hand-bumped constant fails the same way the moment someone forgets, so
+// the version comes from the build instead: layout.tsx registers this file as
+// `/sw.js?v=<build id>`, and the id is read back off our own URL here.
+// Deploy changes the id, the id changes the cache name, and `activate` then
+// evicts every older cache — including the stranded `nutri-trust-shell-v3`.
+const CACHE_VERSION = new URL(self.location.href).searchParams.get("v") || "dev";
 const CACHE_NAME = `nutri-trust-shell-${CACHE_VERSION}`;
 const SHELL_ASSETS = ["/", "/logo.svg"];
 
