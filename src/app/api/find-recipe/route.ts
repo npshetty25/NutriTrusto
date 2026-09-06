@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { createRequestContext } from "@/lib/server-logger";
 import { findDietViolations, normalizeDiet } from "@/lib/diet-check";
+import { ANIMAL_TERMS } from "@/lib/diet";
+import { matchesTerm } from "@/lib/text-match";
 import { getRequestUser, unauthorized } from "@/lib/api-auth";
 import { checkRateLimit, rateLimited } from "@/lib/rate-limit";
 
@@ -19,6 +21,24 @@ interface PantryItem {
   daysPastEstimate?: number;
   risk?: string;
 }
+
+/**
+ * Animal-derived terms that are not something a cook brings to doneness —
+ * they arrive already rendered or processed, so a "cook it through" line
+ * against them would be nonsense.
+ */
+const NOT_COOKED_THROUGH = new Set(["gelatin", "gelatine", "lard"]);
+
+/**
+ * Flesh and egg: the pantry items whose under-cooking is the actual hazard.
+ * Derived from ANIMAL_TERMS rather than re-typed, so a fish added there for
+ * the vegetarian check is covered here too and the two lists cannot drift —
+ * the drift that once let a haddock curry pass as vegetarian.
+ */
+const RAW_PROTEIN_TERMS = [
+  ...ANIMAL_TERMS.filter((t) => !NOT_COOKED_THROUGH.has(t)),
+  "egg", "eggs", "anda",
+];
 
 const isOverloaded = (error: unknown) => {
   const status = (error as { status?: number })?.status;
@@ -231,6 +251,34 @@ Your previous attempt included ${lastViolations.join(", ")}, which breaks the "$
       // card can never credit an ingredient the user doesn't own.
       .filter((r: { item: string }) => r.item && knownNames.has(r.item.toLowerCase()));
 
+    // Appended, never validated against what the model wrote. Asking the model
+    // to include a doneness step and then checking whether it did would make
+    // the safety line contingent on the model's cooperation; this way the line
+    // is there because we put it there. Worst case it restates a step the
+    // recipe already has, which is a far cheaper failure than omitting it.
+    //
+    // The wording carries no temperature or time — the app has no source for a
+    // core temperature and will not invent one. It tells the cook what to
+    // check and to keep going if unsure.
+    const steps = (Array.isArray(recipe.steps) ? recipe.steps : []).map(String).filter(Boolean);
+
+    const rawProteins = fromPantry
+      .map((r: { item: string }) => r.item)
+      // matchesTerm, not diet.ts's hasWord: a plain word boundary fails on a
+      // plural, because the trailing "s" is itself a word character. "Prawns"
+      // is how the item is actually named, and \bprawn\b does not match it.
+      .filter((name: string) => RAW_PROTEIN_TERMS.some((t) => matchesTerm(name.toLowerCase(), t)));
+
+    if (rawProteins.length > 0) {
+      const named =
+        rawProteins.length === 1
+          ? rawProteins[0]
+          : `${rawProteins.slice(0, -1).join(", ")} and ${rawProteins[rawProteins.length - 1]}`;
+      steps.push(
+        `Before serving, check the ${named} is cooked all the way through. If you are not sure it is done, give it longer.`
+      );
+    }
+
     const payload = {
       title,
       prepTime: String(recipe.prepTime || "25m"),
@@ -248,7 +296,7 @@ Your previous attempt included ${lastViolations.join(", ")}, which breaks the "$
         })
         .filter((r: { item: string }) => r.item),
       staples: (Array.isArray(recipe.staples) ? recipe.staples : []).map(String).filter(Boolean),
-      steps: (Array.isArray(recipe.steps) ? recipe.steps : []).map(String).filter(Boolean),
+      steps,
       rescueNote: String(recipe.rescueNote || "").trim(),
       baseDish,
       // Searched on the well-known dish rather than the generated title: the
