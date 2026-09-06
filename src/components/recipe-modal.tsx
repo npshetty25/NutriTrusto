@@ -22,6 +22,12 @@ interface RecipeModalProps {
   onClose: () => void;
   onTryAnother: () => void;
   isRegenerating: boolean;
+  /**
+   * Pantry items withheld from the generation for being past our estimate.
+   * Stated rather than silently dropped: without this line, a recipe that
+   * ignored most of the pantry would read as the feature misfiring.
+   */
+  excludedCount?: number;
   onAddMissing?: () => void;
   isAddingToShoppingList?: boolean;
 }
@@ -31,6 +37,7 @@ export function RecipeModal({
   onClose,
   onTryAnother,
   isRegenerating,
+  excludedCount = 0,
   onAddMissing,
   isAddingToShoppingList,
 }: RecipeModalProps) {
@@ -96,6 +103,18 @@ export function RecipeModal({
           </div>
 
           <div className="p-4 space-y-5">
+            {excludedCount > 0 && (
+              // Deliberately not a risk colour. This is not a claim that the
+              // withheld food has gone off — only that we stopped estimating
+              // for it, so the recipe was not allowed to build on it.
+              <p className="text-[12px] leading-relaxed text-foreground/60 bg-foreground/5 border border-border rounded-xl px-3 py-2">
+                {excludedCount === 1 ? "1 item was" : `${excludedCount} items were`} left out of this
+                recipe — {excludedCount === 1 ? "it is" : "they are"} past our estimate.
+                Check {excludedCount === 1 ? "it" : "them"} yourself before using
+                {excludedCount === 1 ? " it" : " them"}.
+              </p>
+            )}
+
             {recipe.fromPantry.length > 0 && (
               <div>
                 <h4 className="text-[10px] font-semibold uppercase tracking-widest text-foreground/45 mb-2">

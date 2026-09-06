@@ -7,19 +7,7 @@ import {
   type DietPreference, type ItemDietType,
 } from "@/lib/diet";
 
-const parsePurchaseDate = (purchaseDate: string) => {
-  const parsed = new Date(purchaseDate);
-  if (!Number.isNaN(parsed.getTime())) return parsed;
-  return new Date();
-};
-
-const calculateCurrentDaysLeft = (initialDaysLeft: number, purchaseDate: string) => {
-  const boughtOn = parsePurchaseDate(purchaseDate);
-  const now = new Date();
-  const msDiff = now.getTime() - boughtOn.getTime();
-  const daysElapsed = Math.max(0, Math.floor(msDiff / (1000 * 60 * 60 * 24)));
-  return Math.max(0, initialDaysLeft - daysElapsed);
-};
+import { calculateCurrentDaysLeft, calculateDaysPastEstimate } from "@/lib/item-age";
 
 // One definition, in lib/risk-bands.ts. This was a byte-identical copy of
 // the rule in api/extract/route.ts — the same duplication that let the
@@ -120,6 +108,11 @@ interface Item {
   id: string;
   name: string;
   daysLeft: number;
+  // How far past our estimate this item already is, in days. 0 means at or
+  // before the estimate. `daysLeft` is clamped at zero and so cannot carry
+  // this. Not displayed — it gates what the recipe generator is allowed to
+  // put in front of the model.
+  daysPastEstimate: number;
   risk: RiskLevel;
   purchaseDate: string;
   // null/undefined = no real ingredient data for this item (demo data,
@@ -187,6 +180,10 @@ export default function Home() {
   const [isUploading, setIsUploading] = useState(false);
   const [isGeneratingRecipe, setIsGeneratingRecipe] = useState(false);
   const [generatedRecipe, setGeneratedRecipe] = useState<GeneratedRecipe | null>(null);
+  // How many pantry items were withheld from the last generation for being
+  // past our estimate. Shown, not swallowed — a recipe that quietly ignores
+  // half the pantry looks like a bug rather than a decision.
+  const [recipeExcludedCount, setRecipeExcludedCount] = useState(0);
   const [showRecipe, setShowRecipe] = useState(false);
   const [isAddingToShoppingList, setIsAddingToShoppingList] = useState(false);
   // Defaults to the account's own preference once it loads (see the effect
@@ -350,6 +347,7 @@ export default function Home() {
             id: row.id,
             name: row.name,
             daysLeft,
+            daysPastEstimate: calculateDaysPastEstimate(row.days_left, row.purchase_date),
             risk: deriveRisk(daysLeft, row.days_left, row.name),
             purchaseDate: row.purchase_date,
             ingredientsText: row.ingredients_text ?? null,
@@ -554,6 +552,7 @@ export default function Home() {
           id: row.id,
           name: row.name,
           daysLeft: calculateCurrentDaysLeft(row.days_left, row.purchase_date),
+          daysPastEstimate: calculateDaysPastEstimate(row.days_left, row.purchase_date),
           risk: deriveRisk(calculateCurrentDaysLeft(row.days_left, row.purchase_date), row.days_left, row.name),
           purchaseDate: row.purchase_date,
           ingredientsText: row.ingredients_text ?? null,
@@ -820,6 +819,7 @@ export default function Home() {
         id: row.id,
         name: row.name,
         daysLeft,
+        daysPastEstimate: calculateDaysPastEstimate(row.days_left, row.purchase_date),
         risk: deriveRisk(daysLeft, row.days_left, row.name),
         purchaseDate: row.purchase_date,
       };
@@ -850,15 +850,39 @@ export default function Home() {
       return;
     }
 
+    // Anything already past our estimate is removed from the payload outright —
+    // not flagged, not moved to a gentler bucket. Whatever reaches the prompt
+    // can reach the recipe, and the recipe is an instruction to eat.
+    const usable = candidates.filter((i) => i.daysPastEstimate === 0);
+    const excludedCount = candidates.length - usable.length;
+
+    if (usable.length === 0) {
+      toast("Nothing to cook with", {
+        description:
+          excludedCount === 1
+            ? "The one item here is past our estimate. Check it yourself before using it."
+            : "Every item here is past our estimate. Check them yourself before using them.",
+      });
+      return;
+    }
+
     setIsGeneratingRecipe(true);
     setInlineError(null);
+    setRecipeExcludedCount(excludedCount);
 
     try {
       const res = await apiFetch("/api/find-recipe", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          items: candidates.map((i) => ({ name: i.name, daysLeft: i.daysLeft, risk: i.risk })),
+          items: usable.map((i) => ({
+            name: i.name,
+            daysLeft: i.daysLeft,
+            // Sent so the route can enforce the same rule itself. The client
+            // is not the trust boundary.
+            daysPastEstimate: i.daysPastEstimate,
+            risk: i.risk,
+          })),
           dietaryPreference: String(user?.user_metadata?.dietary_preference || "none"),
           avoidTitles,
         }),
@@ -875,7 +899,11 @@ export default function Home() {
       const rescued = data.recipe.fromPantry?.length || 0;
       const toBuy = data.recipe.toBuy?.length || 0;
       toast("Recipe ready", {
-        description: `Saves ${rescued} item${rescued === 1 ? "" : "s"}${toBuy > 0 ? ` · ${toBuy} to buy` : " · nothing to buy"}.`,
+        description:
+          `Saves ${rescued} item${rescued === 1 ? "" : "s"}${toBuy > 0 ? ` · ${toBuy} to buy` : " · nothing to buy"}.` +
+          (excludedCount > 0
+            ? ` ${excludedCount} left out — past our estimate.`
+            : ""),
       });
     } catch {
       setInlineError("Couldn't reach the recipe service. Check your connection and try again.");
@@ -992,6 +1020,9 @@ export default function Home() {
               id: `local-${Math.random().toString(36).slice(2, 10)}`,
               name: row.name,
               daysLeft: row.days_left,
+              // Just built from a fresh purchase_date, so it cannot already
+              // be past its own estimate.
+              daysPastEstimate: 0,
               risk: row.risk as RiskLevel,
               purchaseDate: row.purchase_date,
             });
@@ -1003,6 +1034,7 @@ export default function Home() {
                 id: insertedRow.id,
                 name: insertedRow.name,
                 daysLeft,
+                daysPastEstimate: calculateDaysPastEstimate(insertedRow.days_left, insertedRow.purchase_date),
                 risk: deriveRisk(daysLeft, insertedRow.days_left, insertedRow.name),
                 purchaseDate: insertedRow.purchase_date,
               });
@@ -1350,6 +1382,7 @@ if (nutritionFieldsFilled < 2) {
            id: insertedRow.id,
            name: insertedRow.name,
            daysLeft,
+           daysPastEstimate: calculateDaysPastEstimate(insertedRow.days_left, insertedRow.purchase_date),
            risk: deriveRisk(daysLeft),
            purchaseDate: insertedRow.purchase_date,
            ingredientsText: scannedResult.ingredients ?? null,
@@ -1368,6 +1401,7 @@ if (nutritionFieldsFilled < 2) {
                  id: insertedRow.id,
                  name: insertedRow.name,
                  daysLeft,
+                 daysPastEstimate: calculateDaysPastEstimate(insertedRow.days_left, insertedRow.purchase_date),
                  risk: deriveRisk(daysLeft),
                  purchaseDate: insertedRow.purchase_date,
                }),
@@ -2752,6 +2786,7 @@ if (nutritionFieldsFilled < 2) {
           onClose={() => setShowRecipe(false)}
           onTryAnother={tryAnotherRecipe}
           isRegenerating={isGeneratingRecipe}
+          excludedCount={recipeExcludedCount}
           onAddMissing={() => { void addMissingIngredientsToShoppingList(); }}
           isAddingToShoppingList={isAddingToShoppingList}
         />

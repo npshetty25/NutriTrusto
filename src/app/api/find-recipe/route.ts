@@ -11,6 +11,12 @@ const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null;
 interface PantryItem {
   name: string;
   daysLeft: number;
+  /**
+   * Days elapsed beyond the item's estimated shelf life, 0 when still within
+   * it. Sent separately because `daysLeft` is clamped at zero on the client,
+   * which makes "due today" and "a month gone" the same number.
+   */
+  daysPastEstimate?: number;
   risk?: string;
 }
 
@@ -59,15 +65,39 @@ export async function POST(req: Request) {
       avoidTitles?: string[];
     };
 
-    const pantry = (Array.isArray(items) ? items : [])
-      .filter((i) => i && typeof i.name === "string" && i.name.trim())
+    const accepted = (Array.isArray(items) ? items : [])
+      .filter((i) => i && typeof i.name === "string" && i.name.trim());
+
+    // The client already withholds these, but the client is not the trust
+    // boundary — this route is reachable directly with any body. Food that is
+    // past our estimate is dropped from the payload entirely rather than
+    // demoted to a gentler bucket: anything that reaches the prompt can reach
+    // the recipe, and the recipe tells someone to cook and eat it.
+    const withinEstimate = accepted.filter(
+      (i) => (i.daysPastEstimate ?? 0) <= 0 && (i.daysLeft ?? 0) >= 0
+    );
+    // Counted before the slice below, which also removes items — otherwise a
+    // pantry of 20 fresh things would report 8 as "past estimate".
+    const droppedPastEstimate = accepted.length - withinEstimate.length;
+
+    const pantry = withinEstimate
       // Most urgent first — this ordering is the whole point of the feature,
       // and the prompt below leans on it.
       .sort((a, b) => (a.daysLeft ?? 999) - (b.daysLeft ?? 999))
       .slice(0, 12);
 
     if (pantry.length === 0) {
-      return NextResponse.json({ success: false, error: "No pantry items provided" }, { status: 400 });
+      log.info("Every item was past its estimate", { received: accepted.length });
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            accepted.length > 0
+              ? "Everything here is past our estimate. Check these yourself before cooking with them."
+              : "No pantry items provided",
+        },
+        { status: 400 }
+      );
     }
 
     if (!genAI) {
@@ -80,8 +110,18 @@ export async function POST(req: Request) {
     const soon = pantry.filter((i) => (i.daysLeft ?? 999) > 2 && (i.daysLeft ?? 999) <= 5);
     const rest = pantry.filter((i) => (i.daysLeft ?? 999) > 5);
 
+    // A zero here now means "due today" and nothing else — anything genuinely
+    // past its estimate was dropped above. Saying "0 days left" invited the
+    // model to treat it as already gone; naming the inspection is the honest
+    // version and it carries into rule 9.
     const fmt = (list: PantryItem[]) =>
-      list.map((i) => `- ${i.name} (${i.daysLeft} day${i.daysLeft === 1 ? "" : "s"} left)`).join("\n");
+      list
+        .map((i) =>
+          i.daysLeft === 0
+            ? `- ${i.name} (due today — tell the cook to look at it and smell it first)`
+            : `- ${i.name} (${i.daysLeft} day${i.daysLeft === 1 ? "" : "s"} left)`
+        )
+        .join("\n");
 
     const sections = [
       critical.length ? `MUST USE — these spoil first:\n${fmt(critical)}` : "",
@@ -110,6 +150,7 @@ Rules, in order of importance:
 6. Respect the dietary preference absolutely. "Veg" means no meat, no fish, no egg. "Eggtarian" allows egg but no meat or fish. Never break this.
 7. Use Indian measures and names naturally (katori, tsp, tbsp, grams, ml; jeera, haldi, dhania), with the English term in brackets on first use where it isn't obvious.
 8. Name it like a person would, not like a label. Pick the closest real Indian dish and use that name, adding at most ONE distinguishing word. "Palak Paneer Bhurji" is a name; "Dahi-Doodh Paneer-Palak Bread Bhurji" is an ingredient list with hyphens. Never chain more than two ingredients into the title, never use "&", and keep it under five words.
+9. If an item is marked "due today", the FIRST step must tell the cook to look at it and smell it before it goes in, and to leave it out if it seems off. Do not say it has spoiled, gone bad or expired — nobody has checked it yet. Just have them check.
 
 Split the ingredients into three groups so the cook knows what they already
 have and what they must go out and buy:
@@ -223,6 +264,7 @@ Your previous attempt included ${lastViolations.join(", ")}, which breaks the "$
       usesCount: payload.usesItems.length,
       toBuyCount: payload.toBuy.length,
       criticalCount: critical.length,
+      droppedPastEstimate,
       diet,
     });
 
