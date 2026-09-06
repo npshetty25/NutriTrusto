@@ -785,6 +785,21 @@ export default function Home() {
       { name: "Mango Pickle", daysIntoShelfLife: 40 },
     ];
 
+    // Always present, never sampled. These two are the only way to reach the
+    // past-estimate and due-today states, and until now the demo pantry could
+    // produce neither — so the exclusion notice on the recipe, the "past our
+    // estimate" line on the card, and the inspect-first step inside a recipe
+    // were all unreachable without hand-editing a purchase date in the DB.
+    //
+    // Offsets are relative to the item's own sourced shelf life rather than
+    // absolute, for the same reason the pool above is: a figure written here
+    // would drift the moment the table changed. 0 = due today; positive = that
+    // many days past our estimate.
+    const ALWAYS: { name: string; offsetFromEstimate: number }[] = [
+      { name: "Cucumber", offsetFromEstimate: 5 },
+      { name: "Capsicum", offsetFromEstimate: 0 },
+    ];
+
     // Stratified pick so every demo still has something critical to rescue
     // (the recipe card only appears when it does) without being all red.
     const sample = <T,>(pool: T[], n: number) =>
@@ -793,16 +808,23 @@ export default function Home() {
       .concat(sample(CATALOGUE.slice(6, 12), 3))
       .concat(sample(CATALOGUE.slice(12), 4));
 
-    const rows = mockPlan.map((entry) => {
+    const plan: { name: string; daysIntoShelfLife?: number; offsetFromEstimate?: number }[] =
+      [...mockPlan, ...ALWAYS];
+
+    const rows = plan.map((entry) => {
       const shelfLifeDays = estimateShelfLife(entry.name).days;
-      const currentDays = Math.max(0, shelfLifeDays - entry.daysIntoShelfLife);
+      const daysIn =
+        entry.offsetFromEstimate !== undefined
+          ? shelfLifeDays + entry.offsetFromEstimate
+          : entry.daysIntoShelfLife ?? 0;
+      const currentDays = Math.max(0, shelfLifeDays - daysIn);
       return {
         user_id: user.id,
         ...householdIdField(),
         name: entry.name,
         days_left: shelfLifeDays,
         risk: deriveRisk(currentDays, shelfLifeDays, entry.name),
-        purchase_date: getPurchaseDate(entry.daysIntoShelfLife),
+        purchase_date: getPurchaseDate(daysIn),
       };
     });
 
