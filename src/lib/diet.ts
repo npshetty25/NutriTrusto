@@ -17,6 +17,8 @@
  * One list, one matcher, word boundaries throughout.
  */
 
+import { matchesTerm } from "@/lib/text-match";
+
 export type ItemDietType = "veg" | "egg" | "non-veg";
 export type DietPreference = "veg" | "eggtarian" | "non-veg" | "none";
 
@@ -58,8 +60,24 @@ export const EGG_TERMS = [
 // contains the word "egg". Checked before the egg terms so the claim wins.
 const EGG_FREE_CLAIMS = ["eggless", "egg-free", "egg free"];
 
+/**
+ * Whole-word match that also accepts a plural.
+ *
+ * This was a bare `\b<term>\b` regex, which fails on every plural, because
+ * the trailing "s" is itself a word character. Since ANIMAL_TERMS spells out
+ * no plurals at all, that made the vegetarian check pass "Prawns",
+ * "Sausages", "Chickens", "Oysters", "Crabs" and "Sardines" — it only ever
+ * caught the singular. `EGG_TERMS` was unaffected only because it happens to
+ * list "egg" and "eggs" by hand.
+ *
+ * A comment in shelf-life.ts used to claim the missing plural rule here was
+ * deliberate, on the grounds that widening it would reintroduce the
+ * "eggplant" bug. It does not: `matchesTerm` extends a match by "s" or "es"
+ * only, so "eggplant" and "eggless" still fail on the following consonant.
+ * That is covered by tests in diet.test.ts.
+ */
 export const hasWord = (haystack: string, term: string) =>
-  new RegExp(`\\b${term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(haystack);
+  matchesTerm(haystack.toLowerCase(), term.toLowerCase());
 
 export const normalizeDietPreference = (value: string | undefined | null): DietPreference => {
   const diet = (value || "").toLowerCase().trim();

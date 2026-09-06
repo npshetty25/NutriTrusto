@@ -116,9 +116,13 @@ const DOWNGRADE: Record<Confidence, Confidence> = { high: "medium", medium: "low
  * default. "Tomatoes" was especially deceptive: it returned 7 days, which is
  * also the tomato row's value, so it looked correct while actually missing.
  *
- * The diet classifier's `hasWord` deliberately has no plural rule (its lists
- * spell out "egg" and "eggs" separately), and widening it there would risk
- * the eggplant class of bug, so this is a separate matcher.
+ * This used to note that the diet classifier's `hasWord` had no plural rule
+ * "deliberately", because its lists spell out "egg" and "eggs" separately and
+ * widening it would risk the eggplant bug. Both halves were wrong: only
+ * EGG_TERMS lists a plural, ANIMAL_TERMS lists none, so the vegetarian check
+ * was missing "Prawns" and "Sausages" outright; and matchesTerm extends by
+ * "s"/"es" only, so it never reaches "eggplant". `hasWord` now delegates
+ * here, and there is one matcher again rather than two.
  */
 /**
  * Finds the sourced row for a name, honouring exclusions.
