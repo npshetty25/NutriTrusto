@@ -24,8 +24,31 @@ describe("row identity — every lookup asserts on matched_row_id", () => {
     expect(ids.every((id) => /^[a-z0-9-]+$/.test(id))).toBe(true);
   });
 
+  it("does not derive ids from keys[0]", () => {
+    // Ids used to be generated as keys[0].replace(...), which meant renaming
+    // or reordering a key silently renumbered the row — a test pinned to an
+    // id could start passing against a different row. These three rows are
+    // deliberately named for what they cover rather than their first key, so
+    // a revert to the derivation fails here instead of going unnoticed.
+    const derived = (row: { keys: string[] }) =>
+      row.keys[0].toLowerCase().replace(/[^a-z0-9]+/g, "-");
+
+    const byId = (id: string) => SHELF_LIFE_ROWS.find((r) => r.id === id)!;
+
+    for (const [id, firstKey] of [
+      ["plant-milk-and-powder", "coconut milk"],
+      ["leafy-herbs", "coriander"],
+      ["ground-spices", "masala"],
+    ] as const) {
+      const row = byId(id);
+      expect(row).toBeDefined();
+      expect(row.keys[0]).toBe(firstKey);
+      expect(derived(row)).not.toBe(row.id);
+    }
+  });
+
   it.each([
-    ["Palak (Spinach)", "coriander"],
+    ["Palak (Spinach)", "leafy-herbs"],
     ["Basmati Rice", "rice"],
     ["Toor Dal", "dal"],
     ["Amul Butter", "butter"],
@@ -55,7 +78,7 @@ describe("false-friend regressions (all seven, tier 3)", () => {
 
   it("plant milks and milk powder resolve to the shelf-stable row", () => {
     for (const n of ["Coconut Milk", "Milk Powder", "Almond Milk", "Soya Milk"]) {
-      expect(rowIdFor(n)).toBe("coconut-milk");
+      expect(rowIdFor(n)).toBe("plant-milk-and-powder");
     }
   });
 });
@@ -99,9 +122,9 @@ describe("morphology corpus — both matchers", () => {
     ["atta", "atta"], ["wheat flour", "atta"],
     ["bhindi", "bhindi"], ["okra", "bhindi"], ["lady finger", "bhindi"],
     ["paneer", "paneer"], ["cottage cheese", "paneer"],
-    ["palak", "coriander"], ["spinach", "coriander"],
-    ["jeera", "masala"], ["cumin", "masala"],
-    ["haldi", "masala"], ["turmeric", "masala"],
+    ["palak", "leafy-herbs"], ["spinach", "leafy-herbs"],
+    ["jeera", "ground-spices"], ["cumin", "ground-spices"],
+    ["haldi", "ground-spices"], ["turmeric", "ground-spices"],
     // casing, whitespace, brand prefixes, quantity suffixes
     ["AMUL MASTI DAHI", "curd"],
     ["  Amul   Masti Dahi 400ml  ", "curd"],

@@ -6,6 +6,39 @@ reason. Nothing changes silently.
 
 ---
 
+## data_version 2026-09-07 — explicit row ids
+
+**No day value, activation energy, band threshold or confidence level changed
+in this revision.** It is an identity change only, verified by comparing every
+field of all 70 rows against the previous revision with `id` and
+`data_version` excluded — the comparison found 3 differences, all of them ids.
+`effective_date` therefore stays at `2026-08-31`: no figure moved.
+
+Row ids were derived at export from `keys[0]`. Two problems with that:
+
+1. Reordering or renaming a key silently renumbered the row, so a test pinned
+   to a row id could begin passing against a *different* row with nothing in
+   the diff resembling an identity change. Row ids exist precisely because
+   asserting on a day count alone hides a wrong match.
+2. Naming a row after only its first key misdescribed the broad rows.
+
+Ids are now written out per row, with a duplicate check that throws at module
+load, since nothing else would catch two rows claiming one id.
+
+### Id renames
+
+| Old | New | Why |
+|---|---|---|
+| `coconut-milk` | `plant-milk-and-powder` | The row is every shelf-stable plant milk and milk powder — 8 keys including milk powder, condensed milk, milkmaid, soy/almond/oat milk. It was named after one of them. |
+| `coriander` | `leafy-herbs` | 13 keys, covering methi, palak and spinach as well as coriander. |
+| `masala` | `ground-spices` | 12 keys, covering haldi, jeera, mirch and dhania as well as masala mixes. |
+
+Test expectations in `shelf-life.test.ts` and `poison.test.ts` updated to the
+new ids. All 9 assertions that failed on the rename were expected-id
+positions, never input names — the rename touched no test input.
+
+---
+
 ## data_version 2026-08-31 — post-review hardening
 
 ### Confidence demotions (no day values changed)

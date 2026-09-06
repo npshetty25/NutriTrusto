@@ -41,7 +41,17 @@ export type PerishTier = "highly-perishable" | "perishable" | "semi-perishable" 
 export type Confidence = "high" | "medium" | "low";
 
 export interface ShelfLifeRow {
-  /** Stable identity, derived from the first key. What tests assert on. */
+  /**
+   * Stable identity. What tests assert on.
+   *
+   * Written out per row, not derived from `keys[0]`. Under the derivation,
+   * reordering or renaming a key silently renumbered the row, so a test
+   * pinned to a row id could start passing against a different row without
+   * anything in the diff looking like an identity change. It also forced the
+   * id to name only the first key, which misdescribed the broad rows: the
+   * `coconut-milk` row is really every shelf-stable plant milk and milk
+   * powder.
+   */
   id: string;
   data_version: string;
   effective_date: string;
@@ -98,7 +108,8 @@ export interface ShelfLifeRow {
  * it at export, so a value can always be traced to the revision it came from.
  * See CHANGELOG.md for what moved and why.
  */
-export const DATA_VERSION = "2026-08-31";
+export const DATA_VERSION = "2026-09-07";
+// Unchanged: no figure moved in the 2026-09-07 revision, only row identity.
 export const EFFECTIVE_DATE = "2026-08-31";
 
 const USDA = "USDA FoodKeeper";
@@ -106,11 +117,12 @@ const FSIS = "USDA FSIS";
 const FAO = "FAO Quality and Quality Changes in Fresh Fish (v7180e)";
 const IN_HOUSEHOLD = "Typical Indian household storage";
 
-const RAW_ROWS: Omit<ShelfLifeRow, "id" | "data_version" | "effective_date">[] = [
+const RAW_ROWS: Omit<ShelfLifeRow, "data_version" | "effective_date">[] = [
   // ── Dairy ──────────────────────────────────────────────────────────
   // Quoted at 4 °C and converted down; these are the most-wasted items and
   // the ones where the old flat numbers were furthest out.
   {
+    id: "milk",
     keys: ["milk", "doodh", "toned milk", "full cream milk"],
     // Every one of these is shelf-stable and was landing on milk's 3 days.
     exclude: ["coconut milk", "milk powder", "milk chocolate", "soy milk", "soya milk",
@@ -126,12 +138,14 @@ const RAW_ROWS: Omit<ShelfLifeRow, "id" | "data_version" | "effective_date">[] =
     source_caveat: "Journal of Emerging Investigators publishes secondary-school student research; anchor value pending replacement with a mainstream food-science source.",
   },
   {
+    id: "curd",
     keys: ["curd", "dahi", "yogurt", "yoghurt"],
     exclude: ["curd rice"],
     days: 8, refTempC: 4, storage: "fridge", tier: "perishable",
     source: `${USDA} (yoghurt)`, confidence: "medium",
   },
   {
+    id: "paneer",
     keys: ["paneer", "chhena", "cottage cheese"],
     // A spice packet, not a dairy block. This was resolving to 5 days.
     exclude: ["paneer masala", "shahi paneer masala", "paneer tikka masala"],
@@ -139,28 +153,33 @@ const RAW_ROWS: Omit<ShelfLifeRow, "id" | "data_version" | "effective_date">[] =
     source: "ARCC review, Extension of Shelf Life of Paneer (fresh, untreated)", confidence: "medium",
   },
   {
+    id: "cheese",
     keys: ["cheese", "mozzarella", "cheddar"],
     days: 21, refTempC: 4, storage: "fridge", tier: "semi-perishable",
     source: USDA, confidence: "medium",
   },
   {
+    id: "cream",
     keys: ["cream", "malai"],
     exclude: ["cream biscuit", "ice cream", "cream cracker"],
     days: 7, refTempC: 4, storage: "fridge", tier: "perishable",
     source: USDA, confidence: "medium",
   },
   {
+    id: "buttermilk",
     keys: ["buttermilk", "chaas", "lassi"],
     days: 5, refTempC: 4, storage: "fridge", tier: "highly-perishable",
     source: `${USDA} (cultured dairy)`, confidence: "low",
   },
   {
+    id: "butter",
     keys: ["butter", "makhan"],
     exclude: ["peanut butter", "butter chicken", "butter paneer", "butter masala"],
     days: 60, refTempC: 4, storage: "fridge", tier: "semi-perishable",
     source: USDA, confidence: "medium",
   },
   {
+    id: "ghee",
     keys: ["ghee"],
     days: 180, refTempC: 29, storage: "counter", tier: "shelf-stable",
     lookupOnly: true, source: "Food-science general (rancidity-limited, not microbial)", confidence: "medium",
@@ -168,6 +187,7 @@ const RAW_ROWS: Omit<ShelfLifeRow, "id" | "data_version" | "effective_date">[] =
 
   // ── Meat, fish, eggs ───────────────────────────────────────────────
   {
+    id: "chicken",
     keys: ["chicken", "murgh"],
     exclude: ["chicken masala", "butter chicken", "chicken curry masala"],
     days: 2, refTempC: 4, storage: "fridge", tier: "highly-perishable",
@@ -179,6 +199,7 @@ const RAW_ROWS: Omit<ShelfLifeRow, "id" | "data_version" | "effective_date">[] =
     confidence: "medium",
   },
   {
+    id: "fish",
     keys: ["fish", "machli", "prawn", "shrimp", "jhinga", "pomfret", "surmai",
            "rohu", "katla", "hilsa", "bangda", "crab"],
     exclude: ["fish curry masala", "fish masala", "fish oil"],
@@ -188,6 +209,7 @@ const RAW_ROWS: Omit<ShelfLifeRow, "id" | "data_version" | "effective_date">[] =
     confidence: "low",
   },
   {
+    id: "mutton",
     keys: ["mutton", "lamb", "goat meat", "keema"],
     days: 4, refTempC: 4, storage: "fridge", tier: "highly-perishable",
     eaKJ: 93,
@@ -197,6 +219,7 @@ const RAW_ROWS: Omit<ShelfLifeRow, "id" | "data_version" | "effective_date">[] =
     source: `${FSIS}; Ea a beef-psychrotroph proxy, 85–103 kJ/mol, journal unverified`, confidence: "low",
   },
   {
+    id: "egg",
     keys: ["egg", "eggs", "anda"],
     exclude: ["eggplant", "eggless", "egg curry masala"],
     days: 28, refTempC: 4, storage: "fridge", tier: "semi-perishable",
@@ -207,60 +230,64 @@ const RAW_ROWS: Omit<ShelfLifeRow, "id" | "data_version" | "effective_date">[] =
   // Quoted at Indian household conditions: these figures already reflect how
   // greens are actually kept here, so no conversion is applied.
   {
+    id: "leafy-herbs",
     keys: ["coriander", "dhania", "kothmir", "methi", "fenugreek", "palak", "spinach",
            "pudina", "mint", "sarson", "bathua", "curry leaves", "kadi patta"],
     exclude: ["dhania powder", "coriander powder", "methi powder", "methi seeds"],
     days: 4, refTempC: 29, storage: "counter", tier: "highly-perishable",
     source: IN_HOUSEHOLD, confidence: "medium",
   },
-  { keys: ["mushroom"], days: 5, refTempC: 29, storage: "counter", tier: "highly-perishable", source: IN_HOUSEHOLD, confidence: "medium" },
-  { keys: ["lettuce"], days: 6, refTempC: 29, storage: "counter", tier: "perishable", source: USDA, confidence: "medium" },
-  { keys: ["spring onion"], days: 7, refTempC: 29, storage: "counter", tier: "perishable", source: IN_HOUSEHOLD, confidence: "low" },
+  { id: "mushroom", keys: ["mushroom"], days: 5, refTempC: 29, storage: "counter", tier: "highly-perishable", source: IN_HOUSEHOLD, confidence: "medium" },
+  { id: "lettuce", keys: ["lettuce"], days: 6, refTempC: 29, storage: "counter", tier: "perishable", source: USDA, confidence: "medium" },
+  { id: "spring-onion", keys: ["spring onion"], days: 7, refTempC: 29, storage: "counter", tier: "perishable", source: IN_HOUSEHOLD, confidence: "low" },
 
   // ── Other vegetables ───────────────────────────────────────────────
   {
+    id: "tomato",
     keys: ["tomato", "tamatar"], chilling_sensitive: { min_safe_temp_c: 10, injury_mode: "water soaking and softening, decay", source: "USDA Agriculture Handbook 66, Table 1 (Fresh produce susceptible to chilling injury) — ripe 7-10 C; mature-green 13 C", confidence: "high" },
     exclude: ["tomato ketchup", "tomato sauce", "tomato puree"],
     days: 7, refTempC: 29, storage: "counter", tier: "perishable",
     source: USDA, confidence: "medium",
   },
-  { keys: ["bhindi", "okra", "lady finger"], chilling_sensitive: { min_safe_temp_c: 7, injury_mode: "discoloration, water-soaked areas, pitting, decay", source: "USDA Agriculture Handbook 66, Table 1 (Fresh produce susceptible to chilling injury) — listed as Okra", confidence: "high" }, days: 6, refTempC: 29, storage: "counter", tier: "perishable", source: USDA, confidence: "medium" },
-  { keys: ["capsicum", "bell pepper", "shimla mirch"], days: 10, refTempC: 29, storage: "counter", tier: "perishable", source: USDA, confidence: "medium" },
-  { keys: ["cauliflower", "gobi", "broccoli"], days: 8, refTempC: 29, storage: "counter", tier: "perishable", source: USDA, confidence: "medium" },
-  { keys: ["cabbage", "patta gobi"], days: 14, refTempC: 29, storage: "counter", tier: "semi-perishable", source: USDA, confidence: "medium" },
-  { keys: ["beans", "french beans"], exclude: ["kidney beans", "rajma beans", "baked beans", "coffee beans"], days: 7, refTempC: 29, storage: "counter", tier: "perishable", source: USDA, confidence: "medium" },
-  { keys: ["brinjal", "baingan", "eggplant", "aubergine"], chilling_sensitive: { min_safe_temp_c: 7, injury_mode: "surface scald, alternaria rot, blackening of seeds", source: "USDA Agriculture Handbook 66, Table 1 (Fresh produce susceptible to chilling injury) — listed as Eggplants", confidence: "high" }, days: 7, refTempC: 29, storage: "counter", tier: "perishable", source: USDA, confidence: "medium" },
-  { keys: ["cucumber", "kheera"], chilling_sensitive: { min_safe_temp_c: 7, injury_mode: "pitting, water-soaked spots, decay", source: "USDA Agriculture Handbook 66, Table 1 (Fresh produce susceptible to chilling injury)", confidence: "high" }, days: 7, refTempC: 29, storage: "counter", tier: "perishable", source: USDA, confidence: "medium" },
-  { keys: ["carrot", "gajar"], days: 14, refTempC: 29, storage: "counter", tier: "semi-perishable", source: USDA, confidence: "medium" },
-  { keys: ["beetroot", "chukandar"], days: 14, refTempC: 29, storage: "counter", tier: "semi-perishable", source: USDA, confidence: "low" },
-  { keys: ["peas", "matar"], exclude: ["frozen peas"], days: 5, refTempC: 29, storage: "counter", tier: "perishable", source: USDA, confidence: "medium" },
-  { keys: ["lauki", "bottle gourd", "tinda", "tori"], days: 10, refTempC: 29, storage: "counter", tier: "perishable", source: IN_HOUSEHOLD, confidence: "low" },
-  { keys: ["pumpkin", "kaddu"], chilling_sensitive: { min_safe_temp_c: 10, injury_mode: "decay, especially alternaria rot", source: "USDA Agriculture Handbook 66, Table 1 (Fresh produce susceptible to chilling injury) — listed as Pumpkins and hardshell squash", confidence: "high" }, days: 21, refTempC: 29, storage: "counter", tier: "semi-perishable", source: USDA, confidence: "low" },
-  { keys: ["ginger", "adrak"], chilling_sensitive: { min_safe_temp_c: 7, injury_mode: "softening, tissue breakdown, decay", source: "USDA Agriculture Handbook 66, Table 1 (Fresh produce susceptible to chilling injury)", confidence: "high" }, exclude: ["ginger garlic paste", "ginger powder", "dry ginger"], days: 21, refTempC: 29, storage: "counter", tier: "semi-perishable", source: IN_HOUSEHOLD, confidence: "medium" },
+  { id: "bhindi", keys: ["bhindi", "okra", "lady finger"], chilling_sensitive: { min_safe_temp_c: 7, injury_mode: "discoloration, water-soaked areas, pitting, decay", source: "USDA Agriculture Handbook 66, Table 1 (Fresh produce susceptible to chilling injury) — listed as Okra", confidence: "high" }, days: 6, refTempC: 29, storage: "counter", tier: "perishable", source: USDA, confidence: "medium" },
+  { id: "capsicum", keys: ["capsicum", "bell pepper", "shimla mirch"], days: 10, refTempC: 29, storage: "counter", tier: "perishable", source: USDA, confidence: "medium" },
+  { id: "cauliflower", keys: ["cauliflower", "gobi", "broccoli"], days: 8, refTempC: 29, storage: "counter", tier: "perishable", source: USDA, confidence: "medium" },
+  { id: "cabbage", keys: ["cabbage", "patta gobi"], days: 14, refTempC: 29, storage: "counter", tier: "semi-perishable", source: USDA, confidence: "medium" },
+  { id: "beans", keys: ["beans", "french beans"], exclude: ["kidney beans", "rajma beans", "baked beans", "coffee beans"], days: 7, refTempC: 29, storage: "counter", tier: "perishable", source: USDA, confidence: "medium" },
+  { id: "brinjal", keys: ["brinjal", "baingan", "eggplant", "aubergine"], chilling_sensitive: { min_safe_temp_c: 7, injury_mode: "surface scald, alternaria rot, blackening of seeds", source: "USDA Agriculture Handbook 66, Table 1 (Fresh produce susceptible to chilling injury) — listed as Eggplants", confidence: "high" }, days: 7, refTempC: 29, storage: "counter", tier: "perishable", source: USDA, confidence: "medium" },
+  { id: "cucumber", keys: ["cucumber", "kheera"], chilling_sensitive: { min_safe_temp_c: 7, injury_mode: "pitting, water-soaked spots, decay", source: "USDA Agriculture Handbook 66, Table 1 (Fresh produce susceptible to chilling injury)", confidence: "high" }, days: 7, refTempC: 29, storage: "counter", tier: "perishable", source: USDA, confidence: "medium" },
+  { id: "carrot", keys: ["carrot", "gajar"], days: 14, refTempC: 29, storage: "counter", tier: "semi-perishable", source: USDA, confidence: "medium" },
+  { id: "beetroot", keys: ["beetroot", "chukandar"], days: 14, refTempC: 29, storage: "counter", tier: "semi-perishable", source: USDA, confidence: "low" },
+  { id: "peas", keys: ["peas", "matar"], exclude: ["frozen peas"], days: 5, refTempC: 29, storage: "counter", tier: "perishable", source: USDA, confidence: "medium" },
+  { id: "lauki", keys: ["lauki", "bottle gourd", "tinda", "tori"], days: 10, refTempC: 29, storage: "counter", tier: "perishable", source: IN_HOUSEHOLD, confidence: "low" },
+  { id: "pumpkin", keys: ["pumpkin", "kaddu"], chilling_sensitive: { min_safe_temp_c: 10, injury_mode: "decay, especially alternaria rot", source: "USDA Agriculture Handbook 66, Table 1 (Fresh produce susceptible to chilling injury) — listed as Pumpkins and hardshell squash", confidence: "high" }, days: 21, refTempC: 29, storage: "counter", tier: "semi-perishable", source: USDA, confidence: "low" },
+  { id: "ginger", keys: ["ginger", "adrak"], chilling_sensitive: { min_safe_temp_c: 7, injury_mode: "softening, tissue breakdown, decay", source: "USDA Agriculture Handbook 66, Table 1 (Fresh produce susceptible to chilling injury)", confidence: "high" }, exclude: ["ginger garlic paste", "ginger powder", "dry ginger"], days: 21, refTempC: 29, storage: "counter", tier: "semi-perishable", source: IN_HOUSEHOLD, confidence: "medium" },
   {
+    id: "garlic",
     keys: ["garlic", "lehsun"],
     // "Garlic bread" was matching garlic and getting 30 days. It is bread.
     exclude: ["garlic bread", "garlic naan", "ginger garlic paste", "garlic powder"],
     days: 30, refTempC: 29, storage: "counter", tier: "semi-perishable",
     source: "FAO Farm Structures Ch. 9", confidence: "medium",
   },
-  { keys: ["onion", "pyaz", "pyaaz"], exclude: ["onion pickle", "spring onion", "onion powder"], days: 30, refTempC: 29, storage: "counter", tier: "semi-perishable", source: "FAO Farm Structures Ch. 9", confidence: "medium" },
-  { keys: ["potato", "aloo"], chilling_sensitive: { min_safe_temp_c: 3, injury_mode: "mahogany browning, cold-induced sweetening", source: "USDA Agriculture Handbook 66, Table 1 (Fresh produce susceptible to chilling injury)", confidence: "high" }, exclude: ["potato chips", "sweet potato", "potato wafers"], days: 28, refTempC: 29, storage: "counter", tier: "semi-perishable", source: "FAO Farm Structures Ch. 9", confidence: "medium" },
-  { keys: ["sweet potato", "shakarkandi"], chilling_sensitive: { min_safe_temp_c: 13, injury_mode: "decay, pitting, internal discoloration, hardcore when cooked", source: "USDA Agriculture Handbook 66, Table 1 (Fresh produce susceptible to chilling injury)", confidence: "high" }, days: 21, refTempC: 29, storage: "counter", tier: "semi-perishable", source: USDA, confidence: "low" },
+  { id: "onion", keys: ["onion", "pyaz", "pyaaz"], exclude: ["onion pickle", "spring onion", "onion powder"], days: 30, refTempC: 29, storage: "counter", tier: "semi-perishable", source: "FAO Farm Structures Ch. 9", confidence: "medium" },
+  { id: "potato", keys: ["potato", "aloo"], chilling_sensitive: { min_safe_temp_c: 3, injury_mode: "mahogany browning, cold-induced sweetening", source: "USDA Agriculture Handbook 66, Table 1 (Fresh produce susceptible to chilling injury)", confidence: "high" }, exclude: ["potato chips", "sweet potato", "potato wafers"], days: 28, refTempC: 29, storage: "counter", tier: "semi-perishable", source: "FAO Farm Structures Ch. 9", confidence: "medium" },
+  { id: "sweet-potato", keys: ["sweet potato", "shakarkandi"], chilling_sensitive: { min_safe_temp_c: 13, injury_mode: "decay, pitting, internal discoloration, hardcore when cooked", source: "USDA Agriculture Handbook 66, Table 1 (Fresh produce susceptible to chilling injury)", confidence: "high" }, days: 21, refTempC: 29, storage: "counter", tier: "semi-perishable", source: USDA, confidence: "low" },
 
   // ── Fruit ──────────────────────────────────────────────────────────
-  { keys: ["banana", "kela"], chilling_sensitive: { min_safe_temp_c: 13, injury_mode: "dull colour when ripened", source: "USDA Agriculture Handbook 66, Table 1 (Fresh produce susceptible to chilling injury) — 11.5-13 C range; 13 used", confidence: "high" }, days: 5, refTempC: 29, storage: "counter", tier: "perishable", source: USDA, confidence: "medium" },
-  { keys: ["papaya"], chilling_sensitive: { min_safe_temp_c: 7, injury_mode: "pitting, failure to ripen, off flavours, decay", source: "USDA Agriculture Handbook 66, Table 1 (Fresh produce susceptible to chilling injury)", confidence: "high" }, days: 5, refTempC: 29, storage: "counter", tier: "perishable", source: USDA, confidence: "low" },
-  { keys: ["mango", "aam"], chilling_sensitive: { min_safe_temp_c: 13, injury_mode: "greyish scald-like skin discoloration, uneven ripening", source: "USDA Agriculture Handbook 66, Table 1 (Fresh produce susceptible to chilling injury) — 10-13 C range; 13 used", confidence: "high" }, exclude: ["mango pickle", "aam achar", "mango juice"], days: 6, refTempC: 29, storage: "counter", tier: "perishable", source: USDA, confidence: "medium" },
-  { keys: ["grapes", "angoor"], days: 7, refTempC: 29, storage: "counter", tier: "perishable", source: USDA, confidence: "medium" },
-  { keys: ["guava", "amrood"], chilling_sensitive: { min_safe_temp_c: 4.5, injury_mode: "pulp injury, decay", source: "USDA Agriculture Handbook 66, Table 1 (Fresh produce susceptible to chilling injury)", confidence: "high" }, days: 7, refTempC: 29, storage: "counter", tier: "perishable", source: IN_HOUSEHOLD, confidence: "low" },
-  { keys: ["pomegranate", "anar"], days: 14, refTempC: 29, storage: "counter", tier: "semi-perishable", source: USDA, confidence: "low" },
-  { keys: ["orange", "mosambi", "santra"], chilling_sensitive: { min_safe_temp_c: 3, injury_mode: "pitting, brown stain", source: "USDA Agriculture Handbook 66, Table 1 (Fresh produce susceptible to chilling injury)", confidence: "high" }, exclude: ["orange juice"], days: 14, refTempC: 29, storage: "counter", tier: "semi-perishable", source: USDA, confidence: "medium" },
-  { keys: ["apple", "seb"], exclude: ["apple juice", "custard apple", "pineapple"], days: 21, refTempC: 29, storage: "counter", tier: "semi-perishable", source: USDA, confidence: "medium" },
-  { keys: ["lemon", "nimbu", "lime"], chilling_sensitive: { min_safe_temp_c: 13, injury_mode: "pitting, membranous staining, red blotch", source: "USDA Agriculture Handbook 66, Table 1 (Fresh produce susceptible to chilling injury) — 11-13 C range; 13 used", confidence: "high" }, days: 21, refTempC: 29, storage: "counter", tier: "semi-perishable", source: USDA, confidence: "medium" },
+  { id: "banana", keys: ["banana", "kela"], chilling_sensitive: { min_safe_temp_c: 13, injury_mode: "dull colour when ripened", source: "USDA Agriculture Handbook 66, Table 1 (Fresh produce susceptible to chilling injury) — 11.5-13 C range; 13 used", confidence: "high" }, days: 5, refTempC: 29, storage: "counter", tier: "perishable", source: USDA, confidence: "medium" },
+  { id: "papaya", keys: ["papaya"], chilling_sensitive: { min_safe_temp_c: 7, injury_mode: "pitting, failure to ripen, off flavours, decay", source: "USDA Agriculture Handbook 66, Table 1 (Fresh produce susceptible to chilling injury)", confidence: "high" }, days: 5, refTempC: 29, storage: "counter", tier: "perishable", source: USDA, confidence: "low" },
+  { id: "mango", keys: ["mango", "aam"], chilling_sensitive: { min_safe_temp_c: 13, injury_mode: "greyish scald-like skin discoloration, uneven ripening", source: "USDA Agriculture Handbook 66, Table 1 (Fresh produce susceptible to chilling injury) — 10-13 C range; 13 used", confidence: "high" }, exclude: ["mango pickle", "aam achar", "mango juice"], days: 6, refTempC: 29, storage: "counter", tier: "perishable", source: USDA, confidence: "medium" },
+  { id: "grapes", keys: ["grapes", "angoor"], days: 7, refTempC: 29, storage: "counter", tier: "perishable", source: USDA, confidence: "medium" },
+  { id: "guava", keys: ["guava", "amrood"], chilling_sensitive: { min_safe_temp_c: 4.5, injury_mode: "pulp injury, decay", source: "USDA Agriculture Handbook 66, Table 1 (Fresh produce susceptible to chilling injury)", confidence: "high" }, days: 7, refTempC: 29, storage: "counter", tier: "perishable", source: IN_HOUSEHOLD, confidence: "low" },
+  { id: "pomegranate", keys: ["pomegranate", "anar"], days: 14, refTempC: 29, storage: "counter", tier: "semi-perishable", source: USDA, confidence: "low" },
+  { id: "orange", keys: ["orange", "mosambi", "santra"], chilling_sensitive: { min_safe_temp_c: 3, injury_mode: "pitting, brown stain", source: "USDA Agriculture Handbook 66, Table 1 (Fresh produce susceptible to chilling injury)", confidence: "high" }, exclude: ["orange juice"], days: 14, refTempC: 29, storage: "counter", tier: "semi-perishable", source: USDA, confidence: "medium" },
+  { id: "apple", keys: ["apple", "seb"], exclude: ["apple juice", "custard apple", "pineapple"], days: 21, refTempC: 29, storage: "counter", tier: "semi-perishable", source: USDA, confidence: "medium" },
+  { id: "lemon", keys: ["lemon", "nimbu", "lime"], chilling_sensitive: { min_safe_temp_c: 13, injury_mode: "pitting, membranous staining, red blotch", source: "USDA Agriculture Handbook 66, Table 1 (Fresh produce susceptible to chilling injury) — 11-13 C range; 13 used", confidence: "high" }, days: 21, refTempC: 29, storage: "counter", tier: "semi-perishable", source: USDA, confidence: "medium" },
 
   // ── Bakery ─────────────────────────────────────────────────────────
   {
+    id: "bread",
     keys: ["bread", "pav", "bun", "garlic bread"],
     exclude: ["bread crumbs", "breadcrumb"],
     days: 4, refTempC: 29, storage: "counter", tier: "perishable",
@@ -272,43 +299,44 @@ const RAW_ROWS: Omit<ShelfLifeRow, "id" | "data_version" | "effective_date">[] =
     lookupOnly: true,
     source: IN_HOUSEHOLD, confidence: "low",
   },
-  { keys: ["roti", "chapati", "paratha", "naan"], days: 2, refTempC: 29, storage: "counter", tier: "highly-perishable", source: IN_HOUSEHOLD, confidence: "low" },
-  { keys: ["cake", "pastry", "muffin"], days: 5, refTempC: 29, storage: "counter", tier: "perishable", source: USDA, confidence: "low" },
+  { id: "roti", keys: ["roti", "chapati", "paratha", "naan"], days: 2, refTempC: 29, storage: "counter", tier: "highly-perishable", source: IN_HOUSEHOLD, confidence: "low" },
+  { id: "cake", keys: ["cake", "pastry", "muffin"], days: 5, refTempC: 29, storage: "counter", tier: "perishable", source: USDA, confidence: "low" },
 
   // ── Dry staples ────────────────────────────────────────────────────
   // The category the old flat 30-day default hurt most: a sealed bag of rice
   // was going "Critical" while perfectly good.
-  { keys: ["rice", "chawal", "basmati"], exclude: ["rice flour", "curd rice", "fried rice", "rice bran oil"], days: 365, refTempC: 29, storage: "counter", tier: "shelf-stable", lookupOnly: true, source: "USDA dry-goods storage", confidence: "high" },
-  { keys: ["atta", "wheat flour"], days: 120, refTempC: 29, storage: "counter", tier: "shelf-stable", lookupOnly: true, source: "USDA dry-goods storage", confidence: "medium" },
-  { keys: ["maida", "flour", "rice flour"], days: 180, refTempC: 29, storage: "counter", tier: "shelf-stable", lookupOnly: true, source: "USDA dry-goods storage", confidence: "medium" },
-  { keys: ["dal", "toor dal", "arhar", "moong", "masoor", "urad", "chana", "chole"], exclude: ["dal fry", "dal makhani"], days: 180, refTempC: 29, storage: "counter", tier: "shelf-stable", lookupOnly: true, source: "USDA dry-goods storage (pulses 1 yr+)", confidence: "high" },
-  { keys: ["rajma", "kidney beans"], days: 240, refTempC: 29, storage: "counter", tier: "shelf-stable", lookupOnly: true, source: "USDA dry-goods storage", confidence: "high" },
-  { keys: ["besan", "gram flour"], days: 120, refTempC: 29, storage: "counter", tier: "shelf-stable", lookupOnly: true, source: "USDA dry-goods storage", confidence: "medium" },
-  { keys: ["poha", "suji", "rava", "semolina"], days: 120, refTempC: 29, storage: "counter", tier: "shelf-stable", lookupOnly: true, source: "USDA dry-goods storage", confidence: "medium" },
-  { keys: ["oats"], days: 180, refTempC: 29, storage: "counter", tier: "shelf-stable", lookupOnly: true, source: "USDA dry-goods storage", confidence: "medium" },
-  { keys: ["sugar", "cheeni"], days: 540, refTempC: 29, storage: "counter", tier: "shelf-stable", lookupOnly: true, source: "Food-science general (indefinite if dry)", confidence: "medium" },
-  { keys: ["salt", "namak"], days: 1080, refTempC: 29, storage: "counter", tier: "shelf-stable", lookupOnly: true, source: "Food-science general (indefinite)", confidence: "medium" },
-  { keys: ["oil", "tel"], exclude: ["fish oil", "oil pulling"], days: 270, refTempC: 29, storage: "counter", tier: "shelf-stable", lookupOnly: true, source: "Food-science general (rancidity-limited)", confidence: "medium" },
-  { keys: ["honey", "shahad"], days: 720, refTempC: 29, storage: "counter", tier: "shelf-stable", lookupOnly: true, source: "Food-science general (indefinite)", confidence: "medium" },
+  { id: "rice", keys: ["rice", "chawal", "basmati"], exclude: ["rice flour", "curd rice", "fried rice", "rice bran oil"], days: 365, refTempC: 29, storage: "counter", tier: "shelf-stable", lookupOnly: true, source: "USDA dry-goods storage", confidence: "high" },
+  { id: "atta", keys: ["atta", "wheat flour"], days: 120, refTempC: 29, storage: "counter", tier: "shelf-stable", lookupOnly: true, source: "USDA dry-goods storage", confidence: "medium" },
+  { id: "maida", keys: ["maida", "flour", "rice flour"], days: 180, refTempC: 29, storage: "counter", tier: "shelf-stable", lookupOnly: true, source: "USDA dry-goods storage", confidence: "medium" },
+  { id: "dal", keys: ["dal", "toor dal", "arhar", "moong", "masoor", "urad", "chana", "chole"], exclude: ["dal fry", "dal makhani"], days: 180, refTempC: 29, storage: "counter", tier: "shelf-stable", lookupOnly: true, source: "USDA dry-goods storage (pulses 1 yr+)", confidence: "high" },
+  { id: "rajma", keys: ["rajma", "kidney beans"], days: 240, refTempC: 29, storage: "counter", tier: "shelf-stable", lookupOnly: true, source: "USDA dry-goods storage", confidence: "high" },
+  { id: "besan", keys: ["besan", "gram flour"], days: 120, refTempC: 29, storage: "counter", tier: "shelf-stable", lookupOnly: true, source: "USDA dry-goods storage", confidence: "medium" },
+  { id: "poha", keys: ["poha", "suji", "rava", "semolina"], days: 120, refTempC: 29, storage: "counter", tier: "shelf-stable", lookupOnly: true, source: "USDA dry-goods storage", confidence: "medium" },
+  { id: "oats", keys: ["oats"], days: 180, refTempC: 29, storage: "counter", tier: "shelf-stable", lookupOnly: true, source: "USDA dry-goods storage", confidence: "medium" },
+  { id: "sugar", keys: ["sugar", "cheeni"], days: 540, refTempC: 29, storage: "counter", tier: "shelf-stable", lookupOnly: true, source: "Food-science general (indefinite if dry)", confidence: "medium" },
+  { id: "salt", keys: ["salt", "namak"], days: 1080, refTempC: 29, storage: "counter", tier: "shelf-stable", lookupOnly: true, source: "Food-science general (indefinite)", confidence: "medium" },
+  { id: "oil", keys: ["oil", "tel"], exclude: ["fish oil", "oil pulling"], days: 270, refTempC: 29, storage: "counter", tier: "shelf-stable", lookupOnly: true, source: "Food-science general (rancidity-limited)", confidence: "medium" },
+  { id: "honey", keys: ["honey", "shahad"], days: 720, refTempC: 29, storage: "counter", tier: "shelf-stable", lookupOnly: true, source: "Food-science general (indefinite)", confidence: "medium" },
 
   // ── Preserved, frozen, packaged ────────────────────────────────────
-  { keys: ["pickle", "achar", "achaar"], days: 240, refTempC: 29, storage: "counter", tier: "shelf-stable", lookupOnly: true, source: "Food-science general (sealed)", confidence: "medium" },
-  { keys: ["jam", "marmalade"], days: 180, refTempC: 29, storage: "counter", tier: "shelf-stable", lookupOnly: true, source: "Food-science general (sealed)", confidence: "medium" },
-  { keys: ["ketchup", "sauce", "chutney"], exclude: ["soy sauce"], days: 180, refTempC: 29, storage: "counter", tier: "shelf-stable", lookupOnly: true, source: "Food-science general (sealed)", confidence: "medium" },
-  { keys: ["peanut butter"], days: 180, refTempC: 29, storage: "counter", tier: "shelf-stable", lookupOnly: true, source: "Food-science general", confidence: "medium" },
-  { keys: ["coconut milk", "milk powder", "condensed milk", "milkmaid", "soy milk", "soya milk", "almond milk", "oat milk"], days: 365, refTempC: 29, storage: "counter", tier: "shelf-stable", lookupOnly: true, source: "Food-science general (UHT/canned, sealed)", confidence: "medium" },
-  { keys: ["frozen", "frozen peas", "ice cream"], days: 90, refTempC: -18, storage: "freezer", tier: "shelf-stable", lookupOnly: true, source: `${USDA} (freezer −18 °C)`, confidence: "medium" },
-  { keys: ["biscuit", "cookie", "namkeen", "chips", "wafers"], days: 120, refTempC: 29, storage: "counter", tier: "shelf-stable", lookupOnly: true, source: "Food-science general (sealed, rancidity-limited)", confidence: "medium" },
-  { keys: ["chocolate"], days: 240, refTempC: 29, storage: "counter", tier: "shelf-stable", lookupOnly: true, source: "Food-science general", confidence: "medium" },
-  { keys: ["tea", "chai patti"], days: 540, refTempC: 29, storage: "counter", tier: "shelf-stable", lookupOnly: true, source: "Food-science general", confidence: "medium" },
-  { keys: ["coffee"], days: 365, refTempC: 29, storage: "counter", tier: "shelf-stable", lookupOnly: true, source: "Food-science general", confidence: "medium" },
+  { id: "pickle", keys: ["pickle", "achar", "achaar"], days: 240, refTempC: 29, storage: "counter", tier: "shelf-stable", lookupOnly: true, source: "Food-science general (sealed)", confidence: "medium" },
+  { id: "jam", keys: ["jam", "marmalade"], days: 180, refTempC: 29, storage: "counter", tier: "shelf-stable", lookupOnly: true, source: "Food-science general (sealed)", confidence: "medium" },
+  { id: "ketchup", keys: ["ketchup", "sauce", "chutney"], exclude: ["soy sauce"], days: 180, refTempC: 29, storage: "counter", tier: "shelf-stable", lookupOnly: true, source: "Food-science general (sealed)", confidence: "medium" },
+  { id: "peanut-butter", keys: ["peanut butter"], days: 180, refTempC: 29, storage: "counter", tier: "shelf-stable", lookupOnly: true, source: "Food-science general", confidence: "medium" },
+  { id: "plant-milk-and-powder", keys: ["coconut milk", "milk powder", "condensed milk", "milkmaid", "soy milk", "soya milk", "almond milk", "oat milk"], days: 365, refTempC: 29, storage: "counter", tier: "shelf-stable", lookupOnly: true, source: "Food-science general (UHT/canned, sealed)", confidence: "medium" },
+  { id: "frozen", keys: ["frozen", "frozen peas", "ice cream"], days: 90, refTempC: -18, storage: "freezer", tier: "shelf-stable", lookupOnly: true, source: `${USDA} (freezer −18 °C)`, confidence: "medium" },
+  { id: "biscuit", keys: ["biscuit", "cookie", "namkeen", "chips", "wafers"], days: 120, refTempC: 29, storage: "counter", tier: "shelf-stable", lookupOnly: true, source: "Food-science general (sealed, rancidity-limited)", confidence: "medium" },
+  { id: "chocolate", keys: ["chocolate"], days: 240, refTempC: 29, storage: "counter", tier: "shelf-stable", lookupOnly: true, source: "Food-science general", confidence: "medium" },
+  { id: "tea", keys: ["tea", "chai patti"], days: 540, refTempC: 29, storage: "counter", tier: "shelf-stable", lookupOnly: true, source: "Food-science general", confidence: "medium" },
+  { id: "coffee", keys: ["coffee"], days: 365, refTempC: 29, storage: "counter", tier: "shelf-stable", lookupOnly: true, source: "Food-science general", confidence: "medium" },
   {
+    id: "ground-spices",
     keys: ["masala", "spice", "haldi", "turmeric", "jeera", "cumin", "mirch",
            "garam masala", "hing", "elaichi", "dhania powder", "coriander powder"],
     days: 365, refTempC: 29, storage: "counter", tier: "shelf-stable", lookupOnly: true,
     source: "Food-science general (whole spices 1–2 yr)", confidence: "medium",
   },
-  { keys: ["juice"], days: 7, refTempC: 4, storage: "fridge", tier: "perishable", source: USDA, confidence: "low" },
+  { id: "juice", keys: ["juice"], days: 7, refTempC: 4, storage: "fridge", tier: "perishable", source: USDA, confidence: "low" },
 ];
 
 /**
@@ -319,10 +347,19 @@ const RAW_ROWS: Omit<ShelfLifeRow, "id" | "data_version" | "effective_date">[] =
  */
 export const SHELF_LIFE_ROWS: ShelfLifeRow[] = RAW_ROWS.map((row) => ({
   ...row,
-  id: row.keys[0].toLowerCase().replace(/[^a-z0-9]+/g, "-"),
   data_version: DATA_VERSION,
   effective_date: EFFECTIVE_DATE,
 }));
+
+// Ids are hand-written, so nothing but this stops two rows sharing one. A
+// duplicate would make a row-id assertion ambiguous, which is the failure
+// explicit ids exist to prevent.
+const DUPLICATE_IDS = SHELF_LIFE_ROWS.map((r) => r.id).filter(
+  (id, i, all) => all.indexOf(id) !== i
+);
+if (DUPLICATE_IDS.length > 0) {
+  throw new Error(`shelf-life-data: duplicate row ids: ${[...new Set(DUPLICATE_IDS)].join(", ")}`);
+}
 
 /**
  * Longest key first, so "toor dal" beats "dal" and "sweet potato" beats
