@@ -882,6 +882,9 @@ export default function Home() {
             // is not the trust boundary.
             daysPastEstimate: i.daysPastEstimate,
             risk: i.risk,
+            // How much the day count beside it is worth. A "rough guess" row
+            // and a USDA-sourced one looked identical in the prompt.
+            confidence: findShelfLifeRow(i.name)?.row.confidence,
           })),
           dietaryPreference: String(user?.user_metadata?.dietary_preference || "none"),
           avoidTitles,

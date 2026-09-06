@@ -20,6 +20,13 @@ interface PantryItem {
    */
   daysPastEstimate?: number;
   risk?: string;
+  /**
+   * Confidence of the shelf-life row the day count came from. Only 4 of 70
+   * rows carry a published activation energy; the rest are household figures
+   * or extrapolations, and "low" means the number beside the item is a rough
+   * guess rather than a sourced one.
+   */
+  confidence?: "high" | "medium" | "low";
 }
 
 /**
@@ -136,11 +143,15 @@ export async function POST(req: Request) {
     // version and it carries into rule 9.
     const fmt = (list: PantryItem[]) =>
       list
-        .map((i) =>
-          i.daysLeft === 0
-            ? `- ${i.name} (due today — tell the cook to look at it and smell it first)`
-            : `- ${i.name} (${i.daysLeft} day${i.daysLeft === 1 ? "" : "s"} left)`
-        )
+        .map((i) => {
+          // A low-confidence row's day count is a rough guess, and it read
+          // in the prompt exactly like a USDA-sourced one. Saying so lets the
+          // model pick a method that survives the estimate being wrong.
+          const rough = i.confidence === "low" ? ", rough estimate" : "";
+          return i.daysLeft === 0
+            ? `- ${i.name} (due today — tell the cook to look at it and smell it first${rough})`
+            : `- ${i.name} (${i.daysLeft} day${i.daysLeft === 1 ? "" : "s"} left${rough})`;
+        })
         .join("\n");
 
     const sections = [
@@ -171,6 +182,7 @@ Rules, in order of importance:
 7. Use Indian measures and names naturally (katori, tsp, tbsp, grams, ml; jeera, haldi, dhania), with the English term in brackets on first use where it isn't obvious.
 8. Name it like a person would, not like a label. Pick the closest real Indian dish and use that name, adding at most ONE distinguishing word. "Palak Paneer Bhurji" is a name; "Dahi-Doodh Paneer-Palak Bread Bhurji" is an ingredient list with hyphens. Never chain more than two ingredients into the title, never use "&", and keep it under five words.
 9. If an item is marked "due today", the FIRST step must tell the cook to look at it and smell it before it goes in, and to leave it out if it seems off. Do not say it has spoiled, gone bad or expired — nobody has checked it yet. Just have them check.
+10. Where an item is marked "rough estimate", our day count for it is unreliable. Prefer a method that survives being wrong about it — cooked through in a sabzi, dal or curry rather than raw in a raita, salad or chutney. Do not mention the estimate or its reliability in the recipe; just cook it the safer way.
 
 Split the ingredients into three groups so the cook knows what they already
 have and what they must go out and buy:
