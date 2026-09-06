@@ -427,8 +427,12 @@ export default function Home() {
     if (currentDays <= 0) {
       return {
         id: `${row.id}-${createdAt}`,
-        title: "Item expired",
-        message: `${row.name} has likely spoiled. Remove it or use immediately if still safe.`,
+        // Not "expired" / "has spoiled". Nobody has looked at this food; the
+        // app only knows its own estimate ran out, which is a statement about
+        // our table, not about the item. Asserting spoilage would also send
+        // edible food to the bin, which is the opposite of the point.
+        title: "Past our estimate",
+        message: `Our estimate for ${row.name} has run out. Check it yourself before using it.`,
         severity: "high",
         createdAt,
         category,

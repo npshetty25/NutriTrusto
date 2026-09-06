@@ -231,8 +231,11 @@ export function PantryCard({ name, daysLeft, risk, purchaseDate, healthScore, di
         )}
 
         {daysLeft === 0 && (
+          // Says what we know — our estimate ran out — not what we don't:
+          // whether the food is actually off. Only the person holding it can
+          // tell, and telling them it has spoiled bins food that is still good.
           <p className="mt-2 text-[11px] leading-relaxed font-semibold text-danger">
-            {name} has likely spoiled. Remove it, or use it now if it still seems fine.
+            Our estimate for {name} has run out. Look at it and smell it before you use it.
           </p>
         )}
       </div>
