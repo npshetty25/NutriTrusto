@@ -1713,6 +1713,14 @@ if (nutritionFieldsFilled < 2) {
                     </p>
                   )}
 
+                  {/* Same line as the modal's. This preview is actionable on
+                      its own — "View recipe" is not required to act on it —
+                      so the disclaimer cannot live only behind that button. */}
+                  <p className="text-[11px] leading-relaxed text-foreground/55">
+                    A generated suggestion, not a food-safety check. Look at and smell everything
+                    before you cook it.
+                  </p>
+
                   <div className="flex gap-2">
                     <button
                       onClick={() => setShowRecipe(true)}

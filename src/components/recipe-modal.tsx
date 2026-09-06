@@ -216,6 +216,14 @@ export function RecipeModal({
               </div>
             )}
 
+            {/* Set above the provenance footnote, not folded into it: this one
+                is about whether to eat the food, which is a different question
+                from where the recipe came from. */}
+            <p className="text-[12px] leading-relaxed text-foreground/65 border-t border-border pt-4">
+              A generated suggestion, not a food-safety check. Look at and smell everything before
+              you cook it.
+            </p>
+
             <p className="text-[11px] leading-relaxed text-foreground/40">
               Written for the items you have, so it won&apos;t match any single published recipe. The video
               button searches for {recipe.baseDish || "the dish"}, the closest standard dish.
