@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createRequestContext } from "@/lib/server-logger";
 import { getRequestUser, unauthorized } from "@/lib/api-auth";
 import { checkRateLimit, rateLimited } from "@/lib/rate-limit";
+import { matchesTerm } from "@/lib/text-match";
 
 type NutriScoreGrade = "a" | "b" | "c" | "d" | "e";
 
@@ -13,8 +14,27 @@ type NutritionPayload = {
   protein_g_100g?: number;
 };
 
+/**
+ * Terms that mean "this is not food".
+ *
+ * `"cream"` used to be on this list, matched with a bare `includes`. Ice
+ * Cream, Amul Fresh Cream, Cream Biscuit, Cream Cracker, Coffee Creamer and
+ * Whipping Cream were therefore all answered with `is_food: false` and a
+ * fabricated `health_score` of 1.0 labelled "Not Food". Word boundaries alone
+ * would not have saved it — "cream" IS a food word, and the list itself was
+ * wrong. It is replaced by the specific toiletry phrases that were meant.
+ *
+ * The asymmetry that decides this list: a false "not food" fabricates a score
+ * for real food someone is about to eat, while a missed non-food just runs a
+ * nutrition analysis on a bar of soap and returns something obviously odd.
+ * When in doubt, leave it off.
+ */
 const NON_FOOD_KEYWORDS = [
-  "soap", "detergent", "shampoo", "conditioner", "toothpaste", "cream", "lotion", "cotton bud", "cotton buds", "sanitizer", "disinfectant", "bleach", "cleaner", "battery", "candle",
+  "soap", "detergent", "shampoo", "conditioner", "toothpaste", "lotion",
+  "cotton bud", "sanitizer", "disinfectant", "bleach", "cleaner", "battery",
+  "candle",
+  // Were the point of the bare "cream" entry.
+  "face cream", "body cream", "shaving cream", "hand cream", "cold cream",
 ];
 
 const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
@@ -28,15 +48,33 @@ const toNum = (value: unknown): number | undefined => {
   return undefined;
 };
 
+// Named synthetic colours. A term list, so it goes through the shared matcher
+// like every other food-term match in the codebase.
+const ADDITIVE_COLOUR_TERMS = [
+  "tartrazine", "sunset yellow", "allura red", "brilliant blue",
+  "erythrosine", "carmoisine", "ponceau",
+  "yellow 5", "yellow5", "red 40", "red40", "blue 1", "blue1",
+];
+
+// E-numbers are a regulatory code, not a food name, so this stays a pattern —
+// there is no term list to match against. It gains the word boundaries it
+// never had: without them "e1" plus any two digits matched inside longer
+// alphanumeric tokens. Declared in the containment test's allow-list with
+// this reason.
+const E_NUMBER_COLOUR = /\be1\d\d\b/gi;
+
 const extractAdditiveColorMatches = (ingredientsRaw: string): string[] => {
   const ingredients = ingredientsRaw.toLowerCase();
-  const regex = /(tartrazine|sunset yellow|allura red|brilliant blue|erythrosine|carmoisine|ponceau|yellow\s*5|red\s*40|blue\s*1|e1\d\d)/gi;
-  return Array.from(new Set(ingredients.match(regex) || []));
+  const found = ADDITIVE_COLOUR_TERMS.filter((term) => matchesTerm(ingredients, term));
+  return Array.from(new Set([...found, ...(ingredients.match(E_NUMBER_COLOUR) || [])]));
 };
 
 const detectIsFood = (name: string, categories: string): boolean => {
   const text = `${name} ${categories}`.toLowerCase();
-  return !NON_FOOD_KEYWORDS.some((kw) => text.includes(kw));
+  // matchesTerm, not includes: the shared matcher, so "cotton bud" still
+  // catches "cotton buds" without a second plural entry, and no term can fire
+  // on a fragment of a longer word.
+  return !NON_FOOD_KEYWORDS.some((kw) => matchesTerm(text, kw));
 };
 
 const nutriScoreBase = (grade?: string): number => {
