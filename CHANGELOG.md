@@ -6,6 +6,49 @@ reason. Nothing changes silently.
 
 ---
 
+## 2026-09-07b — matcher fix: `Goat Milk` was reported as 365 days
+
+**No row in `shelf-life-data.ts` changed.** This is a matcher fix, but it moves
+the number some items resolve to, so it is recorded here.
+
+Two independent raw-substring calls compounded:
+
+1. `findShelfLifeRow` special-cased multi-word keys to `text.includes(key)`,
+   on the theory that a phrase needs no boundary check. `"goat milk"` contains
+   `"oat milk"`.
+2. `isExcluded` also used `text.includes(phrase)`. The dairy row excludes
+   `"oat milk"` — so `"goat milk"` matched that exclusion too, and the *correct*
+   row removed itself from consideration.
+
+Either alone would have been caught by the other. Together, fresh goat milk
+resolved to the sealed shelf-stable plant-milk row.
+
+| Item | Before | After | Row |
+|---|---|---|---|
+| Goat Milk | **365 d** | **6 d** | now `milk` |
+| Goat Milk Powder | 365 d | 365 d | unchanged, correct |
+| Milk Powdered Drink | **365 d** | **6 d** | now `milk` |
+| Coconut Milkshake | **365 d** | **14 d** | no match → conservative default |
+| Almond Milkshake | **365 d** | **14 d** | as above |
+| Condensed Milky Bar | **365 d** | **14 d** | as above |
+
+Every move is downward. This is the first matcher defect in the project that
+made a *confident wrong match* rather than missing one and degrading to a
+generic default — roughly 90× too long, in the unsafe direction.
+
+Both call sites now use `matchesTerm`. A phrase has boundaries at its own two
+ends, and `matchesTerm` honours them while still matching "Coconut Milk 200ml"
+and "Sweet Potatoes".
+
+Swept for siblings: every single-word key that is a non-boundary substring of
+another food word (`butter` in `buttermilk`, `egg` in `eggplant`, `atta` in
+`patta gobi`, `matar` in `tamatar`, `anda` in `chukandar`, `hing` in `jhinga`).
+**None of them misfired** — `matchesTerm` has always rejected that case, and
+those keys were never routed through the multi-word branch. Pinned by test
+anyway.
+
+---
+
 ## data_version 2026-09-07 — explicit row ids
 
 **No day value, activation energy, band threshold or confidence level changed

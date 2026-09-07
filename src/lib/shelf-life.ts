@@ -137,10 +137,13 @@ export function findShelfLifeRow(name: string): { key: string; row: ShelfLifeRow
 
   for (const entry of ROWS_BY_KEY_LENGTH) {
     if (isExcluded(text, entry.row.exclude)) continue;
-    // Multi-word keys are phrases, so a plain substring test is right for
-    // them; single words need the boundary check.
-    const matched = entry.key.includes(" ") ? text.includes(entry.key) : matchesTerm(text, entry.key);
-    if (matched) return entry;
+    // One matcher for every key, phrase or not. The old code special-cased
+    // multi-word keys to a plain substring test on the theory that a phrase
+    // needs no boundary — but a phrase has boundaries at its own two ends, and
+    // "goat milk" contains "oat milk", which is how goat milk came to be
+    // reported as keeping 365 days. `matchesTerm` handles phrases correctly:
+    // it still matches "Coconut Milk 200ml" and "Sweet Potatoes".
+    if (matchesTerm(text, entry.key)) return entry;
   }
   return null;
 }

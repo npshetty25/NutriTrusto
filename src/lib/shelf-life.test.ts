@@ -72,6 +72,46 @@ describe("false-friend regressions (all seven, tier 3)", () => {
     expect(rowIdFor(name)).not.toBe(forbiddenId);
   });
 
+  it("Goat Milk is dairy, not a shelf-stable plant milk", () => {
+    // The worst matcher failure this project has had. Two independent raw
+    // `includes` calls compounded: the key "oat milk" matched inside "goat
+    // milk", AND the dairy row's own exclusion "oat milk" fired on it too, so
+    // the correct row removed itself from consideration. Result: 365 days for
+    // fresh milk, ~90x too long and in the unsafe direction. Every other
+    // matcher bug found here failed by MISSING a match and degrading to a
+    // conservative default; this one made a confident wrong match.
+    expect(rowIdFor("Goat Milk")).toBe("milk");
+    expect(estimateShelfLife("Goat Milk").days).toBeLessThanOrEqual(7);
+  });
+
+  it.each([
+    // Same mechanism, same row. Each was 365 days.
+    ["Goat Milk Powder", "plant-milk-and-powder"],
+    ["Milk Powdered Drink", "milk"],
+  ])("%s resolves to %s", (name, id) => {
+    expect(rowIdFor(name)).toBe(id);
+  });
+
+  it.each(["Coconut Milkshake", "Almond Milkshake", "Condensed Milky Bar"])(
+    "%s is not treated as a sealed shelf-stable carton",
+    (name) => {
+      // A milkshake is perishable. These matched the plant-milk row's keys as
+      // bare substrings and were handed 365 days; they now fall through to the
+      // conservative no-match default instead of a confidently wrong number.
+      expect(rowIdFor(name)).not.toBe("plant-milk-and-powder");
+      expect(estimateShelfLife(name).days).toBeLessThanOrEqual(14);
+    }
+  );
+
+  it.each([
+    // Single-word keys hiding inside longer food words. These never actually
+    // misfired — matchesTerm has always rejected them — but they are the class
+    // the multi-word branch bypassed, so they are pinned here explicitly.
+    "Graham Crackers", "Liquorice", "Sandalwood Soap", "Oatmeal", "Wheatgrass",
+  ])("%s matches no row on a word fragment", (name) => {
+    expect(rowIdFor(name)).toBeNull();
+  });
+
   it("Garlic Bread resolves to bread, not garlic", () => {
     expect(rowIdFor("Garlic Bread")).toBe("bread");
   });

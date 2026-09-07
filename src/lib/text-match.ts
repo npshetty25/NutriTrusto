@@ -76,6 +76,19 @@ export const FALSE_FRIENDS: Record<string, string[]> = {
 /** Every false-friend phrase, flattened. */
 export const ALL_FALSE_FRIENDS: string[] = Object.values(FALSE_FRIENDS).flat();
 
-/** True when any of the given phrases appears in the text. */
+/**
+ * True when any of the given phrases appears in the text as a whole term.
+ *
+ * This used a bare `text.includes(phrase)`, which made the exclusion list
+ * carry the same defect the key matcher was fixed for — and worse, because an
+ * over-firing exclusion silently removes the CORRECT row from consideration.
+ * `"goat milk".includes("oat milk")` is true, so the dairy row excluded itself
+ * from goat milk and the item fell through to a shelf-stable plant-milk row at
+ * 365 days.
+ *
+ * Boundary-aware matching keeps every intended exclusion working — "Coconut
+ * Milk 200ml" still matches the phrase "coconut milk" — while refusing the
+ * ones that only ever fired on a word fragment.
+ */
 export const isExcluded = (text: string, phrases: readonly string[] | undefined): boolean =>
-  !!phrases?.some((phrase) => text.includes(phrase.toLowerCase()));
+  !!phrases?.some((phrase) => matchesTerm(text, phrase.toLowerCase()));
