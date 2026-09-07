@@ -17,7 +17,7 @@
  * One list, one matcher, word boundaries throughout.
  */
 
-import { matchesTerm } from "@/lib/text-match";
+import { matchesTerm, FALSE_FRIENDS } from "@/lib/text-match";
 
 export type ItemDietType = "veg" | "egg" | "non-veg";
 export type DietPreference = "veg" | "eggtarian" | "non-veg" | "none";
@@ -87,11 +87,29 @@ export const normalizeDietPreference = (value: string | undefined | null): DietP
   return "none";
 };
 
+/**
+ * Spice packets and preserved goods named after the meat or fish they season.
+ * The shared list — the same phrases the shelf-life table and the category
+ * inferrer consult, so "Chicken Masala" cannot be a spice packet to one
+ * subsystem and Non-Veg to another.
+ *
+ * Scope of what this changes, stated plainly because it moves a safety check
+ * in the permissive direction: an item whose NAME is one of these phrases is
+ * no longer read as meat. The backstop is `resolveItemDiet`, which reads the
+ * ingredient text too and takes the stricter answer — so a scanned ready-meal
+ * declaring chicken is still caught. A hand-typed item with no ingredient text
+ * is not. That trade is deliberate and reviewed; see the tests.
+ */
+const MEAT_FALSE_FRIENDS = FALSE_FRIENDS.meat;
+
 export function getItemDietType(value: string): ItemDietType {
   const text = (value || "").toLowerCase();
-  if (ANIMAL_TERMS.some((t) => hasWord(text, t))) return "non-veg";
+  // Checked before the animal terms, so the packet wins over the word inside
+  // its name — the same ordering EGG_FREE_CLAIMS uses below.
+  const isSpicePacket = MEAT_FALSE_FRIENDS.some((p) => matchesTerm(text, p));
+  if (!isSpicePacket && ANIMAL_TERMS.some((t) => hasWord(text, t))) return "non-veg";
   if (EGG_FREE_CLAIMS.some((c) => text.includes(c))) return "veg";
-  if (EGG_TERMS.some((t) => hasWord(text, t))) return "egg";
+  if (!isSpicePacket && EGG_TERMS.some((t) => hasWord(text, t))) return "egg";
   return "veg";
 }
 

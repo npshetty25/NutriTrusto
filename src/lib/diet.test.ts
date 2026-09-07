@@ -68,6 +68,41 @@ describe("getItemDietType — vegetarian items stay vegetarian", () => {
   });
 });
 
+describe("spice packets are not meat — shared FALSE_FRIENDS", () => {
+  // These are the same phrases the shelf-life table and the category inferrer
+  // consult. Before this, an MDH packet was a spice mix to one subsystem and
+  // Non-Veg to another.
+  it.each([
+    "Fish Curry Masala", "Chicken Masala", "Egg Curry Masala",
+    "Butter Chicken Masala", "Fish Masala", "Chicken Curry Masala",
+  ])("%s is veg", (name) => {
+    expect(getItemDietType(name)).toBe("veg");
+  });
+
+  // The permissive direction of the change above is bounded by these. The
+  // dish is still meat; only the packet named after it is not.
+  it.each([
+    "Butter Chicken", "Chicken Curry", "Chicken Breast", "Fish Fillet",
+    "Mutton Keema", "Prawns", "Chicken",
+  ])("%s is still non-veg", (name) => {
+    expect(getItemDietType(name)).toBe("non-veg");
+  });
+
+  it("the ingredient text remains the backstop for a real ready-meal", () => {
+    // A pack named like a spice packet but declaring chicken is still caught,
+    // because resolveItemDiet takes the stricter of name and ingredients.
+    expect(resolveItemDiet("Chicken Masala", "chicken, tomato, spices")).toBe("non-veg");
+    expect(resolveItemDiet("Chicken Masala", "coriander, cumin, chilli")).toBe("veg");
+  });
+
+  it("does not weaken the recipe gate", () => {
+    // findDietViolations does not go through getItemDietType and must be
+    // unaffected: a generated recipe naming chicken is still refused.
+    expect(findDietViolations("Chicken Masala Curry", "veg")).toContain("chicken");
+    expect(findDietViolations("Fish Curry Masala", "veg")).toContain("fish");
+  });
+});
+
 describe("findDietViolations — the check that gates a generated recipe", () => {
   it("catches plural animal terms for a vegetarian", () => {
     // The failure this whole change exists for: each of these returned [].
