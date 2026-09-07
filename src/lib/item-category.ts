@@ -15,7 +15,16 @@ export type ItemCategory =
 
 const categoryKeywords: Record<ItemCategory, string[]> = {
   vegetable: [
-    "spinach", "tomato", "onion", "potato", "carrot", "broccoli", "cabbage", "capsicum", "pepper", "cucumber", "lettuce", "okra", "beans", "peas", "cauliflower"
+    "spinach", "tomato", "onion", "potato", "carrot", "broccoli", "cabbage", "capsicum", "pepper", "cucumber", "lettuce", "okra", "beans", "peas", "cauliflower",
+    // The Indian names were missing entirely, so the most common vegetables
+    // in the target kitchen fell to `unknown` and drew a cardboard-box icon.
+    // Their shelf life was never affected — every one of these matches a
+    // tier-3 row by name, so the category fallback is not consulted for them.
+    "brinjal", "baingan", "eggplant", "aubergine", "bhindi", "lady finger",
+    "lauki", "bottle gourd", "palak", "methi", "gobi", "patta gobi",
+    "shimla mirch", "kheera", "matar", "gajar", "pyaz", "aloo", "tamatar",
+    "chukandar", "beetroot", "mushroom", "spring onion", "coriander",
+    "dhania", "kothmir", "curry leaves", "kadi patta",
   ],
   fruit: [
     "apple", "banana", "orange", "mango", "grape", "watermelon", "papaya", "pear", "pineapple", "berry", "kiwi", "avocado"
