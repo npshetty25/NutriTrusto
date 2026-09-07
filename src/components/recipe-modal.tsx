@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { X, Clock, Play, RefreshCw, ShoppingCart, Loader2, Check, ChevronDown } from "lucide-react";
+import { ALLERGEN_LABELS, type AllergenTag } from "@/lib/allergens";
 
 export interface GeneratedRecipe {
   title: string;
@@ -15,6 +16,15 @@ export interface GeneratedRecipe {
   steps: string[];
   rescueNote: string;
   videoSearchUrl: string;
+  /**
+   * Allergens the dish's own ingredients appear to contain.
+   *
+   * DISCLOSURE, NOT A FILTER. Nothing was excluded on the user's behalf —
+   * there is no allergen preference in the app to filter against — and the
+   * term list behind this is inherited and unaudited. Copy must say what the
+   * dish contains, never what was kept out.
+   */
+  containsAllergens?: AllergenTag[];
 }
 
 interface RecipeModalProps {
@@ -213,6 +223,26 @@ export function RecipeModal({
                     ))}
                   </ol>
                 )}
+              </div>
+            )}
+
+            {recipe.containsAllergens && recipe.containsAllergens.length > 0 && (
+              // Deliberately "Contains", never "excluded" or "safe for you".
+              // Nothing was filtered — there is no allergen preference to
+              // filter against — and the term list behind this is unaudited.
+              // Stating what is in the dish is a claim we can support; saying
+              // what is not would be one we cannot.
+              <div className="border-t border-border pt-4">
+                <h4 className="text-[10px] font-semibold uppercase tracking-widest text-foreground/45 mb-1.5">
+                  Contains
+                </h4>
+                <p className="text-[13px] text-foreground/85">
+                  {recipe.containsAllergens.map((t) => ALLERGEN_LABELS[t]).join(" · ")}
+                </p>
+                <p className="text-[11px] leading-relaxed text-foreground/50 mt-1.5">
+                  Read from the ingredients above. Not a full allergen check — read the labels on
+                  what you buy.
+                </p>
               </div>
             )}
 

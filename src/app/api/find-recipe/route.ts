@@ -4,6 +4,7 @@ import { createRequestContext } from "@/lib/server-logger";
 import { findDietViolations, normalizeDiet } from "@/lib/diet-check";
 import { ANIMAL_TERMS } from "@/lib/diet";
 import { matchesTerm } from "@/lib/text-match";
+import { detectAllergens } from "@/lib/allergens";
 import { getRequestUser, unauthorized } from "@/lib/api-auth";
 import { checkRateLimit, rateLimited } from "@/lib/rate-limit";
 
@@ -322,6 +323,25 @@ Your previous attempt included ${lastViolations.join(", ")}, which breaks the "$
       // way a curated link can — one of the provider's Indian videos is
       // already dead after a copyright takedown.
       videoSearchUrl: `https://www.youtube.com/results?search_query=${encodeURIComponent(baseDish + " recipe")}`,
+      // DISCLOSURE, NOT A FILTER. This says what the dish appears to contain.
+      // It does not promise anything was kept out, because nothing was: there
+      // is no allergen preference in the app to filter against yet, and the
+      // term list behind this is inherited and unaudited (see allergens.ts).
+      // The UI copy must not describe this as filtering until an allergen
+      // preference exists AND a post-generation check enforces it.
+      //
+      // Read from the ingredient names the recipe itself returned rather than
+      // the whole JSON blob, so the dish title and the prose in the steps
+      // cannot introduce a term that is not actually an ingredient.
+      containsAllergens: detectAllergens(
+        [
+          ...fromPantry.map((r: { item: string }) => r.item),
+          ...(Array.isArray(recipe.toBuy) ? recipe.toBuy : []).map((row: unknown) =>
+            typeof row === "string" ? row : String((row as { item?: unknown })?.item ?? "")
+          ),
+          ...(Array.isArray(recipe.staples) ? recipe.staples : []).map(String),
+        ].join(", ")
+      ),
     };
 
     log.info("Recipe generated", {
