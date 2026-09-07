@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/auth-context";
+import { matchesTerm } from "@/lib/text-match";
 
 interface RestockSuggestionsProps {
   currentItemNames: string[];
@@ -62,9 +63,16 @@ export function RestockSuggestions({ currentItemNames }: RestockSuggestionsProps
 
         const daysSinceLastScan = (now - sorted[sorted.length - 1]) / MS_PER_DAY;
 
-        const alreadyInPantry = currentItemNames.some(
-          (n) => n.toLowerCase().includes(key) || key.includes(n.toLowerCase())
-        );
+        // Bidirectional, because either name can be the longer one ("Milk" in
+        // the pantry should suppress a "Toned Milk" suggestion and vice
+        // versa) — but through the shared matcher, so it is whole words in
+        // both directions. The old `includes` both ways meant "Milk" in the
+        // pantry silently suppressed a Coconut Milk suggestion, and a
+        // "Buttermilk" suggestion suppressed itself against "Butter".
+        const alreadyInPantry = currentItemNames.some((n) => {
+          const name = n.toLowerCase();
+          return matchesTerm(name, key) || matchesTerm(key, name);
+        });
         if (alreadyInPantry) continue;
 
         // Surface it a bit before it's strictly "due", so it's a heads-up,
