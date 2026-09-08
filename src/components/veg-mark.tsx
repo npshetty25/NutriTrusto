@@ -26,6 +26,11 @@ const TONE: Record<ItemDietType, { stroke: string; fill: string; label: string }
   veg: { stroke: "#1a7f3c", fill: "#1a7f3c", label: "Vegetarian" },
   egg: { stroke: "#b4690e", fill: "#d98a1f", label: "Contains egg" },
   "non-veg": { stroke: "#8f1d1d", fill: "#8f1d1d", label: "Non-vegetarian" },
+  // Deliberately neutral, and deliberately not amber: amber already means
+  // "contains egg" one row up, and this mark makes no claim about egg or
+  // meat at all. Grey is the absence of a verdict, which is exactly the
+  // verdict.
+  uncertain: { stroke: "#6b6b6b", fill: "#6b6b6b", label: "Could not tell from the name — check the label" },
 };
 
 interface VegMarkProps {
@@ -38,7 +43,12 @@ interface VegMarkProps {
 
 export function VegMark({ diet, size = 14, unverified = false, className = "" }: VegMarkProps) {
   const tone = TONE[diet];
-  const title = unverified ? `${tone.label} — from the name only, not checked against ingredients` : tone.label;
+  // "uncertain" already says it came from the name alone, so appending the
+  // unverified sentence would say it twice.
+  const title =
+    unverified && diet !== "uncertain"
+      ? `${tone.label} — from the name only, not checked against ingredients`
+      : tone.label;
 
   return (
     <svg
@@ -63,7 +73,24 @@ export function VegMark({ diet, size = 14, unverified = false, className = "" }:
         // the name, not a verified label" without inventing a new symbol.
         strokeDasharray={unverified ? "3 2" : undefined}
       />
-      {diet === "non-veg" ? (
+      {diet === "uncertain" ? (
+        // A question mark, not a filled shape. Every other mark here is solid
+        // because it is an assertion; this one is a question because it is
+        // not. Shape carries it, not colour (WCAG 1.4.1) — the mark is
+        // legible as "unknown" in greyscale and to anyone who cannot separate
+        // the grey from the green.
+        <text
+          x="10"
+          y="14.5"
+          textAnchor="middle"
+          fontSize="12"
+          fontWeight="700"
+          fill={tone.fill}
+          fontFamily="system-ui, sans-serif"
+        >
+          ?
+        </text>
+      ) : diet === "non-veg" ? (
         // Filled triangle — the non-vegetarian mark.
         <path d="M10 5.2 L15 14.2 H5 Z" fill={tone.fill} />
       ) : diet === "egg" ? (

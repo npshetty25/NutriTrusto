@@ -41,6 +41,10 @@ export const isGreenToken = (className: string): boolean =>
  */
 export function dietChipClasses(itemDiet: ItemDietType, conflictsWithUserDiet: boolean): string {
   if (conflictsWithUserDiet) return "bg-danger/15 text-danger-strong";
+  // Neutral on purpose. Not safe-green (we are not saying it is fine), not
+  // danger-red (we are not saying it is not), not warning-amber (that is
+  // "contains egg"). The chip's own text carries the meaning.
+  if (itemDiet === "uncertain") return "bg-foreground/8 text-foreground/70";
   if (itemDiet === "non-veg") return "bg-foreground/8 text-foreground/70";
   if (itemDiet === "egg") return "bg-warning/15 text-warning-strong";
   return "bg-safe/15 text-safe-strong";

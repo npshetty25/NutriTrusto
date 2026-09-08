@@ -243,6 +243,11 @@ export default function Home() {
           // Same resolver the card uses, so the filter and the mark on the
           // card can never disagree about the same item.
           const t = resolveItemDiet(i.name, i.ingredientsText);
+          // "uncertain" is kept in every filter, carrying its own mark.
+          // Hiding it from a vegetarian would assert it contains meat, which
+          // is the claim we just declined to make; showing it unmarked would
+          // assert the opposite. Showing it marked is the only honest option.
+          if (t === "uncertain") return true;
           return dietFilter === "veg" ? t === "veg" : t !== "non-veg";
         });
   const inventoryFilteredItems = displayedItems.filter((item) => {

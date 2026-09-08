@@ -19,7 +19,21 @@
 
 import { matchesTerm, FALSE_FRIENDS } from "@/lib/text-match";
 
-export type ItemDietType = "veg" | "egg" | "non-veg";
+/**
+ * `uncertain` is a real answer, not a missing one.
+ *
+ * A name like "Chicken Masala" is genuinely two products: an MDH spice packet
+ * a vegetarian can eat, and a ready-meal they cannot. With no ingredient text
+ * there is no way to tell, and the two ways of being wrong are not
+ * symmetric — telling a vegetarian something contains meat when it does not
+ * costs them a purchase; telling them it does not when it does breaks a
+ * commitment many people hold seriously and some hold religiously.
+ *
+ * So the classifier declines, the same way the shelf-life engine returns null
+ * for a chilling threshold it has no source for, and the UI asks the user to
+ * read the label instead of asserting either answer.
+ */
+export type ItemDietType = "veg" | "egg" | "non-veg" | "uncertain";
 export type DietPreference = "veg" | "eggtarian" | "non-veg" | "none";
 
 // Unambiguous animal terms only. Anything that has a common vegetarian
@@ -104,12 +118,25 @@ const MEAT_FALSE_FRIENDS = FALSE_FRIENDS.meat;
 
 export function getItemDietType(value: string): ItemDietType {
   const text = (value || "").toLowerCase();
-  // Checked before the animal terms, so the packet wins over the word inside
-  // its name — the same ordering EGG_FREE_CLAIMS uses below.
   const isSpicePacket = MEAT_FALSE_FRIENDS.some((p) => matchesTerm(text, p));
-  if (!isSpicePacket && ANIMAL_TERMS.some((t) => hasWord(text, t))) return "non-veg";
-  if (EGG_FREE_CLAIMS.some((c) => text.includes(c))) return "veg";
-  if (!isSpicePacket && EGG_TERMS.some((t) => hasWord(text, t))) return "egg";
+  const hasAnimal = ANIMAL_TERMS.some((t) => hasWord(text, t));
+
+  // An explicit free-from claim outranks everything: it is the label telling
+  // us directly, which is better evidence than any inference from the name.
+  const claimsEggFree = EGG_FREE_CLAIMS.some((c) => text.includes(c));
+
+  if (isSpicePacket && hasAnimal) {
+    // Both readings are live: the phrase says spice packet, the word says
+    // meat. Previously the packet simply won and this returned "veg" — which
+    // asserted egg-free/meat-free on the strength of a guess. Decline instead.
+    return "uncertain";
+  }
+  if (hasAnimal) return "non-veg";
+  if (claimsEggFree) return "veg";
+
+  const hasEgg = EGG_TERMS.some((t) => hasWord(text, t));
+  if (isSpicePacket && hasEgg) return "uncertain";
+  if (hasEgg) return "egg";
   return "veg";
 }
 
@@ -124,15 +151,33 @@ export function getItemDietType(value: string): ItemDietType {
  */
 export function resolveItemDiet(name: string, ingredientsText?: string | null): ItemDietType {
   const fromName = getItemDietType(name);
-  const fromIngredients = ingredientsText ? getItemDietType(ingredientsText) : "veg";
+
+  // No ingredient list: the name is all there is, uncertainty included.
+  if (!ingredientsText) return fromName;
+
+  const fromIngredients = getItemDietType(ingredientsText);
+
+  // Ingredient text is what the ambiguity was waiting for, so it RESOLVES a
+  // name we could not read rather than being max()'d against it. A packet
+  // named "Chicken Masala" listing only coriander and cumin is vegetarian,
+  // and saying so is the whole point of reading the ingredients.
+  if (fromName === "uncertain") return fromIngredients;
+
+  // Otherwise the stricter reading wins, unchanged: for a vegetarian a false
+  // "veg" is the expensive mistake and a false "non-veg" only an inconvenience.
   if (fromName === "non-veg" || fromIngredients === "non-veg") return "non-veg";
   if (fromName === "egg" || fromIngredients === "egg") return "egg";
+  if (fromIngredients === "uncertain") return "uncertain";
   return "veg";
 }
 
 /** True when this item is not allowed under the given preference. */
 export function isDietConflict(userDiet: DietPreference, itemDiet: ItemDietType): boolean {
   if (userDiet === "none" || userDiet === "non-veg") return false;
+  // Not a conflict, and not a pass either — see dietChipLabel. Marking an
+  // unread item as a conflict asserts it contains meat, which is the same
+  // unfounded claim in the other direction.
+  if (itemDiet === "uncertain") return false;
   if (userDiet === "veg") return itemDiet !== "veg";
   // Eggtarian: egg is fine, meat and fish are not. This case did not exist
   // before — an eggtarian user adding chicken saw "Matches Diet".
@@ -141,6 +186,8 @@ export function isDietConflict(userDiet: DietPreference, itemDiet: ItemDietType)
 
 /** Short label for the chip on an item card. */
 export function dietChipLabel(userDiet: DietPreference, itemDiet: ItemDietType): string {
+  // Never "Matches Diet": we do not know that it does.
+  if (itemDiet === "uncertain") return "Check the label";
   if (!isDietConflict(userDiet, itemDiet)) {
     return userDiet === "none" ? ITEM_DIET_LABEL[itemDiet] : "Matches Diet";
   }
@@ -151,6 +198,7 @@ export const ITEM_DIET_LABEL: Record<ItemDietType, string> = {
   veg: "Veg",
   egg: "Contains Egg",
   "non-veg": "Non-Veg",
+  uncertain: "Check the label",
 };
 
 export const DIET_PREFERENCE_LABEL: Record<DietPreference, string> = {

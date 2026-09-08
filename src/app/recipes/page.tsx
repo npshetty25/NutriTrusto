@@ -163,6 +163,7 @@ export default function RecipesPage() {
     if (!byIngredients) return byTitle;
     if (byTitle === "non-veg" || byIngredients === "non-veg") return "non-veg";
     if (byTitle === "egg" || byIngredients === "egg") return "egg";
+    if (byTitle === "uncertain" || byIngredients === "uncertain") return "uncertain";
     return "veg";
   };
 
@@ -170,6 +171,13 @@ export default function RecipesPage() {
     ? meals
     : meals.filter((m) => {
         const t = dietOf(m);
+        // The opposite call to the pantry's, deliberately. The pantry shows an
+        // uncertain item because the user already owns it and hiding it would
+        // not un-own it — they need to see it to decide. This is a browse list
+        // of thousands of suggestions, so dropping an ambiguous one costs
+        // nothing, while showing it risks recommending meat to a vegetarian.
+        // Dropped ones are counted in `hiddenCount` and shown, not swallowed.
+        if (t === "uncertain") return false;
         return dietFilter === "veg" ? t === "veg" : t !== "non-veg";
       });
   const hiddenCount = meals.length - visibleMeals.length;

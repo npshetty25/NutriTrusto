@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getItemDietType, resolveItemDiet, hasWord } from "./diet";
+import { getItemDietType, resolveItemDiet, hasWord, isDietConflict, dietChipLabel } from "./diet";
 import { findDietViolations } from "./diet-check";
 
 /**
@@ -72,11 +72,43 @@ describe("spice packets are not meat — shared FALSE_FRIENDS", () => {
   // These are the same phrases the shelf-life table and the category inferrer
   // consult. Before this, an MDH packet was a spice mix to one subsystem and
   // Non-Veg to another.
+  // These were asserted as "veg" one pass ago. That was resolving a genuine
+  // ambiguity in the permissive direction: each name reads BOTH as a spice
+  // packet (the phrase) and as meat (the word), and with no ingredient text
+  // there is nothing to break the tie. Telling a vegetarian a ready-meal is
+  // egg- and meat-free on the strength of a guess is not a mistake the app
+  // gets to make, so the classifier declines instead.
   it.each([
     "Fish Curry Masala", "Chicken Masala", "Egg Curry Masala",
     "Butter Chicken Masala", "Fish Masala", "Chicken Curry Masala",
-  ])("%s is veg", (name) => {
-    expect(getItemDietType(name)).toBe("veg");
+  ])("%s is uncertain, not veg", (name) => {
+    expect(getItemDietType(name)).toBe("uncertain");
+  });
+
+  it("a spice-packet phrase with no animal word is still plainly veg", () => {
+    // The exclusion alone does not make a name ambiguous — only the exclusion
+    // AND an animal term together do.
+    expect(getItemDietType("Eggplant")).toBe("veg");
+    expect(getItemDietType("Peanut Butter")).toBe("veg");
+    expect(getItemDietType("Paneer Masala")).toBe("veg");
+  });
+
+  it("ingredient text resolves the ambiguity in both directions", () => {
+    expect(resolveItemDiet("Chicken Masala", "coriander, cumin, chilli")).toBe("veg");
+    expect(resolveItemDiet("Chicken Masala", "chicken, tomato, spices")).toBe("non-veg");
+    expect(resolveItemDiet("Egg Curry Masala", "egg powder, spices")).toBe("egg");
+    // Nothing to resolve it with: the uncertainty survives rather than
+    // collapsing to a guess.
+    expect(resolveItemDiet("Chicken Masala", null)).toBe("uncertain");
+    expect(resolveItemDiet("Chicken Masala", "")).toBe("uncertain");
+  });
+
+  it("uncertain is never reported as matching a diet", () => {
+    expect(isDietConflict("veg", "uncertain")).toBe(false);
+    expect(dietChipLabel("veg", "uncertain")).toBe("Check the label");
+    expect(dietChipLabel("eggtarian", "uncertain")).toBe("Check the label");
+    expect(dietChipLabel("none", "uncertain")).toBe("Check the label");
+    expect(dietChipLabel("veg", "uncertain")).not.toMatch(/Matches Diet/);
   });
 
   // The permissive direction of the change above is bounded by these. The
