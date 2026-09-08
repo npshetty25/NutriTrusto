@@ -27,6 +27,30 @@ describe("detectAllergens — false friends that previously fired", () => {
   });
 });
 
+describe("detectAllergens — dairy products are dairy, whatever their shelf life", () => {
+  // A regression I caused and then found: ALLERGEN_EXCLUSIONS was seeded from
+  // FALSE_FRIENDS.dairy. The two lists look interchangeable and answer
+  // opposite questions — that one asks "is this fresh perishable dairy?"
+  // (Milk Powder is not, correctly, it keeps a year), this one asks "does
+  // this contain milk protein?" (Milk Powder emphatically does). Sharing them
+  // made the badge report NO DAIRY for nine real dairy products.
+  it.each([
+    "Milk Powder", "Condensed Milk", "Milk Chocolate", "Ice Cream",
+    "Cream Biscuit", "Butter Paneer", "Curd Rice", "Whole Milk",
+  ])("%s is dairy", (name) => {
+    expect(detectAllergens(name)).toContain("dairy");
+  });
+
+  it("keeps the genuine non-dairy exclusions", () => {
+    for (const name of [
+      "Coconut Milk", "Oat Milk", "Shea Butter", "Cocoa Butter",
+      "Cream of Tartar", "Milk Thistle",
+    ]) {
+      expect(detectAllergens(name), name).not.toContain("dairy");
+    }
+  });
+});
+
 describe("detectAllergens — a free-from claim is not evidence of the allergen", () => {
   // The worst of the old failures: the matcher read a claim that a product
   // contains NO soy as proof that it does.

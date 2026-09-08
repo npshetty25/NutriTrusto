@@ -1,4 +1,4 @@
-import { matchesTerm, FALSE_FRIENDS } from "@/lib/text-match";
+import { matchesTerm } from "@/lib/text-match";
 
 export type AllergenTag = "nuts" | "dairy" | "gluten" | "soy" | "egg" | "shellfish" | "sesame";
 
@@ -34,22 +34,45 @@ export const ALLERGEN_KEYWORDS: Record<AllergenTag, string[]> = {
 };
 
 /**
- * Phrases that contain an allergen word but are not that allergen.
+ * Phrases that contain an allergen word but do not contain that allergen.
  *
- * The dairy set is largely the shared `FALSE_FRIENDS.dairy` — the same list
- * the shelf-life table and the category inferrer consult, so a product cannot
- * be a sealed shelf-stable carton to one subsystem and dairy to another. The
- * additions here are non-dairy products named "butter" or "cream" that the
- * other subsystems had no reason to enumerate.
+ * This list must NOT be `FALSE_FRIENDS.dairy`, and briefly was — a mistake
+ * worth recording, because the two lists look interchangeable and are not.
+ * They answer opposite questions:
+ *
+ *   FALSE_FRIENDS.dairy asks IDENTITY — "is this a fresh perishable dairy
+ *     product?" Milk Powder is not, so it is excluded there, correctly: it
+ *     keeps for a year on a shelf.
+ *   This list asks COMPOSITION — "does this contain milk protein?" Milk
+ *     Powder emphatically does.
+ *
+ * Sharing the list made the allergen badge report NO DAIRY for Milk Powder,
+ * Condensed Milk, Milkmaid, Milk Chocolate, Ice Cream, Cream Biscuit, Butter
+ * Paneer, Curd Rice and Milkshake. Every one of those is dairy, and a miss in
+ * an allergen badge is the direction that hurts someone.
+ *
+ * So this list is its own, and the bar for an entry is strict: the allergen
+ * word appears in the name AND the product genuinely does not contain the
+ * allergen. Anything that merely *keeps differently* belongs in the other
+ * list, not this one.
  */
 const ALLERGEN_EXCLUSIONS: Partial<Record<AllergenTag, string[]>> = {
   dairy: [
-    ...FALSE_FRIENDS.dairy,
-    "shea butter", "cocoa butter", "apple butter", "cream of tartar",
-    "milk thistle", "coconut cream", "creamer",
+    // Plant milks — the word "milk", none of the protein.
+    "coconut milk", "soy milk", "soya milk", "almond milk", "oat milk",
+    "rice milk", "cashew milk", "coconut cream",
+    // Named "butter" or "cream", not dairy.
+    "peanut butter", "shea butter", "cocoa butter", "apple butter",
+    "cream of tartar",
+    // A plant.
+    "milk thistle",
+    // NOT excluded, deliberately: milk powder, condensed milk, milkmaid,
+    // milk chocolate, ice cream, cream biscuit, butter chicken, butter
+    // paneer, curd rice, milkshake, khoya — all dairy. And not "creamer":
+    // powdered coffee creamer commonly contains sodium caseinate.
   ],
   egg: ["eggplant", "eggless", "egg-free", "egg free"],
-  nuts: ["nutmeg", "coconut", "water chestnut", "nutritional yeast"],
+  nuts: ["nutmeg", "water chestnut", "nutritional yeast", "nut-free", "nut free"],
 };
 
 /**
