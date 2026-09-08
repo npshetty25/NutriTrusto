@@ -54,6 +54,7 @@ type Allow = { file: string; match: string; reason: string };
 const ALLOWED: Allow[] = [
   // ── The shared primitive itself ──────────────────────────────────────
   { file: "lib/text-match.ts", match: "text.indexOf(term, from)", reason: "matchesTerm's own implementation — this IS the primitive" },
+  { file: "lib/text-match.ts", match: 'head.endsWith("s")', reason: "isPluralNoun asks a grammatical question about one string — it takes no term list and compares against nothing, so there is no food term being matched" },
 
   // ── Free-from claims: substring is correct, the claim must win ───────
   { file: "lib/diet.ts", match: "text.includes(c)", reason: "EGG_FREE_CLAIMS — a claim like 'eggless' must match as a fragment so it beats the egg terms" },

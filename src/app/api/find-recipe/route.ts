@@ -3,7 +3,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { createRequestContext } from "@/lib/server-logger";
 import { findDietViolations, normalizeDiet } from "@/lib/diet-check";
 import { ANIMAL_TERMS } from "@/lib/diet";
-import { matchesTerm } from "@/lib/text-match";
+import { matchesTerm, isPluralNoun } from "@/lib/text-match";
 import { detectAllergens } from "@/lib/allergens";
 import { getRequestUser, unauthorized } from "@/lib/api-auth";
 import { checkRateLimit, rateLimited } from "@/lib/rate-limit";
@@ -47,20 +47,6 @@ const RAW_PROTEIN_TERMS = [
   ...ANIMAL_TERMS.filter((t) => !NOT_COOKED_THROUGH.has(t)),
   "egg", "eggs", "anda",
 ];
-
-/**
- * Whether an item name reads as a plural, judged on its head noun — the last
- * word, which is what the verb has to agree with. "Eggs" is plural; "Chicken
- * Breast" is not, despite naming a bird.
- *
- * The -ss/-us/-is exceptions are the singular nouns that merely end in s, and
- * three of them are foods that turn up in a pantry: sea bass, octopus,
- * hummus. Without them the line would read "check the Sea Bass are cooked".
- */
-const isPluralNoun = (name: string) => {
-  const head = name.trim().split(/\s+/).pop()?.toLowerCase().replace(/[^a-z]/g, "") ?? "";
-  return head.endsWith("s") && !/(ss|us|is)$/.test(head);
-};
 
 const isOverloaded = (error: unknown) => {
   const status = (error as { status?: number })?.status;

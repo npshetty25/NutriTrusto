@@ -38,6 +38,28 @@ export const matchesTerm = (text: string, term: string): boolean => {
 };
 
 /**
+ * Whether a name reads as a plural, judged on its head noun — the last word,
+ * which is what a verb has to agree with. "Eggs" is plural; "Chicken Breast"
+ * is not, despite naming a bird.
+ *
+ * Lives here rather than at its call site because this file already owns the
+ * plural morphology: `matchesTerm` extends a match by "s"/"es" for the same
+ * reason. Two places deciding what a plural is, in one codebase, is exactly
+ * the drift this module exists to prevent.
+ *
+ * The -ss/-us/-is exceptions are singular nouns that merely end in s, three of
+ * which are foods that turn up in a pantry: sea bass, octopus, hummus.
+ * Without them a doneness line reads "check the Sea Bass are cooked".
+ *
+ * Not a term match: it takes no list and compares against nothing. It answers
+ * a grammatical question about one string.
+ */
+export const isPluralNoun = (name: string): boolean => {
+  const head = name.trim().split(/\s+/).pop()?.toLowerCase().replace(/[^a-z]/g, "") ?? "";
+  return head.endsWith("s") && !/(ss|us|is)$/.test(head);
+};
+
+/**
  * Phrases that must never be read as the concept they contain.
  *
  * Keyed by concept rather than by category or row, so the shelf-life table
