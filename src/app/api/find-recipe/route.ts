@@ -48,6 +48,20 @@ const RAW_PROTEIN_TERMS = [
   "egg", "eggs", "anda",
 ];
 
+/**
+ * Whether an item name reads as a plural, judged on its head noun — the last
+ * word, which is what the verb has to agree with. "Eggs" is plural; "Chicken
+ * Breast" is not, despite naming a bird.
+ *
+ * The -ss/-us/-is exceptions are the singular nouns that merely end in s, and
+ * three of them are foods that turn up in a pantry: sea bass, octopus,
+ * hummus. Without them the line would read "check the Sea Bass are cooked".
+ */
+const isPluralNoun = (name: string) => {
+  const head = name.trim().split(/\s+/).pop()?.toLowerCase().replace(/[^a-z]/g, "") ?? "";
+  return head.endsWith("s") && !/(ss|us|is)$/.test(head);
+};
+
 const isOverloaded = (error: unknown) => {
   const status = (error as { status?: number })?.status;
   return status === 503 || status === 429;
@@ -283,15 +297,16 @@ Your previous attempt included ${lastViolations.join(", ")}, which breaks the "$
       .filter((name: string) => RAW_PROTEIN_TERMS.some((t) => matchesTerm(name.toLowerCase(), t)));
 
     if (rawProteins.length > 0) {
-      const one = rawProteins.length === 1;
-      const named = one
+      const named = rawProteins.length === 1
         ? rawProteins[0]
         : `${rawProteins.slice(0, -1).join(", ")} and ${rawProteins[rawProteins.length - 1]}`;
-      // Agreement matters here: the first live run produced "check the
-      // Chicken Breast and Eggs is cooked", which reads like a bug and
-      // undermines a line whose whole job is to be taken seriously.
+      // Agreement keys on the NOUN, not on how many proteins there are. The
+      // first fix counted proteins, which got "check the Chicken Breast and
+      // Eggs is cooked" right but still produced "check the Eggs is cooked"
+      // for a single item with a plural name.
+      const plural = rawProteins.length > 1 || isPluralNoun(rawProteins[0]);
       steps.push(
-        one
+        !plural
           ? `Before serving, check the ${named} is cooked all the way through. If you are not sure it is done, give it longer.`
           : `Before serving, check the ${named} are cooked all the way through. If you are not sure they are done, give them longer.`
       );
