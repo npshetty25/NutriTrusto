@@ -18,6 +18,10 @@ export const metadata: Metadata = {
   description:
     "Scan a barcode to understand what is in packaged food, track what is already in your pantry, and cook it before it spoils. Built for Indian kitchens.",
   applicationName: "Nutri-Trust",
+  // iOS ignores the manifest's icons and uses its own tag. Without this
+  // "Add to Home Screen" on iPhone snapshots a blurry screenshot of the page.
+  icons: { apple: "/icons/apple-touch-icon.png" },
+  appleWebApp: { capable: true, title: "Nutri-Trust", statusBarStyle: "default" },
   // Stops the www/non-www and trailing-slash variants competing with each
   // other for the same content.
   alternates: { canonical: "/" },
