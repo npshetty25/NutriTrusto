@@ -64,6 +64,11 @@ const COUNTRIES = [
   { name: "Australian", flag: "🇦🇺" },       // 13
 ];
 
+// TheMealDB's lookup endpoint returns one flat object per meal: named fields
+// (strMeal, strInstructions, ...) plus strIngredient1..20 / strMeasure1..20,
+// each a string, or null / empty when unused.
+type MealDetail = Record<string, string | null | undefined>;
+
 interface Meal {
   idMeal: string;
   strMeal: string;
@@ -148,7 +153,7 @@ export default function RecipesPage() {
     if (userDiet === "veg") setDietFilter("veg");
     else if (userDiet === "eggtarian") setDietFilter("egg");
   }, [userDiet, dietFilterTouched]);
-  const [mealDetail, setMealDetail] = useState<any | null>(null);
+  const [mealDetail, setMealDetail] = useState<MealDetail | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
 
   const filteredCountries = COUNTRIES.filter(c =>
@@ -216,7 +221,7 @@ export default function RecipesPage() {
   };
 
   // Build ingredient list from meal detail
-  const getIngredients = (meal: any) => {
+  const getIngredients = (meal: MealDetail) => {
     const ingredients: string[] = [];
     for (let i = 1; i <= 20; i++) {
       const ing = meal[`strIngredient${i}`];
@@ -287,7 +292,7 @@ export default function RecipesPage() {
                 {/* Instructions */}
                 <h3 className="text-[11px] font-semibold uppercase tracking-widest text-foreground/50 mb-3">Instructions</h3>
                 <p className="text-sm text-foreground/70 leading-relaxed whitespace-pre-line mb-6">
-                  {mealDetail.strInstructions?.slice(0, 600)}{mealDetail.strInstructions?.length > 600 ? "..." : ""}
+                  {mealDetail.strInstructions?.slice(0, 600)}{(mealDetail.strInstructions?.length ?? 0) > 600 ? "..." : ""}
                 </p>
 
                 {/* Links */}
