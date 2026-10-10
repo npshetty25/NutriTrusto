@@ -1,7 +1,13 @@
-// Minimal app-shell service worker — not full offline data sync (the
-// pantry list itself needs Supabase, so it won't load fresh while
-// offline). This only makes sure the app shell renders instead of the
-// browser's default "no internet" page when there's no connection.
+// Minimal service worker — not offline data sync. The pantry list lives in
+// Supabase, so nothing useful can render without a connection.
+//
+// What it does instead of pretending: page navigations always go to the
+// network, and when that fails the worker serves /offline.html, a static
+// page that says plainly that the app is offline. It used to replay the last
+// cached copy of the page, which then ran, found no network, and showed
+// "Your pantry is empty" — a false statement about the user's data. Hashed
+// build assets are cached hard so the offline page and any open tab keep
+// working.
 //
 // Update policy: a new deploy must take effect on the NEXT load, not
 // "whenever every tab of the site happens to be closed at once". The
@@ -30,7 +36,8 @@
 // evicts every older cache — including the stranded `nutri-trust-shell-v3`.
 const CACHE_VERSION = new URL(self.location.href).searchParams.get("v") || "dev";
 const CACHE_NAME = `nutri-trust-shell-${CACHE_VERSION}`;
-const SHELL_ASSETS = ["/", "/logo.svg"];
+const OFFLINE_URL = "/offline.html";
+const SHELL_ASSETS = [OFFLINE_URL, "/logo.svg"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -67,8 +74,27 @@ self.addEventListener("fetch", (event) => {
   // an opaque cross-origin response here would only bloat storage and can
   // serve a stale API reply that looks like fresh data.
   if (url.origin !== self.location.origin) return;
+  // Documents: network only. They are never stored, so a stale build cannot
+  // be replayed from here (see the cache-identity note above); the one thing
+  // served on failure is the offline page.
+  if (request.mode === "navigate") {
+    event.respondWith(
+      fetch(request).catch(() =>
+        caches.match(OFFLINE_URL).then(
+          (cached) =>
+            cached ||
+            new Response("You're offline. Reconnect and try again.", {
+              status: 503,
+              headers: { "Content-Type": "text/plain; charset=utf-8" },
+            })
+        )
+      )
+    );
+    return;
+  }
+
   // Build output is content-hashed, so it can be cached hard; anything else
-  // (HTML, API routes) goes to the network first.
+  // (manifest, icons, API routes) goes to the network first.
   const isHashedAsset = url.pathname.startsWith("/_next/static/");
 
   if (isHashedAsset) {
@@ -97,6 +123,7 @@ self.addEventListener("fetch", (event) => {
         }
         return response;
       })
-      .catch(() => caches.match(request).then((cached) => cached || caches.match("/")))
+      // A failed icon or manifest request must fail, not receive an HTML page.
+      .catch(() => caches.match(request).then((cached) => cached || Response.error()))
   );
 });
