@@ -137,7 +137,7 @@ export default function ExpiryDateScanner({ onResult, onClose }: ExpiryDateScann
             <div className="rounded-xl bg-foreground/5 px-3 py-2.5 space-y-1">
               <p className="text-[11px] font-semibold text-foreground/60 uppercase tracking-wider">Tips for best results</p>
               <ul className="text-xs text-foreground/50 space-y-0.5">
-                <li>• Look for "MFD", "EXP", "Use By" or "Best Before" text</li>
+                <li>• Look for &quot;MFD&quot;, &quot;EXP&quot;, &quot;Use By&quot; or &quot;Best Before&quot; text</li>
                 <li>• Often printed near the cap, seal, or pack edge</li>
                 <li>• Use good lighting and keep the camera steady</li>
               </ul>
