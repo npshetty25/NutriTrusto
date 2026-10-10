@@ -2604,14 +2604,14 @@ if (nutritionFieldsFilled < 2) {
               <button
                 onClick={closeEditItem}
                 disabled={isSavingEdit}
-                className="flex-1 border border-border rounded-xl py-2.5 text-sm font-semibold hover:bg-foreground/5 transition-colors disabled:opacity-60"
+                className="flex-1 min-h-11 border border-border rounded-xl py-2.5 text-sm font-semibold hover:bg-foreground/5 transition-colors disabled:opacity-60"
               >
                 Cancel
               </button>
               <button
                 onClick={() => { void saveEditItem(); }}
                 disabled={isSavingEdit}
-                className="flex-1 bg-foreground text-background rounded-xl py-2.5 text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center justify-center gap-2"
+                className="flex-1 min-h-11 bg-foreground text-background rounded-xl py-2.5 text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center justify-center gap-2"
               >
                 {isSavingEdit ? <Loader2 size={14} className="animate-spin" /> : null}
                 Save Changes
