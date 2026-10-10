@@ -149,6 +149,7 @@ export default function ExpiryDateScanner({ onResult, onClose }: ExpiryDateScann
               ref={cameraRef}
               type="file"
               accept="image/*"
+              capture="environment"
               title="Capture expiry date"
               aria-label="Capture expiry date"
               className="hidden"
