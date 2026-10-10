@@ -181,7 +181,7 @@ export function ProfileDropdown({ onOpenShoppingList }: ProfileDropdownProps) {
         onClick={toggleOpen}
         aria-haspopup="menu"
         aria-expanded={open}
-        className="flex items-center gap-2 bg-foreground/5 border border-border hover:border-foreground/20 rounded-full pl-1 pr-3 py-1 transition-all"
+        className="flex min-h-11 items-center gap-2 bg-foreground/5 border border-border hover:border-foreground/20 rounded-full pl-1.5 pr-3 py-1 transition-all"
       >
         <div className="w-7 h-7 rounded-full bg-foreground text-background flex items-center justify-center text-xs font-bold shrink-0">
           {initials}
