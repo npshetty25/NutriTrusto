@@ -2108,7 +2108,7 @@ if (nutritionFieldsFilled < 2) {
             </div>
           </div>
         ) : (
-          <div className="flex flex-col gap-3">
+          <div className="grid grid-cols-1 items-start gap-3 md:grid-cols-2">
             {paginatedItems.map(item => {
               // Only suggest an alternative when a real scan actually rated the
               // item poorly. This used to key off a grade derived from the
