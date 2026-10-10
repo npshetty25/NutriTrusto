@@ -181,10 +181,11 @@ Return ONLY the raw JSON string, with no markdown formatting.`;
       items,
       purchase_date,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const err = error as { message?: string; stack?: string } | null;
     log.error("Unhandled extraction error", {
-      message: error?.message || "Unknown error",
-      stack: error?.stack || null,
+      message: err?.message || "Unknown error",
+      stack: err?.stack || null,
     });
     return NextResponse.json({ success: false, error: "Failed to parse receipt" }, { status: 500 });
   }

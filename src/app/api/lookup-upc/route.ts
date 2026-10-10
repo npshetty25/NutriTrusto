@@ -105,10 +105,11 @@ export async function GET(req: Request) {
     log.warn("All lookup sources exhausted for UPC", { upc });
     return NextResponse.json({ items: [] });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const err = error as { message?: string; stack?: string } | null;
     log.error("Unhandled UPC lookup error", {
-      message: error?.message || "Unknown error",
-      stack: error?.stack || null,
+      message: err?.message || "Unknown error",
+      stack: err?.stack || null,
     });
     return NextResponse.json({ error: "Failed to fetch from UPC registry" }, { status: 500 });
   }
