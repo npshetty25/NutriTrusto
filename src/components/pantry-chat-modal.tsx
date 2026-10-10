@@ -79,7 +79,7 @@ export default function PantryChatModal({ items, dietaryPreference, onClose }: P
           onClick={onClose}
           title="Close chat"
           aria-label="Close chat"
-          className="w-8 h-8 flex items-center justify-center rounded-full bg-foreground/10 hover:bg-foreground/20 transition-colors shrink-0"
+          className="w-11 h-11 flex items-center justify-center rounded-full bg-foreground/10 hover:bg-foreground/20 transition-colors shrink-0"
         >
           <X size={16} />
         </button>
