@@ -320,7 +320,7 @@ export default function RecipesPage() {
                 placeholder="Search country..."
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                className="w-full min-h-11 bg-card border border-border rounded-xl pl-9 pr-4 py-2.5 text-sm focus:outline-none focus:border-foreground/30 transition-all"
+                className="w-full min-h-11 bg-card border border-border rounded-xl pl-9 pr-4 py-2.5 text-base focus:outline-none focus:border-foreground/30 transition-all"
               />
             </div>
             <div className="grid grid-cols-1 gap-2">

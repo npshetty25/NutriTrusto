@@ -1967,7 +1967,7 @@ if (nutritionFieldsFilled < 2) {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search your pantry…"
-              className="neu-field w-full rounded-xl pl-9 pr-3 h-11 text-sm"
+              className="neu-field w-full rounded-xl pl-9 pr-3 h-11 text-base"
             />
           </div>
           <button
@@ -2583,7 +2583,7 @@ if (nutritionFieldsFilled < 2) {
                   type="text"
                   value={editName}
                   onChange={(e) => setEditName(e.target.value)}
-                  className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-foreground/20"
+                  className="w-full bg-background border border-border rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-1 focus:ring-foreground/20"
                 />
               </div>
               <div className="space-y-1.5">
@@ -2594,7 +2594,7 @@ if (nutritionFieldsFilled < 2) {
                   inputMode="numeric"
                   value={editDaysLeft}
                   onChange={(e) => setEditDaysLeft(e.target.value)}
-                  className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-foreground/20"
+                  className="w-full bg-background border border-border rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-1 focus:ring-foreground/20"
                 />
                 <p className="text-[11px] text-foreground/60">Saving resets the freshness clock to start counting down from today.</p>
               </div>
@@ -2633,7 +2633,7 @@ if (nutritionFieldsFilled < 2) {
               value={manualBarcodeName}
               onChange={(e) => setManualBarcodeName(e.target.value)}
               placeholder="e.g., Whole Wheat Pasta"
-              className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-foreground/20"
+              className="w-full bg-background border border-border rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-1 focus:ring-foreground/20"
             />
             <label className="mt-3 flex items-start gap-2.5 cursor-pointer">
               <input
@@ -2796,7 +2796,7 @@ if (nutritionFieldsFilled < 2) {
                   onChange={(e) => setManualRetryBarcode(e.target.value.replace(/\D/g, ""))}
                   inputMode="numeric"
                   placeholder="Type barcode digits"
-                  className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-foreground/20"
+                  className="w-full bg-background border border-border rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-1 focus:ring-foreground/20"
                 />
               </div>
             )}

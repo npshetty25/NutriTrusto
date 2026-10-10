@@ -132,7 +132,7 @@ export default function PantryChatModal({ items, dietaryPreference, onClose }: P
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") sendQuestion(input); }}
             placeholder="Ask a question..."
-            className="flex-1 bg-background border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-foreground/20"
+            className="flex-1 bg-background border border-border rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-1 focus:ring-foreground/20"
           />
           <button
             onClick={() => sendQuestion(input)}
