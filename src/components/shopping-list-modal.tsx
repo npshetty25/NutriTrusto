@@ -134,7 +134,7 @@ export default function ShoppingListModal({ onClose }: ShoppingListModalProps) {
             onClick={onClose}
             title="Close shopping list"
             aria-label="Close shopping list"
-            className="w-8 h-8 flex items-center justify-center rounded-full bg-foreground/10 hover:bg-foreground/20 transition-colors"
+            className="w-11 h-11 flex items-center justify-center rounded-full bg-foreground/10 hover:bg-foreground/20 transition-colors"
           >
             <X size={14} />
           </button>
