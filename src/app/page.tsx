@@ -2410,7 +2410,7 @@ if (nutritionFieldsFilled < 2) {
                 </div>
                 <button
                   onClick={() => setShowExpiryScanner(true)}
-                  className="flex items-center gap-1.5 border border-border bg-card text-foreground text-xs font-semibold px-3 py-2 rounded-lg hover:bg-foreground/5 transition-colors shrink-0 whitespace-nowrap"
+                  className="flex min-h-11 items-center gap-1.5 border border-border bg-card text-foreground text-xs font-semibold px-3 py-2 rounded-lg hover:bg-foreground/5 transition-colors shrink-0 whitespace-nowrap"
                 >
                   <CalendarClock size={13} /> {scannedExpiry ? "Rescan" : "Scan date"}
                 </button>
