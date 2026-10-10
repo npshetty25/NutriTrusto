@@ -149,7 +149,10 @@ export default function RootLayout({
       </head>
       <body className="flex flex-col min-h-screen bg-background text-foreground transition-colors duration-300">
         <AuthProvider>
-          <main className="flex-1 w-full max-w-md mx-auto min-h-screen relative flex flex-col">
+          {/* One phone-width column up to 767px; from md up it widens so a
+              tablet is not a 448px strip with empty gutters. Pages that need
+              the narrow measure (login card, modals) size themselves. */}
+          <main className="flex-1 w-full max-w-md md:max-w-3xl mx-auto min-h-screen relative flex flex-col">
             {children}
             <AppToaster />
           </main>
