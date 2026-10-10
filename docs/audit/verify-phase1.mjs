@@ -15,7 +15,6 @@ import path from "node:path";
 
 const mode = process.argv[2];
 const BASE = process.env.BASE_URL || "http://localhost:3100";
-const PORT = new URL(BASE).port;
 const OUT = process.env.OUT_DIR;
 const REF = "ileghmcyotmlahlmyszj";
 fs.mkdirSync(OUT, { recursive: true });
