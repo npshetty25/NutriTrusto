@@ -33,11 +33,14 @@ export default function BarcodeScanner({ onScan, onError, onClose }: BarcodeScan
     };
 
     isHandlingResult.current = false;
-    setDebugError(null);
 
     // Delay instantiation to bypass React 18 Strict Mode double-mount glitch
     const mountTimer = setTimeout(() => {
       if (!isComponentMounted.current) return;
+      // Cleared here rather than synchronously in the effect body, so a
+      // restart (camera flip) still starts from a clean slate without a
+      // cascading render on every effect run.
+      setDebugError(null);
 
       if (!html5QrCodeRef.current) {
         html5QrCodeRef.current = new Html5Qrcode("reader");
