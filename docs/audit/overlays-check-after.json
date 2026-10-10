@@ -1,0 +1,69 @@
+{
+  "device": "Pixel 7 (Chromium emulation)",
+  "overlays": [
+    {
+      "overlay": "profile menu",
+      "interactive": 19,
+      "under44": 0,
+      "small": [],
+      "inputsUnder16px": [],
+      "hScroll": false
+    },
+    {
+      "overlay": "notifications panel",
+      "interactive": 6,
+      "under44": 0,
+      "small": [],
+      "inputsUnder16px": [],
+      "hScroll": false
+    },
+    {
+      "overlay": "Ask AI chat",
+      "interactive": 6,
+      "under44": 0,
+      "small": [],
+      "inputsUnder16px": [],
+      "hScroll": false
+    },
+    {
+      "overlay": "edit item dialog",
+      "interactive": 5,
+      "under44": 0,
+      "small": [],
+      "inputsUnder16px": [],
+      "hScroll": false
+    },
+    {
+      "overlay": "household settings",
+      "interactive": 4,
+      "under44": 0,
+      "small": [],
+      "inputsUnder16px": [],
+      "hScroll": false
+    },
+    {
+      "overlay": "shopping list",
+      "interactive": 3,
+      "under44": 0,
+      "small": [],
+      "inputsUnder16px": [],
+      "hScroll": false
+    },
+    {
+      "overlay": "scan history",
+      "interactive": 1,
+      "under44": 0,
+      "small": [],
+      "inputsUnder16px": [],
+      "hScroll": false
+    },
+    {
+      "overlay": "impact dashboard",
+      "interactive": 1,
+      "under44": 0,
+      "small": [],
+      "inputsUnder16px": [],
+      "hScroll": false
+    }
+  ]
+}

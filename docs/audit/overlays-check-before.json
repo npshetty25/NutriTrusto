@@ -1,0 +1,258 @@
+{
+  "device": "Pixel 7 (Chromium emulation)",
+  "overlays": [
+    {
+      "overlay": "profile menu",
+      "interactive": 19,
+      "under44": 13,
+      "small": [
+        {
+          "tag": "button",
+          "w": 71,
+          "h": 29,
+          "label": "Vegetarian — no meat, fish or egg"
+        },
+        {
+          "tag": "button",
+          "w": 71,
+          "h": 29,
+          "label": "Eggtarian — egg is fine, no meat or fish"
+        },
+        {
+          "tag": "button",
+          "w": 71,
+          "h": 29,
+          "label": "No restriction"
+        },
+        {
+          "tag": "button",
+          "w": 71,
+          "h": 29,
+          "label": "Light theme"
+        },
+        {
+          "tag": "button",
+          "w": 71,
+          "h": 29,
+          "label": "System theme"
+        },
+        {
+          "tag": "button",
+          "w": 71,
+          "h": 29,
+          "label": "Dark theme"
+        },
+        {
+          "tag": "button",
+          "w": 242,
+          "h": 40,
+          "label": "Household Settings"
+        },
+        {
+          "tag": "button",
+          "w": 242,
+          "h": 40,
+          "label": "Shopping List"
+        },
+        {
+          "tag": "button",
+          "w": 242,
+          "h": 40,
+          "label": "Scan History"
+        },
+        {
+          "tag": "button",
+          "w": 242,
+          "h": 40,
+          "label": "Impact Dashboard"
+        },
+        {
+          "tag": "button",
+          "w": 242,
+          "h": 40,
+          "label": "Notification Preferences"
+        },
+        {
+          "tag": "button",
+          "w": 242,
+          "h": 40,
+          "label": "Account Settings"
+        },
+        {
+          "tag": "button",
+          "w": 242,
+          "h": 40,
+          "label": "Sign Out"
+        }
+      ],
+      "inputsUnder16px": [],
+      "hScroll": false
+    },
+    {
+      "overlay": "notifications panel",
+      "interactive": 6,
+      "under44": 1,
+      "small": [
+        {
+          "tag": "button",
+          "w": 36,
+          "h": 36,
+          "label": "Close notifications"
+        }
+      ],
+      "inputsUnder16px": [],
+      "hScroll": false
+    },
+    {
+      "overlay": "Ask AI chat",
+      "interactive": 6,
+      "under44": 1,
+      "small": [
+        {
+          "tag": "button",
+          "w": 32,
+          "h": 32,
+          "label": "Close chat"
+        }
+      ],
+      "inputsUnder16px": [
+        {
+          "label": "Ask a question...",
+          "px": 14
+        }
+      ],
+      "hScroll": false
+    },
+    {
+      "overlay": "edit item dialog",
+      "interactive": 5,
+      "under44": 3,
+      "small": [
+        {
+          "tag": "button",
+          "w": 32,
+          "h": 32,
+          "label": "Close edit"
+        },
+        {
+          "tag": "button",
+          "w": 338,
+          "h": 42,
+          "label": "Cancel"
+        },
+        {
+          "tag": "button",
+          "w": 338,
+          "h": 40,
+          "label": "Save Changes"
+        }
+      ],
+      "inputsUnder16px": [
+        {
+          "label": "text",
+          "px": 14
+        },
+        {
+          "label": "number",
+          "px": 14
+        }
+      ],
+      "hScroll": false
+    },
+    {
+      "overlay": "household settings",
+      "interactive": 4,
+      "under44": 3,
+      "small": [
+        {
+          "tag": "button",
+          "w": 32,
+          "h": 32,
+          "label": "Close household settings"
+        },
+        {
+          "tag": "input",
+          "w": 278,
+          "h": 42,
+          "label": "Enter invite code"
+        },
+        {
+          "tag": "button",
+          "w": 60,
+          "h": 42,
+          "label": "Join"
+        }
+      ],
+      "inputsUnder16px": [
+        {
+          "label": "Enter invite code",
+          "px": 14
+        }
+      ],
+      "hScroll": false
+    },
+    {
+      "overlay": "shopping list",
+      "interactive": 3,
+      "under44": 3,
+      "small": [
+        {
+          "tag": "button",
+          "w": 32,
+          "h": 32,
+          "label": "Close shopping list"
+        },
+        {
+          "tag": "input",
+          "w": 298,
+          "h": 42,
+          "label": "Add an item..."
+        },
+        {
+          "tag": "button",
+          "w": 40,
+          "h": 40,
+          "label": "Add item"
+        }
+      ],
+      "inputsUnder16px": [
+        {
+          "label": "Add an item...",
+          "px": 14
+        }
+      ],
+      "hScroll": false
+    },
+    {
+      "overlay": "scan history",
+      "interactive": 1,
+      "under44": 1,
+      "small": [
+        {
+          "tag": "button",
+          "w": 32,
+          "h": 32,
+          "label": "Close scan history"
+        }
+      ],
+      "inputsUnder16px": [],
+      "hScroll": false
+    },
+    {
+      "overlay": "impact dashboard",
+      "interactive": 1,
+      "under44": 1,
+      "small": [
+        {
+          "tag": "button",
+          "w": 32,
+          "h": 32,
+          "label": "Close impact dashboard"
+        }
+      ],
+      "inputsUnder16px": [],
+      "hScroll": false
+    }
+  ],
+  "note": "Pre-fix measurements. profile menu and edit item dialog were re-run after a harness fix; values are from before any tap-target change."
+}

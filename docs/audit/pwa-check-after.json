@@ -1,0 +1,93 @@
+{
+  "swRegistration": {
+    "scope": "http://localhost:3100/",
+    "state": "activated",
+    "script": "http://localhost:3100/sw.js?v=5d911c9"
+  },
+  "controlledAfterReload": true,
+  "installabilityErrors": [],
+  "manifestErrors": [],
+  "head": {
+    "manifestLink": "/manifest.webmanifest",
+    "appleTouchIcon": "/icons/apple-touch-icon.png",
+    "themeColor": "#111111",
+    "appleCapable": "yes",
+    "viewport": "width=device-width, initial-scale=1"
+  },
+  "manifest": {
+    "id": "/",
+    "name": "Nutri-Trust — Smart Pantry",
+    "start_url": "/",
+    "scope": "/",
+    "display": "standalone",
+    "background_color": "#e9ebf1",
+    "theme_color": "#111111"
+  },
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "declared": "192x192",
+      "purpose": "any",
+      "status": 200,
+      "type": "image/png",
+      "bytes": 13413,
+      "dims": "192x192"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "declared": "512x512",
+      "purpose": "any",
+      "status": 200,
+      "type": "image/png",
+      "bytes": 41923,
+      "dims": "512x512"
+    },
+    {
+      "src": "/icons/icon-maskable-512.png",
+      "declared": "512x512",
+      "purpose": "maskable",
+      "status": 200,
+      "type": "image/png",
+      "bytes": 37327,
+      "dims": "512x512"
+    },
+    {
+      "src": "/logo.svg",
+      "declared": "any",
+      "purpose": "any",
+      "status": 200,
+      "type": "image/svg+xml",
+      "bytes": 30996,
+      "dims": null
+    }
+  ],
+  "offlinePageCached": "nutri-trust-shell-5d911c9",
+  "stoppedServerPids": "27288",
+  "serverReallyDown": true,
+  "offline": [
+    {
+      "url": "/login",
+      "status": 200,
+      "fromServiceWorker": true,
+      "title": "Offline | Nutri-Trust",
+      "h1": "You're offline",
+      "tryAgainButton": true
+    },
+    {
+      "url": "/recipes",
+      "status": 200,
+      "fromServiceWorker": true,
+      "title": "Offline | Nutri-Trust",
+      "h1": "You're offline",
+      "tryAgainButton": true
+    },
+    {
+      "url": "/privacy",
+      "status": 200,
+      "fromServiceWorker": true,
+      "title": "Offline | Nutri-Trust",
+      "h1": "You're offline",
+      "tryAgainButton": true
+    }
+  ]
+}
