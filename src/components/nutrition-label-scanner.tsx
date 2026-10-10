@@ -164,6 +164,7 @@ export default function NutritionLabelScanner({ onResult, onClose }: NutritionLa
               ref={cameraRef}
               type="file"
               accept="image/*"
+              capture="environment"
               title="Capture nutrition label"
               aria-label="Capture nutrition label"
               className="hidden"
