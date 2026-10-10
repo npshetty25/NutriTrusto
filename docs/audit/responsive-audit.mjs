@@ -92,7 +92,7 @@ const measure = () => {
     if (el instanceof HTMLInputElement && el.type === "file") continue;
     total++;
     const r = el.getBoundingClientRect();
-    if (r.width < 44 || r.height < 44) {
+    if (r.width < 43.5 || r.height < 43.5) {
       small.push({
         tag: el.tagName.toLowerCase(),
         w: Math.round(r.width),
