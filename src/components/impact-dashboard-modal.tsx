@@ -145,7 +145,7 @@ export function ImpactDashboardModal({ onClose }: ImpactDashboardModalProps) {
             onClick={onClose}
             title="Close impact dashboard"
             aria-label="Close impact dashboard"
-            className="w-8 h-8 flex items-center justify-center rounded-full bg-foreground/10 hover:bg-foreground/20 transition-colors"
+            className="w-11 h-11 flex items-center justify-center rounded-full bg-foreground/10 hover:bg-foreground/20 transition-colors"
           >
             <X size={14} />
           </button>
