@@ -76,7 +76,7 @@ export function DietPreferenceToggle() {
               : "No restriction"
             }
             aria-pressed={current === id}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-full text-[11px] font-bold transition-all disabled:opacity-60 ${
+            className={`flex-1 min-h-11 flex items-center justify-center gap-1.5 py-1.5 rounded-full text-[11px] font-bold transition-all disabled:opacity-60 ${
               current === id ? "bg-card text-foreground shadow-sm" : "text-foreground/50 hover:text-foreground/80"
             }`}
           >
