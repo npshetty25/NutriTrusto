@@ -1709,7 +1709,7 @@ if (nutritionFieldsFilled < 2) {
             {!generatedRecipe ? (
               <div className="p-4 flex flex-col gap-4">
                 <div>
-                  <h2 className="font-semibold text-sm flex items-center gap-2"><BrainCircuit size={14} /> Use up what's expiring</h2>
+                  <h2 className="font-semibold text-sm flex items-center gap-2"><BrainCircuit size={14} /> Use up what&apos;s expiring</h2>
                   <p className="text-xs text-foreground/60 mt-1">Cook something using what expires first.</p>
                 </div>
                 <motion.button
@@ -2503,7 +2503,7 @@ if (nutritionFieldsFilled < 2) {
               {scannedResult.analysis.positives?.length > 0 && (
                 <div className="space-y-3">
                   <h4 className="font-bold flex items-center gap-2 text-foreground">
-                    What You'll Like <span className="text-xl">🙂</span>
+                    What You&apos;ll Like <span className="text-xl">🙂</span>
                   </h4>
                   {/* Raw green-500/600/700 here was the second instance of
                       the non-veg-in-green defect: it painted a scanned
