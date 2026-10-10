@@ -1,8 +1,8 @@
 {
   "swRegistration": {
     "scope": "http://localhost:3100/",
-    "state": "activated",
-    "script": "http://localhost:3100/sw.js?v=5d911c9"
+    "state": "activating",
+    "script": "http://localhost:3100/sw.js?v=8ebd844"
   },
   "controlledAfterReload": true,
   "installabilityErrors": [],
@@ -61,8 +61,8 @@
       "dims": null
     }
   ],
-  "offlinePageCached": "nutri-trust-shell-5d911c9",
-  "stoppedServerPids": "27288",
+  "offlinePageCached": "nutri-trust-shell-8ebd844",
+  "stoppedServerPids": "14804",
   "serverReallyDown": true,
   "offline": [
     {
