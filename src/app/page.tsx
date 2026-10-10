@@ -2363,7 +2363,7 @@ if (nutritionFieldsFilled < 2) {
             {/* Header */}
             <div className="sticky top-0 bg-card/80 backdrop-blur-md z-10 border-b border-border px-5 py-4 flex justify-between items-center">
               <h3 id="scanned-result-heading" className="font-bold text-lg text-foreground truncate pr-4">{scannedResult.name}</h3>
-              <button onClick={() => { setScannedResult(null); setScannedExpiry(null); }} title="Close analysis" aria-label="Close analysis" className="w-8 h-8 flex items-center justify-center rounded-full bg-foreground/10 hover:bg-foreground/20 text-foreground transition-colors shrink-0">
+              <button onClick={() => { setScannedResult(null); setScannedExpiry(null); }} title="Close analysis" aria-label="Close analysis" className="w-11 h-11 flex items-center justify-center rounded-full bg-foreground/10 hover:bg-foreground/20 text-foreground transition-colors shrink-0">
                 <X size={18} />
               </button>
             </div>
