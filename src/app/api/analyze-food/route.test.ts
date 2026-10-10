@@ -70,6 +70,32 @@ describe("POST /api/analyze-food — scoring", () => {
     expect(body.data_accuracy_warning).toMatch(/verified nutrition label data/);
   });
 
+  // One adjustment at a time, so a changed or deleted rule is visible instead
+  // of being absorbed by the 1.0 floor. Bases: A=95 B=80 C=60. score = total/20.
+  it.each([
+    ["sugar > 22.5 g costs 20", "b", { sugars_g_100g: 30 }, "3.0"], // 80-20=60
+    ["sugar > 10 g costs 12", "b", { sugars_g_100g: 15 }, "3.4"], // 80-12=68
+    ["sodium > 600 mg costs 18", "b", { sodium_mg_100g: 700 }, "3.1"], // 80-18=62
+    ["sodium > 400 mg costs 12", "b", { sodium_mg_100g: 500 }, "3.4"], // 80-12=68
+    ["saturated fat > 5 g costs 15", "a", { saturated_fat_g_100g: 8 }, "4.0"], // 95-15=80
+    ["saturated fat > 2 g costs 8", "b", { saturated_fat_g_100g: 3 }, "3.6"], // 80-8=72
+    ["fibre > 6 g adds 10", "c", { fibre_g_100g: 7 }, "3.5"], // 60+10=70
+    ["fibre > 3 g adds 6", "c", { fibre_g_100g: 4 }, "3.3"], // 60+6=66
+    ["fibre > 1.5 g adds 3", "a", { fibre_g_100g: 2 }, "4.9"], // 95+3=98
+    ["protein > 10 g adds 8", "c", { protein_g_100g: 12 }, "3.4"], // 60+8=68
+    ["protein > 5 g adds 4", "c", { protein_g_100g: 6 }, "3.2"], // 60+4=64
+    ["protein > 2 g adds 2", "b", { protein_g_100g: 3 }, "4.1"], // 80+2=82
+  ])("%s", async (_label, grade, nutritionData, expected) => {
+    const { body } = await analyze({ name: "Test Food", nutriScoreGrade: grade, nutritionData });
+    expect(body.health_score).toBe(expected);
+  });
+
+  it("each distinct synthetic colour costs 2", async () => {
+    // B=80, one colour -> 78 -> 3.9
+    const { body } = await analyze({ name: "Candy", nutriScoreGrade: "b", additiveColors: ["tartrazine"] });
+    expect(body.health_score).toBe("3.9");
+  });
+
   it("an unknown grade starts from 55", async () => {
     const { body } = await analyze({ name: "Mystery Snack" });
     expect(body.health_score).toBe("2.8"); // 55/20 = 2.75 -> 2.8
