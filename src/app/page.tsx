@@ -2571,7 +2571,7 @@ if (nutritionFieldsFilled < 2) {
           <div role="dialog" aria-modal="true" aria-labelledby="edit-item-heading" className="neu-panel w-full max-w-md rounded-2xl p-5">
             <div className="flex items-center justify-between mb-4">
               <h3 id="edit-item-heading" className="text-lg font-bold tracking-tight">Edit Item</h3>
-              <button onClick={closeEditItem} title="Close edit" aria-label="Close edit" className="w-8 h-8 flex items-center justify-center rounded-full bg-foreground/10 hover:bg-foreground/20 transition-colors">
+              <button onClick={closeEditItem} title="Close edit" aria-label="Close edit" className="w-11 h-11 flex items-center justify-center rounded-full bg-foreground/10 hover:bg-foreground/20 transition-colors">
                 <X size={16} />
               </button>
             </div>
