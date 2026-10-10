@@ -160,10 +160,14 @@ export function PantryCard({ name, daysLeft, risk, purchaseDate, healthScore, di
               {hasScore ? score.toFixed(1) : "—"}
             </div>
             <VegMark diet={itemDiet} unverified={dietUnverified} size={15} />
-            <h3 title={name} className="font-bold text-sm sm:text-[15px] text-foreground tracking-tight leading-snug truncate">
-              {name}
-            </h3>
           </div>
+          {/* The name gets its own row. Beside the icon, score and veg mark it
+              was left with about 80px once the risk badge took its share, so
+              "Whole Wheat Bread" rendered as "Whole ...". Two lines of the
+              full column width fit any real product name. */}
+          <h3 title={name} className="mb-1 font-bold text-sm sm:text-[15px] text-foreground tracking-tight leading-snug line-clamp-2 wrap-break-word">
+            {name}
+          </h3>
           {/* An expiry tracker that never printed an expiry date. The
               purchase date was the only date on the card — the one that
               doesn't matter — leaving the user to hold the shelf life in
