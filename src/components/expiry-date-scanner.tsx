@@ -89,7 +89,7 @@ export default function ExpiryDateScanner({ onResult, onClose }: ExpiryDateScann
             onClick={onClose}
             title="Close expiry scanner"
             aria-label="Close expiry scanner"
-            className="w-11 h-11 flex items-center justify-center rounded-full bg-foreground/10 hover:bg-foreground/20 transition-colors"
+            className="w-11 h-11 shrink-0 flex items-center justify-center rounded-full bg-foreground/10 hover:bg-foreground/20 transition-colors"
           >
             <X size={14} />
           </button>
