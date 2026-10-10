@@ -1824,7 +1824,7 @@ if (nutritionFieldsFilled < 2) {
                   title="Close notifications"
                   aria-label="Close notifications"
                   onClick={() => setShowNotificationsPanel(false)}
-                  className="neu-raised-sm w-9 h-9 rounded-xl flex items-center justify-center shrink-0 text-foreground/70"
+                  className="neu-raised-sm w-11 h-11 rounded-xl flex items-center justify-center shrink-0 text-foreground/70"
                 >
                   <X size={15} />
                 </button>
