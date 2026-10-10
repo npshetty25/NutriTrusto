@@ -203,7 +203,7 @@ export default function ShoppingListModal({ onClose }: ShoppingListModalProps) {
           )}
 
           {!loading && !error && rows.length > 0 && visibleRows.length === 0 && (
-            <div className="text-center py-8 text-sm text-foreground/50">Nothing to show — everything's checked off.</div>
+            <div className="text-center py-8 text-sm text-foreground/50">Nothing to show — everything&apos;s checked off.</div>
           )}
 
           {visibleRows.map((row) => (
