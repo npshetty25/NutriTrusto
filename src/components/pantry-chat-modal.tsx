@@ -79,7 +79,7 @@ export default function PantryChatModal({ items, dietaryPreference, onClose }: P
           onClick={onClose}
           title="Close chat"
           aria-label="Close chat"
-          className="w-8 h-8 flex items-center justify-center rounded-full bg-foreground/10 hover:bg-foreground/20 transition-colors shrink-0"
+          className="w-11 h-11 flex items-center justify-center rounded-full bg-foreground/10 hover:bg-foreground/20 transition-colors shrink-0"
         >
           <X size={16} />
         </button>
@@ -132,7 +132,7 @@ export default function PantryChatModal({ items, dietaryPreference, onClose }: P
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") sendQuestion(input); }}
             placeholder="Ask a question..."
-            className="flex-1 bg-background border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-foreground/20"
+            className="flex-1 bg-background border border-border rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-1 focus:ring-foreground/20"
           />
           <button
             onClick={() => sendQuestion(input)}

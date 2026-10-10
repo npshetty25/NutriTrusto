@@ -87,7 +87,7 @@ export function RecipeModal({
             onClick={onClose}
             title="Close recipe"
             aria-label="Close recipe"
-            className="w-8 h-8 shrink-0 flex items-center justify-center rounded-full bg-foreground/10 hover:bg-foreground/20 transition-colors"
+            className="w-11 h-11 shrink-0 flex items-center justify-center rounded-full bg-foreground/10 hover:bg-foreground/20 transition-colors"
           >
             <X size={14} />
           </button>

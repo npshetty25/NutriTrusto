@@ -18,6 +18,10 @@ export const metadata: Metadata = {
   description:
     "Scan a barcode to understand what is in packaged food, track what is already in your pantry, and cook it before it spoils. Built for Indian kitchens.",
   applicationName: "Nutri-Trust",
+  // iOS ignores the manifest's icons and uses its own tag. Without this
+  // "Add to Home Screen" on iPhone snapshots a blurry screenshot of the page.
+  icons: { apple: "/icons/apple-touch-icon.png" },
+  appleWebApp: { capable: true, title: "Nutri-Trust", statusBarStyle: "default" },
   // Stops the www/non-www and trailing-slash variants competing with each
   // other for the same content.
   alternates: { canonical: "/" },
@@ -149,7 +153,10 @@ export default function RootLayout({
       </head>
       <body className="flex flex-col min-h-screen bg-background text-foreground transition-colors duration-300">
         <AuthProvider>
-          <main className="flex-1 w-full max-w-md mx-auto min-h-screen relative flex flex-col">
+          {/* One phone-width column up to 767px; from md up it widens so a
+              tablet is not a 448px strip with empty gutters. Pages that need
+              the narrow measure (login card, modals) size themselves. */}
+          <main className="flex-1 w-full max-w-md md:max-w-3xl mx-auto min-h-screen relative flex flex-col">
             {children}
             <AppToaster />
           </main>

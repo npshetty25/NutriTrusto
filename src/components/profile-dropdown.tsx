@@ -112,7 +112,7 @@ export function ProfileDropdown({ onOpenShoppingList }: ProfileDropdownProps) {
   };
 
   const itemClass =
-    "w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-foreground/80 hover:bg-foreground/5 rounded-xl transition-colors text-left";
+    "w-full min-h-11 flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-foreground/80 hover:bg-foreground/5 rounded-xl transition-colors text-left";
 
   const menu = open && menuPos ? createPortal(
     <div
@@ -164,7 +164,7 @@ export function ProfileDropdown({ onOpenShoppingList }: ProfileDropdownProps) {
           onClick={handleSignOut}
           disabled={signingOut}
           role="menuitem"
-          className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-danger hover:bg-danger/5 rounded-xl transition-colors text-left disabled:opacity-60"
+          className="w-full min-h-11 flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-danger hover:bg-danger/5 rounded-xl transition-colors text-left disabled:opacity-60"
         >
           {signingOut ? <Loader2 size={15} className="animate-spin" /> : <LogOut size={15} />}
           {signingOut ? "Signing Out..." : "Sign Out"}
@@ -181,7 +181,7 @@ export function ProfileDropdown({ onOpenShoppingList }: ProfileDropdownProps) {
         onClick={toggleOpen}
         aria-haspopup="menu"
         aria-expanded={open}
-        className="flex items-center gap-2 bg-foreground/5 border border-border hover:border-foreground/20 rounded-full pl-1 pr-3 py-1 transition-all"
+        className="flex min-h-11 items-center gap-2 bg-foreground/5 border border-border hover:border-foreground/20 rounded-full pl-1.5 pr-3 py-1 transition-all"
       >
         <div className="w-7 h-7 rounded-full bg-foreground text-background flex items-center justify-center text-xs font-bold shrink-0">
           {initials}

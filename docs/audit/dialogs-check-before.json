@@ -1,0 +1,179 @@
+{
+  "device": "Pixel 7 (Chromium emulation)",
+  "viewport": {
+    "width": 412,
+    "height": 839
+  },
+  "steps": [
+    {
+      "step": "dashboard closed",
+      "interactive": 10,
+      "under44": 0,
+      "small": [],
+      "inputsUnder16px": [
+        {
+          "label": "Search your pantry…",
+          "px": 14
+        }
+      ],
+      "hScroll": false
+    },
+    {
+      "step": "receipt menu open",
+      "interactive": 11,
+      "under44": 0,
+      "small": [],
+      "inputsUnder16px": [
+        {
+          "label": "Search your pantry…",
+          "px": 14
+        }
+      ],
+      "hScroll": false
+    },
+    {
+      "step": "receipt > Take Photo",
+      "capture": "environment",
+      "accept": "image/*",
+      "label": "Take a photo of the receipt"
+    },
+    {
+      "step": "receipt > Choose from Gallery (control)",
+      "capture": null,
+      "accept": "image/*,.pdf,application/pdf",
+      "label": "Choose a receipt photo from your gallery"
+    },
+    {
+      "step": "barcode scanner open",
+      "interactive": 4,
+      "under44": 4,
+      "small": [
+        {
+          "tag": "button",
+          "w": 52,
+          "h": 32,
+          "label": "Flip camera"
+        },
+        {
+          "tag": "button",
+          "w": 32,
+          "h": 32,
+          "label": "✕"
+        },
+        {
+          "tag": "input",
+          "w": 294,
+          "h": 34,
+          "label": "e.g., 8901234567890"
+        },
+        {
+          "tag": "button",
+          "w": 44,
+          "h": 32,
+          "label": "Use"
+        }
+      ],
+      "inputsUnder16px": [
+        {
+          "label": "Search your pantry…",
+          "px": 14
+        },
+        {
+          "label": "e.g., 8901234567890",
+          "px": 12
+        }
+      ],
+      "hScroll": false
+    },
+    {
+      "step": "scan result dialog open",
+      "interactive": 4,
+      "under44": 2,
+      "small": [
+        {
+          "tag": "button",
+          "w": 32,
+          "h": 32,
+          "label": "Close analysis"
+        },
+        {
+          "tag": "button",
+          "w": 98,
+          "h": 34,
+          "label": "Scan date"
+        }
+      ],
+      "inputsUnder16px": [
+        {
+          "label": "Search your pantry…",
+          "px": 14
+        }
+      ],
+      "hScroll": false
+    },
+    {
+      "step": "expiry scanner open",
+      "interactive": 3,
+      "under44": 1,
+      "small": [
+        {
+          "tag": "button",
+          "w": 31,
+          "h": 32,
+          "label": "Close expiry scanner"
+        }
+      ],
+      "inputsUnder16px": [
+        {
+          "label": "Search your pantry…",
+          "px": 14
+        }
+      ],
+      "hScroll": false
+    },
+    {
+      "step": "expiry scanner > Camera",
+      "capture": "environment",
+      "accept": "image/*",
+      "label": "Capture expiry date"
+    },
+    {
+      "step": "expiry scanner > Gallery (control)",
+      "capture": null,
+      "accept": "image/*",
+      "label": "Upload expiry date photo"
+    },
+    {
+      "step": "label scanner open",
+      "interactive": 3,
+      "under44": 1,
+      "small": [
+        {
+          "tag": "button",
+          "w": 32,
+          "h": 32,
+          "label": "Close nutrition scanner"
+        }
+      ],
+      "inputsUnder16px": [
+        {
+          "label": "Search your pantry…",
+          "px": 14
+        }
+      ],
+      "hScroll": false
+    },
+    {
+      "step": "label scanner > Camera",
+      "capture": "environment",
+      "accept": "image/*",
+      "label": "Capture nutrition label"
+    },
+    {
+      "step": "label scanner > Gallery (control)",
+      "capture": null,
+      "accept": "image/*",
+      "label": "Upload nutrition label"
+    }
+  ]
+}

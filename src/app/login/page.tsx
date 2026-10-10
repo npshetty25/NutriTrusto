@@ -92,7 +92,7 @@ export default function LoginPage() {
           which made signing in and using the app feel like two products. */}
       <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background text-foreground px-4 py-8">
         {/* Drifting ambient blobs — pure decoration, non-interactive */}
-        <div className="pointer-events-none absolute inset-0">
+        <div className="pointer-events-none fixed inset-0">
           <div className="animate-blob absolute -top-24 -left-8 h-72 w-72 rounded-full bg-brand/12 blur-3xl" />
           <div className="animate-blob absolute -bottom-28 -right-10 h-80 w-80 rounded-full bg-safe/12 blur-3xl [animation-delay:-6s]" />
           <div className="animate-blob absolute left-1/2 top-1/2 h-80 w-80 -translate-x-1/2 -translate-y-1/2 rounded-full bg-brand/8 blur-3xl [animation-delay:-12s]" />
@@ -307,7 +307,7 @@ export default function LoginPage() {
                           onClick={() => setShowPassword(!showPassword)}
                           title={showPassword ? "Hide password" : "Show password"}
                           aria-label={showPassword ? "Hide password" : "Show password"}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground/50 hover:text-foreground transition-colors p-1"
+                          className="absolute right-1 top-1/2 -translate-y-1/2 flex h-11 w-11 items-center justify-center text-foreground/50 hover:text-foreground transition-colors"
                         >
                           {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                         </button>

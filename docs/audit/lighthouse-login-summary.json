@@ -1,0 +1,28 @@
+{
+  "note": "Single run, one page (/login, signed out), local production build on the author laptop, simulated mobile throttling. Not a field measurement and not representative of the authenticated app.",
+  "command": "npx lighthouse http://localhost:3100/login --only-categories=performance,accessibility,best-practices,seo --chrome-flags=\"--headless=new --no-sandbox\"",
+  "lighthouseVersion": "13.5.0",
+  "finalUrl": "http://localhost:3100/login",
+  "formFactor": "mobile",
+  "throttling": "simulate",
+  "fetchTime": "2026-10-10T18:31:47.330Z",
+  "scores": {
+    "performance": 90,
+    "accessibility": 100,
+    "best-practices": 100,
+    "seo": 100
+  },
+  "metrics": {
+    "first-contentful-paint": "1.9 s",
+    "largest-contentful-paint": "3.0 s",
+    "total-blocking-time": "80 ms",
+    "cumulative-layout-shift": "0",
+    "speed-index": "4.3 s",
+    "interactive": "3.1 s"
+  },
+  "pwaCategory": {
+    "attempted": "npx lighthouse ... --only-categories=pwa",
+    "result": "Runtime error: unrecognized category in onlyCategories: pwa",
+    "meaning": "Lighthouse removed its PWA category; installability was verified with Chrome DevTools Protocol Page.getInstallabilityErrors instead (see pwa-check-after.json)."
+  }
+}

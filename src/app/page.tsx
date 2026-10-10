@@ -1824,7 +1824,7 @@ if (nutritionFieldsFilled < 2) {
                   title="Close notifications"
                   aria-label="Close notifications"
                   onClick={() => setShowNotificationsPanel(false)}
-                  className="neu-raised-sm w-9 h-9 rounded-xl flex items-center justify-center shrink-0 text-foreground/70"
+                  className="neu-raised-sm w-11 h-11 rounded-xl flex items-center justify-center shrink-0 text-foreground/70"
                 >
                   <X size={15} />
                 </button>
@@ -1967,7 +1967,7 @@ if (nutritionFieldsFilled < 2) {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search your pantry…"
-              className="neu-field w-full rounded-xl pl-9 pr-3 h-11 text-sm"
+              className="neu-field w-full rounded-xl pl-9 pr-3 h-11 text-base"
             />
           </div>
           <button
@@ -2108,7 +2108,7 @@ if (nutritionFieldsFilled < 2) {
             </div>
           </div>
         ) : (
-          <div className="flex flex-col gap-3">
+          <div className="grid grid-cols-1 items-start gap-3 md:grid-cols-2">
             {paginatedItems.map(item => {
               // Only suggest an alternative when a real scan actually rated the
               // item poorly. This used to key off a grade derived from the
@@ -2363,7 +2363,7 @@ if (nutritionFieldsFilled < 2) {
             {/* Header */}
             <div className="sticky top-0 bg-card/80 backdrop-blur-md z-10 border-b border-border px-5 py-4 flex justify-between items-center">
               <h3 id="scanned-result-heading" className="font-bold text-lg text-foreground truncate pr-4">{scannedResult.name}</h3>
-              <button onClick={() => { setScannedResult(null); setScannedExpiry(null); }} title="Close analysis" aria-label="Close analysis" className="w-8 h-8 flex items-center justify-center rounded-full bg-foreground/10 hover:bg-foreground/20 text-foreground transition-colors shrink-0">
+              <button onClick={() => { setScannedResult(null); setScannedExpiry(null); }} title="Close analysis" aria-label="Close analysis" className="w-11 h-11 flex items-center justify-center rounded-full bg-foreground/10 hover:bg-foreground/20 text-foreground transition-colors shrink-0">
                 <X size={18} />
               </button>
             </div>
@@ -2410,7 +2410,7 @@ if (nutritionFieldsFilled < 2) {
                 </div>
                 <button
                   onClick={() => setShowExpiryScanner(true)}
-                  className="flex items-center gap-1.5 border border-border bg-card text-foreground text-xs font-semibold px-3 py-2 rounded-lg hover:bg-foreground/5 transition-colors shrink-0 whitespace-nowrap"
+                  className="flex min-h-11 items-center gap-1.5 border border-border bg-card text-foreground text-xs font-semibold px-3 py-2 rounded-lg hover:bg-foreground/5 transition-colors shrink-0 whitespace-nowrap"
                 >
                   <CalendarClock size={13} /> {scannedExpiry ? "Rescan" : "Scan date"}
                 </button>
@@ -2571,7 +2571,7 @@ if (nutritionFieldsFilled < 2) {
           <div role="dialog" aria-modal="true" aria-labelledby="edit-item-heading" className="neu-panel w-full max-w-md rounded-2xl p-5">
             <div className="flex items-center justify-between mb-4">
               <h3 id="edit-item-heading" className="text-lg font-bold tracking-tight">Edit Item</h3>
-              <button onClick={closeEditItem} title="Close edit" aria-label="Close edit" className="w-8 h-8 flex items-center justify-center rounded-full bg-foreground/10 hover:bg-foreground/20 transition-colors">
+              <button onClick={closeEditItem} title="Close edit" aria-label="Close edit" className="w-11 h-11 flex items-center justify-center rounded-full bg-foreground/10 hover:bg-foreground/20 transition-colors">
                 <X size={16} />
               </button>
             </div>
@@ -2583,7 +2583,7 @@ if (nutritionFieldsFilled < 2) {
                   type="text"
                   value={editName}
                   onChange={(e) => setEditName(e.target.value)}
-                  className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-foreground/20"
+                  className="w-full bg-background border border-border rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-1 focus:ring-foreground/20"
                 />
               </div>
               <div className="space-y-1.5">
@@ -2594,7 +2594,7 @@ if (nutritionFieldsFilled < 2) {
                   inputMode="numeric"
                   value={editDaysLeft}
                   onChange={(e) => setEditDaysLeft(e.target.value)}
-                  className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-foreground/20"
+                  className="w-full bg-background border border-border rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-1 focus:ring-foreground/20"
                 />
                 <p className="text-[11px] text-foreground/60">Saving resets the freshness clock to start counting down from today.</p>
               </div>
@@ -2604,14 +2604,14 @@ if (nutritionFieldsFilled < 2) {
               <button
                 onClick={closeEditItem}
                 disabled={isSavingEdit}
-                className="flex-1 border border-border rounded-xl py-2.5 text-sm font-semibold hover:bg-foreground/5 transition-colors disabled:opacity-60"
+                className="flex-1 min-h-11 border border-border rounded-xl py-2.5 text-sm font-semibold hover:bg-foreground/5 transition-colors disabled:opacity-60"
               >
                 Cancel
               </button>
               <button
                 onClick={() => { void saveEditItem(); }}
                 disabled={isSavingEdit}
-                className="flex-1 bg-foreground text-background rounded-xl py-2.5 text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center justify-center gap-2"
+                className="flex-1 min-h-11 bg-foreground text-background rounded-xl py-2.5 text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center justify-center gap-2"
               >
                 {isSavingEdit ? <Loader2 size={14} className="animate-spin" /> : null}
                 Save Changes
@@ -2633,7 +2633,7 @@ if (nutritionFieldsFilled < 2) {
               value={manualBarcodeName}
               onChange={(e) => setManualBarcodeName(e.target.value)}
               placeholder="e.g., Whole Wheat Pasta"
-              className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-foreground/20"
+              className="w-full bg-background border border-border rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-1 focus:ring-foreground/20"
             />
             <label className="mt-3 flex items-start gap-2.5 cursor-pointer">
               <input
@@ -2796,7 +2796,7 @@ if (nutritionFieldsFilled < 2) {
                   onChange={(e) => setManualRetryBarcode(e.target.value.replace(/\D/g, ""))}
                   inputMode="numeric"
                   placeholder="Type barcode digits"
-                  className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 focus:ring-foreground/20"
+                  className="w-full bg-background border border-border rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-1 focus:ring-foreground/20"
                 />
               </div>
             )}

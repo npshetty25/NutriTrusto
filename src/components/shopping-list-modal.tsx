@@ -134,7 +134,7 @@ export default function ShoppingListModal({ onClose }: ShoppingListModalProps) {
             onClick={onClose}
             title="Close shopping list"
             aria-label="Close shopping list"
-            className="w-8 h-8 flex items-center justify-center rounded-full bg-foreground/10 hover:bg-foreground/20 transition-colors"
+            className="w-11 h-11 flex items-center justify-center rounded-full bg-foreground/10 hover:bg-foreground/20 transition-colors"
           >
             <X size={14} />
           </button>
@@ -148,14 +148,14 @@ export default function ShoppingListModal({ onClose }: ShoppingListModalProps) {
               onChange={(e) => setNewItemName(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") void addItem(); }}
               placeholder="Add an item..."
-              className="neu-field flex-1 rounded-xl px-3 py-2.5 text-sm"
+              className="neu-field flex-1 min-h-11 rounded-xl px-3 py-2.5 text-base"
             />
             <button
               onClick={() => { void addItem(); }}
               disabled={isAdding || !newItemName.trim()}
               title="Add item"
               aria-label="Add item"
-              className="w-10 h-10 shrink-0 flex items-center justify-center rounded-xl bg-foreground text-background disabled:opacity-40 transition-opacity"
+              className="w-11 h-11 shrink-0 flex items-center justify-center rounded-xl bg-foreground text-background disabled:opacity-40 transition-opacity"
             >
               {isAdding ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />}
             </button>

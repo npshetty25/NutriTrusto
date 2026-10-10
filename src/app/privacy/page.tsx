@@ -26,7 +26,7 @@ export default function PrivacyPage() {
     <main className="px-5 py-10 pb-24">
       <Link
         href="/"
-        className="inline-flex items-center gap-2 text-xs font-semibold text-foreground/60 hover:text-foreground transition-colors mb-7"
+        className="inline-flex min-h-11 items-center gap-2 text-xs font-semibold text-foreground/60 hover:text-foreground transition-colors mb-3"
       >
         <ArrowLeft size={14} /> Back to Nutri-Trust
       </Link>
@@ -174,7 +174,7 @@ export default function PrivacyPage() {
         <p>
           <a
             href={`mailto:${CONTACT_EMAIL}?subject=Nutri-Trust%20privacy%20request`}
-            className="font-semibold text-brand underline underline-offset-2 break-all"
+            className="inline-flex min-h-11 items-center font-semibold text-brand underline underline-offset-2 break-all"
           >
             {CONTACT_EMAIL}
           </a>

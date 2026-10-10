@@ -1,0 +1,93 @@
+{
+  "device": "Pixel 7 (Chromium emulation)",
+  "viewport": {
+    "width": 412,
+    "height": 839
+  },
+  "steps": [
+    {
+      "step": "dashboard closed",
+      "interactive": 10,
+      "under44": 0,
+      "small": [],
+      "inputsUnder16px": [],
+      "hScroll": false
+    },
+    {
+      "step": "receipt menu open",
+      "interactive": 11,
+      "under44": 0,
+      "small": [],
+      "inputsUnder16px": [],
+      "hScroll": false
+    },
+    {
+      "step": "receipt > Take Photo",
+      "capture": "environment",
+      "accept": "image/*",
+      "label": "Take a photo of the receipt"
+    },
+    {
+      "step": "receipt > Choose from Gallery (control)",
+      "capture": null,
+      "accept": "image/*,.pdf,application/pdf",
+      "label": "Choose a receipt photo from your gallery"
+    },
+    {
+      "step": "barcode scanner open",
+      "interactive": 4,
+      "under44": 0,
+      "small": [],
+      "inputsUnder16px": [],
+      "hScroll": false
+    },
+    {
+      "step": "scan result dialog open",
+      "interactive": 4,
+      "under44": 0,
+      "small": [],
+      "inputsUnder16px": [],
+      "hScroll": false
+    },
+    {
+      "step": "expiry scanner open",
+      "interactive": 3,
+      "under44": 0,
+      "small": [],
+      "inputsUnder16px": [],
+      "hScroll": false
+    },
+    {
+      "step": "expiry scanner > Camera",
+      "capture": "environment",
+      "accept": "image/*",
+      "label": "Capture expiry date"
+    },
+    {
+      "step": "expiry scanner > Gallery (control)",
+      "capture": null,
+      "accept": "image/*",
+      "label": "Upload expiry date photo"
+    },
+    {
+      "step": "label scanner open",
+      "interactive": 3,
+      "under44": 0,
+      "small": [],
+      "inputsUnder16px": [],
+      "hScroll": false
+    },
+    {
+      "step": "label scanner > Camera",
+      "capture": "environment",
+      "accept": "image/*",
+      "label": "Capture nutrition label"
+    },
+    {
+      "step": "label scanner > Gallery (control)",
+      "capture": null,
+      "accept": "image/*",
+      "label": "Upload nutrition label"
+    }
+  ]
+}

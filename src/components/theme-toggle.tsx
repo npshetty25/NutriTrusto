@@ -34,7 +34,7 @@ export function ThemeToggle() {
             title={label}
             aria-label={`${label} theme`}
             aria-pressed={active === id}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-full text-[11px] font-bold transition-all ${
+            className={`flex-1 min-h-11 flex items-center justify-center gap-1.5 py-1.5 rounded-full text-[11px] font-bold transition-all ${
               active === id ? "bg-card text-foreground shadow-sm" : "text-foreground/50 hover:text-foreground/80"
             }`}
           >

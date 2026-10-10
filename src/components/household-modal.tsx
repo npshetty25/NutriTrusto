@@ -120,7 +120,7 @@ export function HouseholdModal({ onClose }: HouseholdModalProps) {
             onClick={onClose}
             title="Close household settings"
             aria-label="Close household settings"
-            className="w-8 h-8 flex items-center justify-center rounded-full bg-foreground/10 hover:bg-foreground/20 transition-colors"
+            className="w-11 h-11 flex items-center justify-center rounded-full bg-foreground/10 hover:bg-foreground/20 transition-colors"
           >
             <X size={14} />
           </button>
@@ -154,7 +154,7 @@ export function HouseholdModal({ onClose }: HouseholdModalProps) {
                       onClick={handleCopyCode}
                       title="Copy invite code"
                       aria-label="Copy invite code"
-                      className="w-9 h-9 shrink-0 flex items-center justify-center rounded-lg border border-border hover:bg-foreground/5 transition-colors"
+                      className="w-11 h-11 shrink-0 flex items-center justify-center rounded-lg border border-border hover:bg-foreground/5 transition-colors"
                     >
                       {copied ? <Check size={14} className="text-safe" /> : <Copy size={14} />}
                     </button>
@@ -200,12 +200,12 @@ export function HouseholdModal({ onClose }: HouseholdModalProps) {
                   value={joinCode}
                   onChange={(e) => setJoinCode(e.target.value.trim())}
                   placeholder="Enter invite code"
-                  className="flex-1 bg-background border border-border rounded-xl px-3 py-2.5 text-sm font-mono tracking-widest focus:outline-none focus:ring-1 focus:ring-foreground/20"
+                  className="flex-1 min-h-11 bg-background border border-border rounded-xl px-3 py-2.5 text-base font-mono tracking-widest focus:outline-none focus:ring-1 focus:ring-foreground/20"
                 />
                 <button
                   onClick={handleJoin}
                   disabled={isJoining}
-                  className="px-4 py-2.5 rounded-xl border border-border text-sm font-semibold hover:bg-foreground/5 disabled:opacity-60 transition-all shrink-0"
+                  className="min-h-11 px-4 py-2.5 rounded-xl border border-border text-sm font-semibold hover:bg-foreground/5 disabled:opacity-60 transition-all shrink-0"
                 >
                   {isJoining ? <Loader2 size={14} className="animate-spin" /> : "Join"}
                 </button>
