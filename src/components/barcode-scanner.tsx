@@ -102,14 +102,14 @@ export default function BarcodeScanner({ onScan, onError, onClose }: BarcodeScan
             <button
               type="button"
               onClick={() => setFacingMode((prev) => (prev === "environment" ? "user" : "environment"))}
-              className="h-8 px-2 rounded-lg bg-foreground/10 text-foreground hover:bg-foreground/20 transition-colors text-xs font-semibold flex items-center gap-1"
+              className="h-11 px-3 rounded-lg bg-foreground/10 text-foreground hover:bg-foreground/20 transition-colors text-xs font-semibold flex items-center gap-1"
               title="Flip camera"
             >
               <RefreshCcw size={12} /> Flip
             </button>
             <button
               onClick={onClose}
-              className="w-8 h-8 flex items-center justify-center rounded-full bg-foreground/10 text-foreground hover:bg-foreground/20 transition-colors"
+              className="w-11 h-11 flex items-center justify-center rounded-full bg-foreground/10 text-foreground hover:bg-foreground/20 transition-colors"
             >
               ✕
             </button>
@@ -143,7 +143,7 @@ export default function BarcodeScanner({ onScan, onError, onClose }: BarcodeScan
                 value={manualCode}
                 onChange={(e) => setManualCode(e.target.value.replace(/\D/g, ""))}
                 placeholder="e.g., 8901234567890"
-                className="flex-1 bg-background border border-border rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-foreground/30"
+                className="flex-1 min-h-11 bg-background border border-border rounded-lg px-3 py-2 text-base focus:outline-none focus:border-foreground/30"
               />
               <button
                 type="button"
@@ -154,7 +154,7 @@ export default function BarcodeScanner({ onScan, onError, onClose }: BarcodeScan
                   }
                   onScan(manualCode.trim());
                 }}
-                className="px-3 py-2 rounded-lg bg-foreground text-background text-xs font-semibold"
+                className="min-h-11 px-4 py-2 rounded-lg bg-foreground text-background text-sm font-semibold"
               >
                 Use
               </button>
