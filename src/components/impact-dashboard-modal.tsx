@@ -35,6 +35,9 @@ const MS_PER_DAY = 1000 * 60 * 60 * 24;
 
 export function ImpactDashboardModal({ onClose }: ImpactDashboardModalProps) {
   const { user, household } = useAuth();
+  // Captured once so render stays pure; the streak is measured against the
+  // moment the dashboard was opened.
+  const [now] = useState(() => Date.now());
   const [rows, setRows] = useState<OutcomeRow[] | null>(null);
   const [scoreRows, setScoreRows] = useState<ScoreRow[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -115,7 +118,7 @@ export function ImpactDashboardModal({ onClose }: ImpactDashboardModalProps) {
   // recent wasted item, not the household's combined record.
   const mostRecentExpired = rows?.find((r) => r.outcome === "expired");
   const streakDays = mostRecentExpired
-    ? Math.max(0, Math.floor((Date.now() - new Date(mostRecentExpired.removed_at).getTime()) / MS_PER_DAY))
+    ? Math.max(0, Math.floor((now - new Date(mostRecentExpired.removed_at).getTime()) / MS_PER_DAY))
     : null; // null = never logged a wasted item (either brand new, or a perfect record)
 
   const recentScores = scoreRows
