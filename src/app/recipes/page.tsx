@@ -234,7 +234,7 @@ export default function RecipesPage() {
         <header className="px-4 sm:px-6 pt-8 sm:pt-10 pb-5 border-b border-border bg-card/90 backdrop-blur-sm sticky top-0 z-30">
         <div className="flex justify-between items-center mb-1">
           <div className="flex items-center gap-3">
-            <button title="Back to pantry" aria-label="Back to pantry" onClick={() => router.push("/")} className="text-foreground/50 hover:text-foreground transition-colors p-1 -ml-1">
+            <button title="Back to pantry" aria-label="Back to pantry" onClick={() => router.push("/")} className="flex h-11 w-11 items-center justify-center text-foreground/50 hover:text-foreground transition-colors -ml-3">
               <ArrowLeft size={20} />
             </button>
             <div>
