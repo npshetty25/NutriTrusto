@@ -215,7 +215,7 @@ export function ScanHistoryModal({ onClose }: ScanHistoryModalProps) {
                   disabled={reAddingId === row.id}
                   title="Add back to pantry"
                   aria-label="Add back to pantry"
-                  className="w-8 h-8 shrink-0 flex items-center justify-center rounded-lg border border-border hover:bg-foreground/5 disabled:opacity-60 transition-colors"
+                  className="w-11 h-11 shrink-0 flex items-center justify-center rounded-lg border border-border hover:bg-foreground/5 disabled:opacity-60 transition-colors"
                 >
                   {reAddingId === row.id ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />}
                 </button>
