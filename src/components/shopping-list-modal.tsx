@@ -207,16 +207,20 @@ export default function ShoppingListModal({ onClose }: ShoppingListModalProps) {
           )}
 
           {visibleRows.map((row) => (
-            <div key={row.id} className="rounded-xl border border-border bg-background px-3 py-2.5 flex items-center gap-3">
+            <div key={row.id} className="rounded-xl border border-border bg-background pl-1 pr-1 py-0.5 flex items-center gap-1">
               <button
                 onClick={() => toggleChecked(row)}
                 title={row.checked ? "Mark as not bought" : "Mark as bought"}
                 aria-label={row.checked ? "Mark as not bought" : "Mark as bought"}
-                className={`w-5 h-5 shrink-0 rounded-md border flex items-center justify-center transition-colors ${
-                  row.checked ? "bg-safe border-safe text-white" : "border-border"
-                }`}
+                className="w-11 h-11 shrink-0 flex items-center justify-center"
               >
-                {row.checked && <span className="text-[10px] font-bold">✓</span>}
+                <span
+                  className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${
+                    row.checked ? "bg-safe border-safe text-white" : "border-border"
+                  }`}
+                >
+                  {row.checked && <span className="text-[10px] font-bold">✓</span>}
+                </span>
               </button>
               <div className="min-w-0 flex-1">
                 <p className={`text-sm font-medium ${row.checked ? "line-through text-foreground/40" : "text-foreground"}`}>
@@ -235,7 +239,7 @@ export default function ShoppingListModal({ onClose }: ShoppingListModalProps) {
                 onClick={() => removeItem(row.id)}
                 title="Remove item"
                 aria-label="Remove item"
-                className="w-7 h-7 shrink-0 flex items-center justify-center rounded-lg hover:bg-danger/10 text-foreground/40 hover:text-danger transition-colors"
+                className="w-11 h-11 shrink-0 flex items-center justify-center rounded-lg hover:bg-danger/10 text-foreground/40 hover:text-danger transition-colors"
               >
                 <Trash2 size={13} />
               </button>
