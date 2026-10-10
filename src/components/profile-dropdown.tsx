@@ -112,7 +112,7 @@ export function ProfileDropdown({ onOpenShoppingList }: ProfileDropdownProps) {
   };
 
   const itemClass =
-    "w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-foreground/80 hover:bg-foreground/5 rounded-xl transition-colors text-left";
+    "w-full min-h-11 flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-foreground/80 hover:bg-foreground/5 rounded-xl transition-colors text-left";
 
   const menu = open && menuPos ? createPortal(
     <div
@@ -164,7 +164,7 @@ export function ProfileDropdown({ onOpenShoppingList }: ProfileDropdownProps) {
           onClick={handleSignOut}
           disabled={signingOut}
           role="menuitem"
-          className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-danger hover:bg-danger/5 rounded-xl transition-colors text-left disabled:opacity-60"
+          className="w-full min-h-11 flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-danger hover:bg-danger/5 rounded-xl transition-colors text-left disabled:opacity-60"
         >
           {signingOut ? <Loader2 size={15} className="animate-spin" /> : <LogOut size={15} />}
           {signingOut ? "Signing Out..." : "Sign Out"}
