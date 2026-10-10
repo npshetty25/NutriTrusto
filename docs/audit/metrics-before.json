@@ -1,0 +1,212 @@
+[
+  {
+    "page": "login",
+    "viewport": "375x812",
+    "finalUrl": "/login",
+    "screenshot": "login-375x812-before.png",
+    "clientWidth": 375,
+    "scrollWidth": 375,
+    "hScroll": false,
+    "interactiveVisible": 6,
+    "under44": 1,
+    "smallSample": [
+      {
+        "tag": "button",
+        "w": 24,
+        "h": 24,
+        "label": "Show password"
+      }
+    ],
+    "overflowers": [],
+    "consoleErrors": []
+  },
+  {
+    "page": "privacy",
+    "viewport": "375x812",
+    "finalUrl": "/privacy",
+    "screenshot": "privacy-375x812-before.png",
+    "clientWidth": 375,
+    "scrollWidth": 375,
+    "hScroll": false,
+    "interactiveVisible": 2,
+    "under44": 2,
+    "smallSample": [
+      {
+        "tag": "a",
+        "w": 125,
+        "h": 16,
+        "label": "Back to Nutri-Trust"
+      },
+      {
+        "tag": "a",
+        "w": 267,
+        "h": 20,
+        "label": "nirav.mitmpl2023@learner.manipal.edu"
+      }
+    ],
+    "overflowers": [],
+    "consoleErrors": []
+  },
+  {
+    "page": "dashboard",
+    "viewport": "375x812",
+    "finalUrl": "/",
+    "screenshot": "dashboard-375x812-before.png",
+    "clientWidth": 375,
+    "scrollWidth": 375,
+    "hScroll": false,
+    "interactiveVisible": 30,
+    "under44": 1,
+    "smallSample": [
+      {
+        "tag": "button",
+        "w": 111,
+        "h": 38,
+        "label": "AAudit"
+      }
+    ],
+    "overflowers": [],
+    "consoleErrors": [
+      "WebSocket connection to 'wss://ileghmcyotmlahlmyszj.supabase.co/realtime/v1/websocket?apikey=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZi",
+      "WebSocket connection to 'wss://ileghmcyotmlahlmyszj.supabase.co/realtime/v1/websocket?apikey=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZi"
+    ]
+  },
+  {
+    "page": "recipes",
+    "viewport": "375x812",
+    "finalUrl": "/recipes",
+    "screenshot": "recipes-375x812-before.png",
+    "clientWidth": 375,
+    "scrollWidth": 375,
+    "hScroll": false,
+    "interactiveVisible": 42,
+    "under44": 3,
+    "smallSample": [
+      {
+        "tag": "button",
+        "w": 28,
+        "h": 28,
+        "label": "Back to pantry"
+      },
+      {
+        "tag": "button",
+        "w": 111,
+        "h": 38,
+        "label": "AAudit"
+      },
+      {
+        "tag": "input",
+        "w": 343,
+        "h": 42,
+        "label": ""
+      }
+    ],
+    "overflowers": [],
+    "consoleErrors": []
+  },
+  {
+    "page": "login",
+    "viewport": "768x1024",
+    "finalUrl": "/login",
+    "screenshot": "login-768x1024-before.png",
+    "clientWidth": 768,
+    "scrollWidth": 768,
+    "hScroll": false,
+    "interactiveVisible": 6,
+    "under44": 1,
+    "smallSample": [
+      {
+        "tag": "button",
+        "w": 24,
+        "h": 24,
+        "label": "Show password"
+      }
+    ],
+    "overflowers": [],
+    "consoleErrors": []
+  },
+  {
+    "page": "privacy",
+    "viewport": "768x1024",
+    "finalUrl": "/privacy",
+    "screenshot": "privacy-768x1024-before.png",
+    "clientWidth": 768,
+    "scrollWidth": 768,
+    "hScroll": false,
+    "interactiveVisible": 2,
+    "under44": 2,
+    "smallSample": [
+      {
+        "tag": "a",
+        "w": 125,
+        "h": 16,
+        "label": "Back to Nutri-Trust"
+      },
+      {
+        "tag": "a",
+        "w": 267,
+        "h": 20,
+        "label": "nirav.mitmpl2023@learner.manipal.edu"
+      }
+    ],
+    "overflowers": [],
+    "consoleErrors": []
+  },
+  {
+    "page": "dashboard",
+    "viewport": "768x1024",
+    "finalUrl": "/",
+    "screenshot": "dashboard-768x1024-before.png",
+    "clientWidth": 768,
+    "scrollWidth": 768,
+    "hScroll": false,
+    "interactiveVisible": 30,
+    "under44": 1,
+    "smallSample": [
+      {
+        "tag": "button",
+        "w": 111,
+        "h": 38,
+        "label": "AAudit"
+      }
+    ],
+    "overflowers": [],
+    "consoleErrors": [
+      "WebSocket connection to 'wss://ileghmcyotmlahlmyszj.supabase.co/realtime/v1/websocket?apikey=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZi",
+      "WebSocket connection to 'wss://ileghmcyotmlahlmyszj.supabase.co/realtime/v1/websocket?apikey=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZi"
+    ]
+  },
+  {
+    "page": "recipes",
+    "viewport": "768x1024",
+    "finalUrl": "/recipes",
+    "screenshot": "recipes-768x1024-before.png",
+    "clientWidth": 768,
+    "scrollWidth": 768,
+    "hScroll": false,
+    "interactiveVisible": 42,
+    "under44": 3,
+    "smallSample": [
+      {
+        "tag": "button",
+        "w": 28,
+        "h": 28,
+        "label": "Back to pantry"
+      },
+      {
+        "tag": "button",
+        "w": 111,
+        "h": 38,
+        "label": "AAudit"
+      },
+      {
+        "tag": "input",
+        "w": 400,
+        "h": 42,
+        "label": ""
+      }
+    ],
+    "overflowers": [],
+    "consoleErrors": []
+  }
+]
