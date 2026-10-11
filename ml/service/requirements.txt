@@ -1,0 +1,8 @@
+# Pinned to the versions the model was trained and tested with. A joblib file
+# is only guaranteed to load under the scikit-learn that wrote it.
+scikit-learn==1.9.1
+numpy==2.5.4
+joblib==1.6.0
+fastapi==0.143.0
+uvicorn==0.54.0
+pydantic==2.14.0

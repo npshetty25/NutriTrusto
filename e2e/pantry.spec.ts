@@ -34,6 +34,37 @@ test.describe("pantry", () => {
     expect(inserted[0].body).toMatchObject([{ health_score: "3.1" }]);
   });
 
+  test("shows the category the model predicts for a scanned product", async ({ backend, page }) => {
+    void backend;
+    await openDashboard(page);
+    await page.getByRole("button", { name: /Barcode/ }).first().click();
+    await page.getByPlaceholder("e.g., 8901234567890").fill("8901262010023");
+    await page.getByRole("button", { name: "Use", exact: true }).click();
+    await expect(page.getByTestId("scan-category")).toHaveText(/Looks like: dairy · model, 91% sure/);
+  });
+
+  test("says plainly when the category is only a keyword guess", async ({ backend, page }) => {
+    backend.api["categorize"] = {
+      body: { success: true, source: "rules", modelVersion: null, predictions: [{ name: "x", category: "dairy", confidence: null }] },
+    };
+    await openDashboard(page);
+    await page.getByRole("button", { name: /Barcode/ }).first().click();
+    await page.getByPlaceholder("e.g., 8901234567890").fill("8901262010023");
+    await page.getByRole("button", { name: "Use", exact: true }).click();
+    await expect(page.getByTestId("scan-category")).toHaveText(/Looks like: dairy · keyword guess/);
+    await expect(page.getByTestId("scan-category")).not.toContainText("%");
+  });
+
+  test("shows nothing when the category service is unavailable", async ({ backend, page }) => {
+    backend.api["categorize"] = { status: 500, body: { success: false } };
+    await openDashboard(page);
+    await page.getByRole("button", { name: /Barcode/ }).first().click();
+    await page.getByPlaceholder("e.g., 8901234567890").fill("8901262010023");
+    await page.getByRole("button", { name: "Use", exact: true }).click();
+    await expect(page.getByRole("dialog")).toBeVisible();
+    await expect(page.getByTestId("scan-category")).toHaveCount(0);
+  });
+
   test("records the scan in history", async ({ backend, page }) => {
     await openDashboard(page);
     await page.getByRole("button", { name: /Barcode/ }).first().click();

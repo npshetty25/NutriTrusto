@@ -195,6 +195,15 @@ export default function Home() {
   const [isAnalyzingFood, setIsAnalyzingFood] = useState(false);
   const [scannedResult, setScannedResult] = useState<ScannedResultEntry | null>(null);
   const [scannedExpiry, setScannedExpiry] = useState<ScannedExpiryEntry | null>(null);
+  // What the category model (or, failing that, the keyword rules) makes of the
+  // scanned product. Keyed by name so a stale answer for the previous scan is
+  // never shown against the current one, and so no reset is needed.
+  const [scanCategory, setScanCategory] = useState<{
+    name: string;
+    category: string;
+    confidence: number | null;
+    source: "model" | "rules";
+  } | null>(null);
   const [showExpiryScanner, setShowExpiryScanner] = useState(false);
   const [barcodeRetryPrompt, setBarcodeRetryPrompt] = useState<{ code: string } | null>(null);
   const [showBarcodeRetryOptions, setShowBarcodeRetryOptions] = useState(false);
@@ -545,6 +554,32 @@ export default function Home() {
   };
 
   // ─── Guard + redirect ──────────────────────────────────────────
+  // Category prediction for the scanned product: the trained model when the
+  // service is configured, otherwise the keyword rules (the route says which).
+  const scannedName = scannedResult?.name;
+  useEffect(() => {
+    if (!scannedName) return;
+    let cancelled = false;
+    apiFetch("/api/categorize", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ names: [scannedName] }),
+    })
+      .then((r) => r.json())
+      .then((d) => {
+        const p = d?.success ? d.predictions?.[0] : null;
+        if (!cancelled && p && p.category && p.category !== "unknown") {
+          setScanCategory({ name: scannedName, category: p.category, confidence: p.confidence ?? null, source: d.source });
+        }
+      })
+      .catch(() => {
+        // A missing hint is not worth an error: the scan itself is unaffected.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [scannedName]);
+
   useEffect(() => {
     if (!authLoading && !user) router.push("/login");
   }, [user, authLoading, router]);
@@ -2378,6 +2413,15 @@ if (nutritionFieldsFilled < 2) {
             </div>
 
             <div className="p-5 flex-1 space-y-6 overflow-y-auto pb-6">
+              {scanCategory && scanCategory.name === scannedResult.name && (
+                <p className="text-xs text-foreground/60" data-testid="scan-category">
+                  Looks like: <span className="font-semibold text-foreground capitalize">{scanCategory.category}</span>
+                  {scanCategory.source === "model" && scanCategory.confidence !== null
+                    ? ` · model, ${Math.round(scanCategory.confidence * 100)}% sure`
+                    : " · keyword guess"}
+                </p>
+              )}
+
               {/* Expiry Date Card */}
               <div className="bg-foreground/5 rounded-2xl p-4 flex items-center justify-between border border-border/50 sleek-shadow gap-3">
                 <div className="flex flex-col min-w-0">

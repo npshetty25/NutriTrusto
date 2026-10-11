@@ -1,0 +1,200 @@
+{
+  "model_version": "category-v1",
+  "seed": 42,
+  "selected": {
+    "model": "linear_svm",
+    "params": {
+      "C": 0.3
+    },
+    "val_macro_f1": 0.833,
+    "val_accuracy": 0.8232
+  },
+  "validation_trials": [
+    {
+      "model": "complement_nb",
+      "params": {
+        "alpha": 0.1
+      },
+      "val_macro_f1": 0.807,
+      "val_accuracy": 0.7976
+    },
+    {
+      "model": "complement_nb",
+      "params": {
+        "alpha": 0.3
+      },
+      "val_macro_f1": 0.815,
+      "val_accuracy": 0.8055
+    },
+    {
+      "model": "complement_nb",
+      "params": {
+        "alpha": 1.0
+      },
+      "val_macro_f1": 0.804,
+      "val_accuracy": 0.7957
+    },
+    {
+      "model": "logistic_regression",
+      "params": {
+        "C": 1
+      },
+      "val_macro_f1": 0.8186,
+      "val_accuracy": 0.8075
+    },
+    {
+      "model": "logistic_regression",
+      "params": {
+        "C": 3
+      },
+      "val_macro_f1": 0.8244,
+      "val_accuracy": 0.8153
+    },
+    {
+      "model": "logistic_regression",
+      "params": {
+        "C": 10
+      },
+      "val_macro_f1": 0.8237,
+      "val_accuracy": 0.8153
+    },
+    {
+      "model": "logistic_regression",
+      "params": {
+        "C": 30
+      },
+      "val_macro_f1": 0.8252,
+      "val_accuracy": 0.8173
+    },
+    {
+      "model": "linear_svm",
+      "params": {
+        "C": 0.1
+      },
+      "val_macro_f1": 0.822,
+      "val_accuracy": 0.8134
+    },
+    {
+      "model": "linear_svm",
+      "params": {
+        "C": 0.3
+      },
+      "val_macro_f1": 0.833,
+      "val_accuracy": 0.8232
+    },
+    {
+      "model": "linear_svm",
+      "params": {
+        "C": 1.0
+      },
+      "val_macro_f1": 0.8286,
+      "val_accuracy": 0.8193
+    }
+  ],
+  "split": {
+    "train": 2375,
+    "validation": 509,
+    "test": 510
+  },
+  "dataset": {
+    "rows_after_dedupe": 3394,
+    "class_counts": {
+      "meat": 464,
+      "beverage": 464,
+      "snack": 406,
+      "frozen": 382,
+      "fruit": 369,
+      "grain": 341,
+      "pantry": 320,
+      "vegetable": 315,
+      "dairy": 219,
+      "bakery": 114
+    },
+    "source_scope_counts_before_dedupe": {
+      "india": 2378,
+      "global": 1940
+    }
+  },
+  "test": {
+    "accuracy": 0.8529,
+    "macro_precision": 0.871,
+    "macro_recall": 0.8469,
+    "macro_f1": 0.856,
+    "mean_confidence": 0.7567,
+    "expected_calibration_error": 0.1014,
+    "per_class": {
+      "bakery": {
+        "precision": 1.0,
+        "recall": 0.8235,
+        "f1-score": 0.9032,
+        "support": 17.0
+      },
+      "beverage": {
+        "precision": 0.84,
+        "recall": 0.9,
+        "f1-score": 0.869,
+        "support": 70.0
+      },
+      "dairy": {
+        "precision": 0.9286,
+        "recall": 0.7879,
+        "f1-score": 0.8525,
+        "support": 33.0
+      },
+      "frozen": {
+        "precision": 0.8571,
+        "recall": 0.7241,
+        "f1-score": 0.785,
+        "support": 58.0
+      },
+      "fruit": {
+        "precision": 0.9423,
+        "recall": 0.8909,
+        "f1-score": 0.9159,
+        "support": 55.0
+      },
+      "grain": {
+        "precision": 0.8542,
+        "recall": 0.8039,
+        "f1-score": 0.8283,
+        "support": 51.0
+      },
+      "meat": {
+        "precision": 0.9155,
+        "recall": 0.9286,
+        "f1-score": 0.922,
+        "support": 70.0
+      },
+      "pantry": {
+        "precision": 0.8077,
+        "recall": 0.875,
+        "f1-score": 0.84,
+        "support": 48.0
+      },
+      "snack": {
+        "precision": 0.7042,
+        "recall": 0.8197,
+        "f1-score": 0.7576,
+        "support": 61.0
+      },
+      "vegetable": {
+        "precision": 0.86,
+        "recall": 0.9149,
+        "f1-score": 0.8866,
+        "support": 47.0
+      }
+    }
+  },
+  "labels": [
+    "bakery",
+    "beverage",
+    "dairy",
+    "frozen",
+    "fruit",
+    "grain",
+    "meat",
+    "pantry",
+    "snack",
+    "vegetable"
+  ]
+}
