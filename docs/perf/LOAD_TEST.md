@@ -76,6 +76,10 @@ rate. It is not the ceiling.
   pausing; that is queueing on a saturated machine, not a per-request cost.
 - `/login` is a statically prerendered page, so its numbers measure Next's
   static serving, not React rendering or database work.
+- **`/api/health` was measured at build `1fadccc`, when readiness made one
+  outbound call.** It now makes two in parallel (Auth health and a PostgREST
+  table request), so its latency here understates the current endpoint. The
+  other endpoints are unaffected. Re-run before quoting a readiness number.
 - Nothing here exercises Supabase's real latency, row-level security, or
   Gemini. The readiness probe's cost is the loopback stub's, ~1 ms.
 - The in-memory rate limiter (`src/lib/rate-limit.ts`) is per-instance and was
