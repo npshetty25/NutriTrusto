@@ -2,35 +2,38 @@ export type LogLevel = "info" | "warn" | "error";
 
 const nowIso = () => new Date().toISOString();
 
-const safeStringify = (data?: Record<string, unknown>) => {
-  if (!data) return "";
-  try {
-    return JSON.stringify(data);
-  } catch {
-    return '[unserializable-meta]';
-  }
-};
-
+/**
+ * One JSON object per line, so a log drain (Vercel, Azure Monitor, Loki) can
+ * index fields instead of regex-parsing text. `level`, `route` and `requestId`
+ * are always present; anything passed as `meta` is nested under `meta` so a
+ * caller's key can never overwrite one of the reserved fields.
+ */
 export const createRequestContext = (route: string) => {
   const startedAt = Date.now();
   const requestId = `${route}-${Math.random().toString(36).slice(2, 8)}-${Date.now().toString(36)}`;
 
   const log = (level: LogLevel, message: string, meta?: Record<string, unknown>) => {
-    const durationMs = Date.now() - startedAt;
-    const base = `[${nowIso()}] [${level.toUpperCase()}] [${route}] [${requestId}] ${message} (+${durationMs}ms)`;
-    const payload = safeStringify(meta);
+    const entry: Record<string, unknown> = {
+      ts: nowIso(),
+      level,
+      route,
+      requestId,
+      msg: message,
+      durationMs: Date.now() - startedAt,
+    };
+    if (meta) entry.meta = meta;
 
-    if (level === "error") {
-      console.error(payload ? `${base} ${payload}` : base);
-      return;
+    let line: string;
+    try {
+      line = JSON.stringify(entry);
+    } catch {
+      // A circular or BigInt value in meta must not lose the log line itself.
+      line = JSON.stringify({ ...entry, meta: "[unserializable]" });
     }
 
-    if (level === "warn") {
-      console.warn(payload ? `${base} ${payload}` : base);
-      return;
-    }
-
-    console.info(payload ? `${base} ${payload}` : base);
+    if (level === "error") console.error(line);
+    else if (level === "warn") console.warn(line);
+    else console.info(line);
   };
 
   return {
