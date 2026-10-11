@@ -1,8 +1,9 @@
 # ADR 0001 — Keep PostgreSQL as the system of record; store raw OCR responses in MongoDB
 
-- **Status:** Proposed. Code is merged behind a flag and inert until
-  `MONGODB_URI` is set; the Postgres link column is a proposed migration, not
-  applied. Both wait on an Atlas cluster that only the project owner can create.
+- **Status:** Proposed. The implementation (an optional, fail-open store)
+  exists on branch `feat/p4-mongodb` and is **not merged**; the Postgres link
+  column is a proposed migration, not applied. Both wait on an Atlas cluster
+  that only the project owner can create.
 - **Date:** 2026-10-11
 - **Deciders:** project owner
 
