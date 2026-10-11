@@ -1,8 +1,8 @@
-import { expect, openDashboard, test } from "./fixtures";
+import { expect, openDashboard, openProfileMenu, test } from "./fixtures";
 import type { Page } from "@playwright/test";
 
 const openMenuItem = async (page: Page, name: RegExp) => {
-  await page.locator('button[aria-haspopup="menu"]').click();
+  await openProfileMenu(page);
   await page.getByRole("menuitem", { name }).click();
 };
 

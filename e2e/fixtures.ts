@@ -72,3 +72,15 @@ export async function undersizedTargets(page: Page) {
 
 export const horizontalOverflow = (page: Page) =>
   page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+
+/**
+ * Open the profile menu. A click that lands before hydration is silently
+ * dropped, so retry the click until the menu is really there; this is a
+ * property of server-rendered pages, not something to paper over with sleeps.
+ */
+export async function openProfileMenu(page: Page) {
+  await expect(async () => {
+    await page.locator('button[aria-haspopup="menu"]').click();
+    await expect(page.getByRole("menu")).toBeVisible({ timeout: 1500 });
+  }).toPass({ timeout: 15_000 });
+}

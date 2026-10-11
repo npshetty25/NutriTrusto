@@ -1,4 +1,4 @@
-import { expect, horizontalOverflow, openDashboard, test, undersizedTargets } from "./fixtures";
+import { expect, horizontalOverflow, openDashboard, openProfileMenu, test, undersizedTargets } from "./fixtures";
 
 /**
  * Regression guard for the responsive work (docs/audit/PHASE1_RESULTS.md):
@@ -43,15 +43,14 @@ test.describe("phone layout", () => {
   test("the profile menu rows are tappable", async ({ backend, page }) => {
     seed(backend);
     await openDashboard(page);
-    await page.locator('button[aria-haspopup="menu"]').click();
-    await expect(page.getByRole("menu")).toBeVisible();
+    await openProfileMenu(page);
     expect(await undersizedTargets(page)).toEqual([]);
   });
 
   test("the shopping list, including its row controls, is tappable", async ({ backend, page }) => {
     seed(backend);
     await openDashboard(page);
-    await page.locator('button[aria-haspopup="menu"]').click();
+    await openProfileMenu(page);
     await page.getByRole("menuitem", { name: /Shopping List/ }).click();
     await expect(page.getByText("Atta 5kg")).toBeVisible();
     expect(await undersizedTargets(page)).toEqual([]);

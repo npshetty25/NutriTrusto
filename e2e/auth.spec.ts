@@ -1,4 +1,4 @@
-import { expect, test } from "./fixtures";
+import { expect, openProfileMenu, test } from "./fixtures";
 
 test.describe("authentication", () => {
   test("a signed-out visitor to the dashboard is sent to the login page", async ({ anonymous, page }) => {
@@ -63,7 +63,7 @@ test.describe("authentication", () => {
   test("a signed-in user can sign out and is returned to the login page", async ({ backend, page }) => {
     void backend;
     await page.goto("/");
-    await page.locator('button[aria-haspopup="menu"]').click();
+    await openProfileMenu(page);
     await page.getByRole("menuitem", { name: /Sign Out/ }).click();
     await expect(page).toHaveURL(/\/login$/);
   });
