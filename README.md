@@ -3,6 +3,8 @@
 A pantry tracker that helps reduce household food waste: scan groceries in,
 see what's about to expire, and get a recipe to use it up before it spoils.
 
+[![CI](https://github.com/npshetty25/NutriTrusto/actions/workflows/ci.yml/badge.svg)](https://github.com/npshetty25/NutriTrusto/actions/workflows/ci.yml)
+
 Live: https://nutri-trusto.vercel.app
 
 ## Getting started
@@ -35,6 +37,20 @@ Both are idempotent and additive, so re-running them is safe. The app probes
 for newer columns at startup and degrades gracefully with a "migration hasn't
 been run" message rather than failing, so it stays usable if you've only run
 the first file.
+
+## Testing
+
+```bash
+npm run lint && npm run typecheck
+npm test                 # unit, component, API-route and RLS tests
+npm run test:coverage    # same, with a v8 coverage report
+npm run test:e2e         # builds, then runs the Playwright journeys
+```
+
+The RLS tests run the real migrations in `db/` against Postgres 17 (PGlite)
+as the `authenticated` role; the browser tests fake Supabase, Open Food Facts
+and the Gemini-backed routes at the network layer. CI runs all of it on every
+push.
 
 ## Stack
 
