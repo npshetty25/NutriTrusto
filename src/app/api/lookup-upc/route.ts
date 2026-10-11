@@ -28,9 +28,13 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "No UPC provided" }, { status: 400 });
     }
 
+    // The code goes into upstream URLs, so it is encoded: left raw, "1&x=y"
+    // adds a parameter and "../" walks the path. Digits are unchanged.
+    const code = encodeURIComponent(upc);
+
     // ── 1. Try UPCItemDB (good for global packaged goods) ──────────
     try {
-      const res = await fetch(`https://api.upcitemdb.com/prod/trial/lookup?upc=${upc}`);
+      const res = await fetch(`https://api.upcitemdb.com/prod/trial/lookup?upc=${code}`);
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data?.items) && data.items.length > 0) {
@@ -46,7 +50,7 @@ export async function GET(req: Request) {
     // ── 2. Fallback: India OFF server (better for Indian products) ──
     try {
       const indiaRes = await fetch(
-        `https://in.openfoodfacts.org/api/v2/product/${upc}.json?fields=${OFF_FIELDS}`
+        `https://in.openfoodfacts.org/api/v2/product/${code}.json?fields=${OFF_FIELDS}`
       );
       if (indiaRes.ok) {
         const indiaData = await indiaRes.json();
@@ -75,7 +79,7 @@ export async function GET(req: Request) {
     // ── 3. Fallback: Global OFF server ──────────────────────────────
     try {
       const globalRes = await fetch(
-        `https://world.openfoodfacts.org/api/v2/product/${upc}.json?fields=${OFF_FIELDS}`
+        `https://world.openfoodfacts.org/api/v2/product/${code}.json?fields=${OFF_FIELDS}`
       );
       if (globalRes.ok) {
         const globalData = await globalRes.json();
@@ -105,10 +109,11 @@ export async function GET(req: Request) {
     log.warn("All lookup sources exhausted for UPC", { upc });
     return NextResponse.json({ items: [] });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const err = error as { message?: string; stack?: string } | null;
     log.error("Unhandled UPC lookup error", {
-      message: error?.message || "Unknown error",
-      stack: error?.stack || null,
+      message: err?.message || "Unknown error",
+      stack: err?.stack || null,
     });
     return NextResponse.json({ error: "Failed to fetch from UPC registry" }, { status: 500 });
   }

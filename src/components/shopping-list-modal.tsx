@@ -168,7 +168,7 @@ export default function ShoppingListModal({ onClose }: ShoppingListModalProps) {
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as ShoppingSortOption)}
               title="Sort"
-              className="neu-field flex-1 rounded-lg px-2 py-1.5 text-xs"
+              className="neu-field flex-1 min-h-11 rounded-lg px-2 py-1.5 text-base"
             >
               <option value="newest">Newest First</option>
               <option value="name">Name (A-Z)</option>
@@ -176,7 +176,7 @@ export default function ShoppingListModal({ onClose }: ShoppingListModalProps) {
             </select>
             <button
               onClick={() => setHideChecked((v) => !v)}
-              className={`text-[11px] font-semibold px-2.5 py-1.5 rounded-lg border whitespace-nowrap transition-colors ${
+              className={`min-h-11 text-[11px] font-semibold px-3 py-1.5 rounded-lg border whitespace-nowrap transition-colors ${
                 hideChecked ? "bg-foreground text-background border-foreground" : "border-border text-foreground/60 hover:text-foreground hover:bg-foreground/5"
               }`}
             >
@@ -203,20 +203,24 @@ export default function ShoppingListModal({ onClose }: ShoppingListModalProps) {
           )}
 
           {!loading && !error && rows.length > 0 && visibleRows.length === 0 && (
-            <div className="text-center py-8 text-sm text-foreground/50">Nothing to show — everything's checked off.</div>
+            <div className="text-center py-8 text-sm text-foreground/50">Nothing to show — everything&apos;s checked off.</div>
           )}
 
           {visibleRows.map((row) => (
-            <div key={row.id} className="rounded-xl border border-border bg-background px-3 py-2.5 flex items-center gap-3">
+            <div key={row.id} className="rounded-xl border border-border bg-background pl-1 pr-1 py-0.5 flex items-center gap-1">
               <button
                 onClick={() => toggleChecked(row)}
                 title={row.checked ? "Mark as not bought" : "Mark as bought"}
                 aria-label={row.checked ? "Mark as not bought" : "Mark as bought"}
-                className={`w-5 h-5 shrink-0 rounded-md border flex items-center justify-center transition-colors ${
-                  row.checked ? "bg-safe border-safe text-white" : "border-border"
-                }`}
+                className="w-11 h-11 shrink-0 flex items-center justify-center"
               >
-                {row.checked && <span className="text-[10px] font-bold">✓</span>}
+                <span
+                  className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${
+                    row.checked ? "bg-safe border-safe text-white" : "border-border"
+                  }`}
+                >
+                  {row.checked && <span className="text-[10px] font-bold">✓</span>}
+                </span>
               </button>
               <div className="min-w-0 flex-1">
                 <p className={`text-sm font-medium ${row.checked ? "line-through text-foreground/40" : "text-foreground"}`}>
@@ -235,7 +239,7 @@ export default function ShoppingListModal({ onClose }: ShoppingListModalProps) {
                 onClick={() => removeItem(row.id)}
                 title="Remove item"
                 aria-label="Remove item"
-                className="w-7 h-7 shrink-0 flex items-center justify-center rounded-lg hover:bg-danger/10 text-foreground/40 hover:text-danger transition-colors"
+                className="w-11 h-11 shrink-0 flex items-center justify-center rounded-lg hover:bg-danger/10 text-foreground/40 hover:text-danger transition-colors"
               >
                 <Trash2 size={13} />
               </button>

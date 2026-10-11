@@ -15,6 +15,25 @@ export const applyTheme = (theme: ThemePreference) => {
   if (theme !== "system") root.classList.add(theme);
 };
 
+const listeners = new Set<() => void>();
+
+/**
+ * Subscription for useSyncExternalStore, so a component can read the stored
+ * preference without a setState-in-effect after hydration. Notifies on this
+ * tab's own setTheme() and on another tab changing localStorage.
+ */
+export const subscribeTheme = (onChange: () => void) => {
+  listeners.add(onChange);
+  const onStorage = (e: StorageEvent) => {
+    if (e.key === STORAGE_KEY || e.key === null) onChange();
+  };
+  if (typeof window !== "undefined") window.addEventListener("storage", onStorage);
+  return () => {
+    listeners.delete(onChange);
+    if (typeof window !== "undefined") window.removeEventListener("storage", onStorage);
+  };
+};
+
 export const setTheme = (theme: ThemePreference) => {
   if (typeof window === "undefined") return;
   if (theme === "system") {
@@ -23,6 +42,7 @@ export const setTheme = (theme: ThemePreference) => {
     window.localStorage.setItem(STORAGE_KEY, theme);
   }
   applyTheme(theme);
+  listeners.forEach((notify) => notify());
 };
 
 // Inlined into a <script> tag in layout.tsx so the correct theme class

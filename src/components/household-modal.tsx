@@ -26,7 +26,8 @@ export function HouseholdModal({ onClose }: HouseholdModalProps) {
     setError(null);
 
     const { error: createError } = await supabase.rpc("create_household", {
-      new_name: `${user.user_metadata?.full_name || "My"}'s Household`,
+      // "My's Household" is what a nameless profile used to get.
+      new_name: user.user_metadata?.full_name ? `${user.user_metadata.full_name}'s Household` : "My Household",
     });
 
     setIsCreating(false);

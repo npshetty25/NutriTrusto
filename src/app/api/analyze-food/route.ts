@@ -31,7 +31,7 @@ type NutritionPayload = {
  */
 const NON_FOOD_KEYWORDS = [
   "soap", "detergent", "shampoo", "conditioner", "toothpaste", "lotion",
-  "cotton bud", "sanitizer", "disinfectant", "bleach", "cleaner", "battery",
+  "cotton bud", "sanitizer", "disinfectant", "bleach", "cleaner", "battery", "batteries",
   "candle",
   // Were the point of the bare "cream" entry.
   "face cream", "body cream", "shaving cream", "hand cream", "cold cream",

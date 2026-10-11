@@ -103,6 +103,7 @@ import { CountUp } from "@/components/count-up";
 import { motion, AnimatePresence, MotionConfig } from "framer-motion";
 import { toast } from "sonner";
 import { apiFetch } from "@/lib/api-client";
+import type { FoodAnalysis } from "@/lib/food-analysis";
 
 interface Item {
   id: string;
@@ -133,7 +134,7 @@ interface NotificationEntry {
 
 interface ScannedResultEntry {
   name: string;
-  analysis: any;
+  analysis: FoodAnalysis;
   itemDiet: ItemDietType;
   // Real ingredient text from Open Food Facts, when actually available —
   // never the "None provided..." placeholder used when no product data
@@ -424,7 +425,13 @@ export default function Home() {
     unknown: Package,
   } as const;
 
-  const buildNotificationFromRow = (row: any): NotificationEntry => {
+  const buildNotificationFromRow = (row: {
+    id: string;
+    name?: string | null;
+    days_left: number;
+    purchase_date: string;
+    created_at?: string | null;
+  }): NotificationEntry => {
     const currentDays = calculateCurrentDaysLeft(row.days_left, row.purchase_date);
     const createdAt = row.created_at || new Date().toISOString();
     const category = inferItemCategory(String(row.name || ""));
@@ -1009,7 +1016,7 @@ export default function Home() {
       });
       const data = await res.json();
       if (data.success && data.items && user) {
-        const normalizedItems = (data.items as any[])
+        const normalizedItems = (data.items as Array<{ name?: unknown; days_left?: unknown }>)
           .map((apiItem) => {
             const name = String(apiItem?.name || "").trim();
             const daysLeft = Number.isFinite(Number(apiItem?.days_left))
@@ -1156,6 +1163,8 @@ if (data.status === 0) {
         saturated_fat_g_100g?: number;
         fibre_g_100g?: number;
         protein_g_100g?: number;
+        // Set when fewer than two fields came back, so the UI can warn.
+        __isEstimated?: boolean;
       } = {};
       let additivesCount = 0;
       let additiveColors: string[] = [];
@@ -1214,7 +1223,7 @@ const sodiumFromSalt = typeof nutriments.salt_100g === "number" ? nutriments.sal
 const nutritionFieldsFilled = Object.values(nutritionData).filter(v => typeof v === "number").length;
 if (nutritionFieldsFilled < 2) {
   // Mark so the UI can warn the user clearly
-  (nutritionData as any).__isEstimated = true;
+  nutritionData.__isEstimated = true;
 }
 
         additivesCount = typeof product.additives_n === "number"
@@ -1700,7 +1709,7 @@ if (nutritionFieldsFilled < 2) {
             {!generatedRecipe ? (
               <div className="p-4 flex flex-col gap-4">
                 <div>
-                  <h2 className="font-semibold text-sm flex items-center gap-2"><BrainCircuit size={14} /> Use up what's expiring</h2>
+                  <h2 className="font-semibold text-sm flex items-center gap-2"><BrainCircuit size={14} /> Use up what&apos;s expiring</h2>
                   <p className="text-xs text-foreground/60 mt-1">Cook something using what expires first.</p>
                 </div>
                 <motion.button
@@ -2473,7 +2482,7 @@ if (nutritionFieldsFilled < 2) {
                        </div>
                     ))}
 
-                    {scannedResult.analysis.concerns?.map((concern: any, i: number) => (
+                    {scannedResult.analysis.concerns?.map((concern, i) => (
                        <div key={i} className="p-3.5 flex flex-col gap-1.5">
                          <div className="flex justify-between items-center">
                            <div className="flex items-center gap-2.5">
@@ -2494,7 +2503,7 @@ if (nutritionFieldsFilled < 2) {
               {scannedResult.analysis.positives?.length > 0 && (
                 <div className="space-y-3">
                   <h4 className="font-bold flex items-center gap-2 text-foreground">
-                    What You'll Like <span className="text-xl">🙂</span>
+                    What You&apos;ll Like <span className="text-xl">🙂</span>
                   </h4>
                   {/* Raw green-500/600/700 here was the second instance of
                       the non-veg-in-green defect: it painted a scanned
@@ -2507,7 +2516,7 @@ if (nutritionFieldsFilled < 2) {
                     );
                     return (
                       <div className={`rounded-2xl border divide-y divide-border/50 overflow-hidden ${tone.container}`}>
-                        {scannedResult.analysis.positives.map((pos: any, i: number) => (
+                        {scannedResult.analysis.positives.map((pos, i) => (
                           <div key={i} className="p-3.5 flex flex-col gap-1.5">
                             <div className="flex justify-between items-center">
                               <div className="flex items-center gap-2.5">
@@ -2530,7 +2539,7 @@ if (nutritionFieldsFilled < 2) {
                 <div className="space-y-3">
                   <h4 className="font-bold text-foreground/80 text-sm">Better Rated Options</h4>
                   <div className="flex gap-3 overflow-x-auto pb-4 snap-x hide-scrollbar">
-                    {scannedResult.analysis.alternatives.map((alt: any, i: number) => (
+                    {scannedResult.analysis.alternatives.map((alt, i) => (
                       <div key={i} className="min-w-35 snap-center bg-card border border-border p-3 rounded-2xl shrink-0 flex flex-col sleek-shadow">
                         <div className="w-8 h-8 rounded-full bg-foreground/8 text-foreground/70 flex items-center justify-center font-black text-xs mb-2">
                            {alt.score}

@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import { Sun, Moon, Monitor } from "lucide-react";
-import { getStoredTheme, setTheme, type ThemePreference } from "@/lib/theme";
+import { getStoredTheme, setTheme, subscribeTheme, type ThemePreference } from "@/lib/theme";
 
 const OPTIONS: { id: ThemePreference; label: string; icon: typeof Sun }[] = [
   { id: "light", label: "Light", icon: Sun },
@@ -11,14 +11,11 @@ const OPTIONS: { id: ThemePreference; label: string; icon: typeof Sun }[] = [
 ];
 
 export function ThemeToggle() {
-  const [active, setActive] = useState<ThemePreference>("system");
-
-  useEffect(() => {
-    setActive(getStoredTheme());
-  }, []);
+  // The server and the first client render both see "system"; the stored
+  // value is read after hydration without an effect-driven setState.
+  const active = useSyncExternalStore(subscribeTheme, getStoredTheme, (): ThemePreference => "system");
 
   const handleSelect = (theme: ThemePreference) => {
-    setActive(theme);
     setTheme(theme);
   };
 

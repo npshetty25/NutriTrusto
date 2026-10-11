@@ -93,6 +93,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (user) {
+      // The loading flag has to flip before the request starts, so the first
+      // paint after sign-in shows a spinner rather than "no household".
+      // This is a fetch-on-change effect, which is what effects are for; the
+      // rule objects to the synchronous setHouseholdLoading(true) inside.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       void refreshHousehold();
       // Cheap, one-time probe: does pantry_items.household_id exist yet?
       // Postgrest returns an error (missing column / schema cache) if the
