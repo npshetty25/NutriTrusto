@@ -8,6 +8,8 @@ process.env.TZ = "UTC";
 
 const generateContent = vi.hoisted(() => vi.fn());
 const getRequestUser = vi.hoisted(() => vi.fn());
+const recordRawScan = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/scan-store", () => ({ recordRawScan }));
 
 vi.mock("@google/generative-ai", () => ({
   GoogleGenerativeAI: class {
@@ -33,6 +35,7 @@ beforeAll(async () => {
 beforeEach(() => {
   silenceLogs();
   generateContent.mockReset();
+  recordRawScan.mockReset().mockResolvedValue({ stored: true });
   getRequestUser.mockReset();
   getRequestUser.mockResolvedValue(nextUser());
 });
@@ -171,6 +174,40 @@ describe("POST /api/extract — turning Gemini output into pantry items", () => 
     const res = await POST(receipt());
     expect(res.status).toBe(200);
     expect((await json(res)).items).toEqual([]);
+  });
+});
+
+describe("POST /api/extract — raw payload store", () => {
+  it("hands the model's untouched answer to the store, and returns the same scan id", async () => {
+    const raw = {
+      purchase_date_iso: "2026-10-08",
+      items: [{ name: "  Milk ", days_left: "five", risk: "weird" }, { name: "" }],
+      extra_model_field: { kept: true },
+    };
+    generateContent.mockResolvedValue(geminiText(JSON.stringify(raw)));
+    const user = nextUser();
+    getRequestUser.mockResolvedValue(user);
+
+    const body = await json(await POST(receipt()));
+
+    expect(recordRawScan).toHaveBeenCalledOnce();
+    const doc = recordRawScan.mock.calls[0][0];
+    expect(doc).toMatchObject({ kind: "receipt", userId: user.id, model: "gemini-2.5-flash", normalisedCount: 1 });
+    expect(doc.payload).toEqual(raw); // before normalisation: odd fields and bad rows intact
+    expect(body.scan_id).toBe(doc.scanId);
+  });
+
+  it("still succeeds when the store reports it could not write", async () => {
+    recordRawScan.mockResolvedValue({ stored: false, reason: "write timed out" });
+    generateContent.mockResolvedValue(geminiText('{"items":[{"name":"Milk","days_left":5,"risk":"high"}]}'));
+    const res = await POST(receipt());
+    expect(res.status).toBe(200);
+    expect(((await json(res)).items as unknown[]).length).toBe(1);
+  });
+
+  it("does not record anything for a request that was rejected", async () => {
+    await POST(multipartRequest("receipt", null));
+    expect(recordRawScan).not.toHaveBeenCalled();
   });
 });
 

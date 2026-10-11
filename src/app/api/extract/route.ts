@@ -5,6 +5,7 @@ import { deriveRiskFromDaysOnly } from "@/lib/risk-bands";
 import { validateUpload } from "@/lib/upload-validation";
 import { getRequestUser, unauthorized } from "@/lib/api-auth";
 import { checkRateLimit, rateLimited } from "@/lib/rate-limit";
+import { recordRawScan } from "@/lib/scan-store";
 
 const apiKey = process.env.GEMINI_API_KEY;
 const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null;
@@ -176,10 +177,23 @@ Return ONLY the raw JSON string, with no markdown formatting.`;
       rawPurchaseDateIso: parsedData?.purchase_date_iso ?? null,
     });
 
+    // The model's answer as it came back, kept beside (not inside) Postgres.
+    // A no-op unless MONGODB_URI is set; never fails the scan.
+    const scan_id = crypto.randomUUID();
+    await recordRawScan({
+      scanId: scan_id,
+      userId: user.id,
+      kind: "receipt",
+      model: "gemini-2.5-flash",
+      payload: parsedData,
+      normalisedCount: items.length,
+    });
+
     return NextResponse.json({
       success: true,
       items,
       purchase_date,
+      scan_id,
     });
   } catch (error: unknown) {
     const err = error as { message?: string; stack?: string } | null;

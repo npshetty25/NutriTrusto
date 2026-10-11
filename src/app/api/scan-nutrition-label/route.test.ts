@@ -49,7 +49,9 @@ describe("POST /api/scan-nutrition-label", () => {
     generateContent.mockResolvedValue(geminiText(JSON.stringify(table)));
     const res = await POST(label());
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ success: true, nutrition: table });
+    const body = (await res.json()) as { success: boolean; nutrition: unknown; scan_id: string };
+    expect(body).toMatchObject({ success: true, nutrition: table });
+    expect(body.scan_id).toMatch(/^[0-9a-f-]{36}$/);
   });
 
   it("keeps nulls as nulls — a value the model could not read is never filled in", async () => {

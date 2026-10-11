@@ -4,6 +4,7 @@ import { createRequestContext } from "@/lib/server-logger";
 import { validateUpload } from "@/lib/upload-validation";
 import { getRequestUser, unauthorized } from "@/lib/api-auth";
 import { checkRateLimit, rateLimited } from "@/lib/rate-limit";
+import { recordRawScan } from "@/lib/scan-store";
 
 const apiKey = process.env.GEMINI_API_KEY;
 const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null;
@@ -161,8 +162,12 @@ export async function POST(req: Request) {
 
     log.info("Expiry resolved", { source, daysLeft, confidence });
 
+    const scan_id = crypto.randomUUID();
+    await recordRawScan({ scanId: scan_id, userId: user.id, kind: "expiry-date", model: "gemini-2.5-flash", payload: parsed });
+
     return NextResponse.json({
       success: true,
+      scan_id,
       expiry: {
         days_left: daysLeft,
         expiry_date: resolvedExpiry ? resolvedExpiry.toISOString().slice(0, 10) : null,

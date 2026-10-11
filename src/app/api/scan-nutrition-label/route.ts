@@ -4,6 +4,7 @@ import { createRequestContext } from "@/lib/server-logger";
 import { validateUpload } from "@/lib/upload-validation";
 import { getRequestUser, unauthorized } from "@/lib/api-auth";
 import { checkRateLimit, rateLimited } from "@/lib/rate-limit";
+import { recordRawScan } from "@/lib/scan-store";
 
 const apiKey = process.env.GEMINI_API_KEY;
 const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null;
@@ -130,7 +131,10 @@ The "confidence" field is your honest assessment:
     const parsed = JSON.parse(jsonStr);
     log.info("Nutrition label parsed", parsed);
 
-    return NextResponse.json({ success: true, nutrition: parsed });
+    const scan_id = crypto.randomUUID();
+    await recordRawScan({ scanId: scan_id, userId: user.id, kind: "nutrition-label", model: "gemini-2.5-flash", payload: parsed });
+
+    return NextResponse.json({ success: true, nutrition: parsed, scan_id });
   } catch (error: unknown) {
     log.error("Nutrition label scan failed", {
       message: error instanceof Error ? error.message : "Unknown",
