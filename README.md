@@ -1,84 +1,138 @@
 # Nutri-Trust — Smart Pantry
 
-A pantry tracker that helps reduce household food waste: scan groceries in,
-see what's about to expire, and get a recipe to use it up before it spoils.
-
 [![CI](https://github.com/npshetty25/NutriTrusto/actions/workflows/ci.yml/badge.svg)](https://github.com/npshetty25/NutriTrusto/actions/workflows/ci.yml)
 
-Live: https://nutri-trusto.vercel.app
+A pantry tracker for Indian households that cuts food waste: scan a barcode or
+a receipt, see what is about to expire, and get a recipe that uses it up first.
+Pantries can be shared across a household with row-level security enforcing who
+sees what.
 
-## Getting started
+**Live:** https://nutri-trusto.vercel.app · installable as a PWA
 
-```bash
-npm install
-npm run dev
+<p align="center">
+  <img src="docs/audit/dashboard-375x812-after.png" alt="Dashboard on a 375px phone, showing pantry items sorted by urgency" width="260">
+</p>
+
+<sub>Screenshot rendered from synthetic pantry data in a test browser, not a real account.
+There is no demo GIF yet.</sub>
+
+## What it does
+
+- **Scan in** — barcode (camera or typed), receipt photo, nutrition label,
+  printed expiry date. Gemini reads the images; Open Food Facts resolves barcodes.
+- **Know what is expiring** — shelf-life estimates with their source shown on
+  the card, risk bands, and a plain "past our estimate, check it yourself" rather
+  than a claim that food has spoiled.
+- **Cook it** — Indian recipes generated from what expires first, validated
+  server-side against the user's diet (vegetarian / eggtarian) before they are shown.
+- **Share it** — households with invite codes, a shared pantry, per-user
+  shopping list and impact dashboard.
+- **Category hint** — a trained model suggests a category for scanned products.
+
+## Architecture
+
+```mermaid
+flowchart LR
+  UI[Next.js PWA] -->|anon key + RLS| PG[(Supabase Postgres)]
+  UI -->|bearer token| API[/api routes/]
+  API --> GEM[Gemini]
+  API --> OFF[Open Food Facts]
+  API -.-> ML[FastAPI category model]
+  API -.-> MONGO[(MongoDB raw OCR log)]
 ```
 
-Open http://localhost:3000.
+Dotted edges are optional. Full diagram, trust boundaries and request flows:
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
-Copy `.env.local.example` to `.env.local` and fill in:
+## Engineering evidence
 
-| Variable | Used for |
-| --- | --- |
-| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key |
-| `GEMINI_API_KEY` | Receipt / label / expiry scanning and pantry chat |
-| `OFF_USER_ID`, `OFF_PASSWORD` | *(optional)* contributing corrected barcodes back to Open Food Facts |
-
-## Database setup
-
-Run both files in the Supabase SQL Editor, in order:
-
-1. `db/supabase-schema.sql` — base tables
-2. `db/supabase-schema-additions.sql` — households, shopping list, scan
-   history, ingredient text, item outcomes, household leaderboard
-
-Both are idempotent and additive, so re-running them is safe. The app probes
-for newer columns at startup and degrades gracefully with a "migration hasn't
-been run" message rather than failing, so it stays usable if you've only run
-the first file.
-
-## Testing
-
-```bash
-npm run lint && npm run typecheck
-npm test                 # unit, component, API-route and RLS tests
-npm run test:coverage    # same, with a v8 coverage report
-npm run test:e2e         # builds, then runs the Playwright journeys
-```
-
-The RLS tests run the real migrations in `db/` against Postgres 17 (PGlite)
-as the `authenticated` role; the browser tests fake Supabase, Open Food Facts
-and the Gemini-backed routes at the network layer. CI runs all of it on every
-push.
+| | |
+|---|---|
+| **Tests & CI** | Vitest unit/component/API-route tests, RLS policies run against real Postgres (PGlite), Playwright browser journeys on phone and desktop, a pytest job for the model service, and a Docker job. All on every push: [workflow](.github/workflows/ci.yml) |
+| **RLS & the 42P17 fix** | [db/rls.test.ts](db/rls.test.ts) proves the policies and includes a negative control that *does* raise `42P17`. It also pins a real cross-household write issue and a tested, **unapplied** fix in [db/proposed/](db/proposed/) |
+| **Responsive & PWA** | Before/after measurements in [docs/audit/PHASE1_RESULTS.md](docs/audit/PHASE1_RESULTS.md); a browser test fails the build if a tap target drops below 44px |
+| **Load test** | [docs/perf/LOAD_TEST.md](docs/perf/LOAD_TEST.md) — labelled synthetic, with its limits stated |
+| **ML model** | [ml/README.md](ml/README.md) — dataset, licence, metrics against the existing keyword rules, calibration, known misses |
+| **Decision record** | [docs/adr/0001-postgres-plus-mongodb.md](docs/adr/0001-postgres-plus-mongodb.md) |
+| **Audit & honest status** | [docs/audit/PHASE0_AUDIT.md](docs/audit/PHASE0_AUDIT.md), [PORTFOLIO_REPORT.md](PORTFOLIO_REPORT.md) |
 
 ## Stack
 
 - **Next.js 16** (App Router, Turbopack), React 19, TypeScript, Tailwind v4
-- **Supabase** — Postgres, Auth, Realtime, row-level security
-- **Google Gemini** (`gemini-2.5-flash`) — receipt OCR, nutrition-label and
-  expiry-date reading, and chat over your live pantry
-- **Open Food Facts** — barcode product lookup
-- **TheMealDB** — recipe lookup, restricted to Indian dishes
-- Installable as a PWA (web manifest + a small offline app-shell cache)
+- **Supabase** — Postgres, Auth, Realtime, row-level security, security-definer functions
+- **Google Gemini** (`gemini-2.5-flash`) — receipt, label and expiry OCR; recipes; chat
+- **Open Food Facts** — barcode lookup
+- **scikit-learn + FastAPI** — category classifier service
+- **Vitest, Testing Library, PGlite, Playwright, pytest** — tests
+- **Docker, GitHub Actions** — container image and CI
+- **Vercel** — hosting
+
+## Run it
+
+### Locally
+
+```bash
+npm install
+cp .env.local.example .env.local   # fill in Supabase and Gemini values
+npm run dev                        # http://localhost:3000
+```
+
+| Variable | Used for |
+| --- | --- |
+| `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase project (public values) |
+| `GEMINI_API_KEY` | Scanning, recipes and chat (server only) |
+| `ML_SERVICE_URL` | *(optional)* category model service; unset → keyword rules |
+| `MONGODB_URI` | *(optional, branch `feat/p4-mongodb`, not merged)* raw OCR log |
+| `OFF_USER_ID`, `OFF_PASSWORD` | *(optional)* contribute barcodes to Open Food Facts |
+
+### With Docker
+
+```bash
+cp .env.local.example .env         # compose reads .env
+docker compose up --build          # web on :3000, model service on :8000
+```
+
+### Database
+
+Run in the Supabase SQL editor, in order: `db/supabase-schema.sql`,
+`db/supabase-schema-additions.sql`, `db/supabase-schema-hardening.sql`. All are
+idempotent. There is no migration ledger; the repo cannot tell you which have
+been applied to a given project.
+
+### Tests
+
+```bash
+npm run lint && npm run typecheck
+npm test                  # unit, component, API-route and RLS tests
+npm run test:coverage
+npm run test:e2e          # builds, then runs Playwright (phone + desktop + PWA)
+pytest ml/service         # model service
+```
+
+## Known limitations
+
+Short list; the full one is in [PORTFOLIO_REPORT.md](PORTFOLIO_REPORT.md).
+
+- Rate limiting is per server instance, in memory.
+- `src/app/page.tsx` is ~2,900 lines; it is covered by browser tests, not unit tests.
+- Statement coverage is about a third of `src/` — high where logic lives
+  (`lib`, API routes), near zero on the big page component.
+- The category model is trained on packaged-product names and mislabels fresh
+  produce; it is not wired to anything that spends money.
+- Not deployed to Azure; MongoDB is merged only as a branch, awaiting an Atlas cluster.
 
 ## Layout
 
 ```
-smart-pantry/          this app
-├── src/app/           routes, layout, and API routes
-├── src/components/    UI components
-├── src/context/       auth + household context
-├── src/lib/           supabase client, allergens, categories, estimates
-├── public/            static assets, service worker
-└── db/                SQL migrations (run manually in Supabase)
-
-project-files/         not part of the app
-├── presentations/     slide decks and exported PDFs
-├── reports/           written reports, judge Q&A
-├── wireframe/         early wireframe
-├── ppt-scripts/       one-off deck-generation scripts
-└── archive/           extracted deck text, QA exports, superseded files
+src/app/         routes, layout, API routes (/api/health, /api/categorize, …)
+src/components/  UI components
+src/lib/         matchers, shelf-life data, auth, rate limit, upload validation
+db/              SQL migrations; db/proposed/ holds reviewed-but-unapplied ones
+e2e/             Playwright specs and the fake backend they run against
+ml/              data fetch, training, evaluation, service, committed model
+perf/            Locust load test and stub
+docs/            architecture, ADRs, audits, perf report
 ```
 
-`FEATURE_IDEAS.md` tracks build status for planned and shipped features.
+`FEATURE_IDEAS.md` tracks planned and shipped features; `CHANGELOG.md` records
+every change to shelf-life data with the reason.
