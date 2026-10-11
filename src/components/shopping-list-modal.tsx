@@ -168,7 +168,7 @@ export default function ShoppingListModal({ onClose }: ShoppingListModalProps) {
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as ShoppingSortOption)}
               title="Sort"
-              className="neu-field flex-1 rounded-lg px-2 py-1.5 text-xs"
+              className="neu-field flex-1 min-h-11 rounded-lg px-2 py-1.5 text-base"
             >
               <option value="newest">Newest First</option>
               <option value="name">Name (A-Z)</option>
@@ -176,7 +176,7 @@ export default function ShoppingListModal({ onClose }: ShoppingListModalProps) {
             </select>
             <button
               onClick={() => setHideChecked((v) => !v)}
-              className={`text-[11px] font-semibold px-2.5 py-1.5 rounded-lg border whitespace-nowrap transition-colors ${
+              className={`min-h-11 text-[11px] font-semibold px-3 py-1.5 rounded-lg border whitespace-nowrap transition-colors ${
                 hideChecked ? "bg-foreground text-background border-foreground" : "border-border text-foreground/60 hover:text-foreground hover:bg-foreground/5"
               }`}
             >
