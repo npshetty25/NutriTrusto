@@ -9,17 +9,17 @@ type Fixtures = {
 };
 
 export const test = base.extend<Fixtures>({
-  anonymous: async ({ context, page }, use) => {
+  anonymous: async ({ context, page }, provide) => {
     const backend = new FakeBackend();
     await backend.install(context);
     await backend.quietRealtime(page);
-    await use(backend);
+    await provide(backend);
   },
-  backend: async ({ context, page }, use) => {
+  backend: async ({ context, page }, provide) => {
     const backend = new FakeBackend();
     await backend.install(context, { signedIn: true });
     await backend.quietRealtime(page);
-    await use(backend);
+    await provide(backend);
   },
 });
 
