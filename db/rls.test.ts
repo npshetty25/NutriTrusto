@@ -410,3 +410,41 @@ describe("cross-household writes on pantry_items", () => {
     });
   });
 });
+
+describe("proposed scan_id link (db/proposed/scan-id-link.sql)", () => {
+  let db: PGlite;
+  beforeAll(async () => {
+    db = await freshDatabase(["proposed/scan-id-link.sql"]);
+  }, 60_000);
+  afterAll(async () => db.close());
+
+  it("adds a nullable scan_id to pantry_items and scan_history", async () => {
+    const { rows } = await db.query<{ table_name: string; is_nullable: string }>(
+      `select table_name, is_nullable from information_schema.columns
+        where table_schema = 'public' and column_name = 'scan_id' order by table_name`
+    );
+    expect(rows).toEqual([
+      { table_name: "pantry_items", is_nullable: "YES" },
+      { table_name: "scan_history", is_nullable: "YES" },
+    ]);
+  });
+
+  it("leaves existing writes and row-level security working unchanged", async () => {
+    await as(db, ALICE, () =>
+      db.query(`insert into public.pantry_items (user_id, name, days_left) values ('${ALICE}', 'Milk', 3)`)
+    );
+    const own = await as(db, ALICE, () => db.query(`select name, scan_id from public.pantry_items`));
+    expect(own.rows).toEqual([{ name: "Milk", scan_id: null }]);
+    const other = await as(db, BOB, () => db.query(`select * from public.pantry_items`));
+    expect(other.rows).toHaveLength(0);
+  });
+
+  it("stores a scan id on a row the caller owns", async () => {
+    const id = "11111111-1111-4111-8111-111111111111";
+    await as(db, ALICE, () =>
+      db.query(`insert into public.pantry_items (user_id, name, days_left, scan_id) values ('${ALICE}', 'Rice', 300, '${id}')`)
+    );
+    const { rows } = await as(db, ALICE, () => db.query<{ scan_id: string }>(`select scan_id from public.pantry_items where name = 'Rice'`));
+    expect(rows[0].scan_id).toBe(id);
+  });
+});
