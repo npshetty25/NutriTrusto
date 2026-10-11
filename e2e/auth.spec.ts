@@ -15,7 +15,7 @@ test.describe("authentication", () => {
     await page.locator('form button[type="submit"]').click();
 
     await expect(page).toHaveURL(/\/$/);
-    await expect(page.getByText("Your pantry is empty")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Your pantry is empty" })).toBeVisible();
 
     const tokenCall = anonymous.requests.find((r) => r.path === "/auth/v1/token");
     expect(tokenCall?.body).toMatchObject({ email: "asha@example.test", password: "correct horse battery" });
