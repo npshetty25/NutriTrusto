@@ -1,0 +1,2552 @@
+[
+ {
+  "name": "datteln getrocknet",
+  "label": "fruit",
+  "predicted": "unknown"
+ },
+ {
+  "name": "navaratan mix",
+  "label": "snack",
+  "predicted": "unknown"
+ },
+ {
+  "name": "crunchy granola",
+  "label": "grain",
+  "predicted": "unknown"
+ },
+ {
+  "name": "monsoon harvest toasted millet muesli cranberry & almond",
+  "label": "grain",
+  "predicted": "unknown"
+ },
+ {
+  "name": "kopi kapal api special",
+  "label": "beverage",
+  "predicted": "unknown"
+ },
+ {
+  "name": "ready to eat tropical and sweet giant mango",
+  "label": "fruit",
+  "predicted": "fruit"
+ },
+ {
+  "name": "all natural ice cream bars, vanilla",
+  "label": "frozen",
+  "predicted": "frozen"
+ },
+ {
+  "name": "bingo mad angles pizza..aaaah",
+  "label": "snack",
+  "predicted": "unknown"
+ },
+ {
+  "name": "custard apple",
+  "label": "fruit",
+  "predicted": "fruit"
+ },
+ {
+  "name": "limca 2ltr pet",
+  "label": "beverage",
+  "predicted": "unknown"
+ },
+ {
+  "name": "kiwifruit sungold",
+  "label": "fruit",
+  "predicted": "unknown"
+ },
+ {
+  "name": "keto dark chocolate",
+  "label": "snack",
+  "predicted": "snack"
+ },
+ {
+  "name": "kitkat",
+  "label": "snack",
+  "predicted": "unknown"
+ },
+ {
+  "name": "unpolished toor dal",
+  "label": "grain",
+  "predicted": "grain"
+ },
+ {
+  "name": "homestyle chips",
+  "label": "frozen",
+  "predicted": "snack"
+ },
+ {
+  "name": "italian style beef ravioli in marinara sauce",
+  "label": "frozen",
+  "predicted": "meat"
+ },
+ {
+  "name": "thumbs up 750ml",
+  "label": "beverage",
+  "predicted": "unknown"
+ },
+ {
+  "name": "b natural orange",
+  "label": "beverage",
+  "predicted": "fruit"
+ },
+ {
+  "name": "cornetto oreo disc",
+  "label": "frozen",
+  "predicted": "unknown"
+ },
+ {
+  "name": "keya mixed herbs",
+  "label": "pantry",
+  "predicted": "unknown"
+ },
+ {
+  "name": "tata gluco+ orange",
+  "label": "beverage",
+  "predicted": "fruit"
+ },
+ {
+  "name": "d-lite tomato ketchup",
+  "label": "pantry",
+  "predicted": "pantry"
+ },
+ {
+  "name": "pio pulpy mix fruit pulp juice",
+  "label": "beverage",
+  "predicted": "beverage"
+ },
+ {
+  "name": "doble chocolate & strawberry",
+  "label": "frozen",
+  "predicted": "snack"
+ },
+ {
+  "name": "green tea honey lemon",
+  "label": "beverage",
+  "predicted": "beverage"
+ },
+ {
+  "name": "gadbad mixture",
+  "label": "snack",
+  "predicted": "unknown"
+ },
+ {
+  "name": "refined wheat flour maida srilalitha",
+  "label": "grain",
+  "predicted": "grain"
+ },
+ {
+  "name": "6 sultana scones",
+  "label": "fruit",
+  "predicted": "unknown"
+ },
+ {
+  "name": "kool badam flavour",
+  "label": "beverage",
+  "predicted": "unknown"
+ },
+ {
+  "name": "kroger, ground round beef with natural flavors",
+  "label": "meat",
+  "predicted": "meat"
+ },
+ {
+  "name": "brownie batter chocolate light ice cream",
+  "label": "frozen",
+  "predicted": "frozen"
+ },
+ {
+  "name": "pav",
+  "label": "bakery",
+  "predicted": "unknown"
+ },
+ {
+  "name": "dates",
+  "label": "fruit",
+  "predicted": "unknown"
+ },
+ {
+  "name": "unpolished moong dal",
+  "label": "grain",
+  "predicted": "grain"
+ },
+ {
+  "name": "chilly papad",
+  "label": "bakery",
+  "predicted": "unknown"
+ },
+ {
+  "name": "pears general",
+  "label": "fruit",
+  "predicted": "fruit"
+ },
+ {
+  "name": "flirty tomato tango",
+  "label": "snack",
+  "predicted": "vegetable"
+ },
+ {
+  "name": "2 pork loin steaks",
+  "label": "meat",
+  "predicted": "meat"
+ },
+ {
+  "name": "fortune refined sunflower oil",
+  "label": "pantry",
+  "predicted": "pantry"
+ },
+ {
+  "name": "peperboat",
+  "label": "snack",
+  "predicted": "unknown"
+ },
+ {
+  "name": "aarambh muesli",
+  "label": "grain",
+  "predicted": "unknown"
+ },
+ {
+  "name": "multgrain bread",
+  "label": "bakery",
+  "predicted": "bakery"
+ },
+ {
+  "name": "mccain crazy fries with masala mix",
+  "label": "frozen",
+  "predicted": "pantry"
+ },
+ {
+  "name": "kimia dates",
+  "label": "fruit",
+  "predicted": "unknown"
+ },
+ {
+  "name": "pomme fuji",
+  "label": "fruit",
+  "predicted": "unknown"
+ },
+ {
+  "name": "metropolitan market, rustic diced tomatoes",
+  "label": "vegetable",
+  "predicted": "vegetable"
+ },
+ {
+  "name": "amul gold",
+  "label": "dairy",
+  "predicted": "unknown"
+ },
+ {
+  "name": "flat peaches",
+  "label": "fruit",
+  "predicted": "unknown"
+ },
+ {
+  "name": "kipnuggets",
+  "label": "meat",
+  "predicted": "unknown"
+ },
+ {
+  "name": "smoky valley, spicy beef summer sausage",
+  "label": "meat",
+  "predicted": "meat"
+ },
+ {
+  "name": "british beef sirloin steak",
+  "label": "meat",
+  "predicted": "meat"
+ },
+ {
+  "name": "rich tomato sauce",
+  "label": "vegetable",
+  "predicted": "pantry"
+ },
+ {
+  "name": "slim 'n' trim",
+  "label": "dairy",
+  "predicted": "unknown"
+ },
+ {
+  "name": "plant chef coronation cauliflower",
+  "label": "vegetable",
+  "predicted": "vegetable"
+ },
+ {
+  "name": "beef and pork mince",
+  "label": "meat",
+  "predicted": "meat"
+ },
+ {
+  "name": "golden delicious apples",
+  "label": "fruit",
+  "predicted": "fruit"
+ },
+ {
+  "name": "nutties",
+  "label": "snack",
+  "predicted": "unknown"
+ },
+ {
+  "name": "lil'goodness milk chocolate",
+  "label": "snack",
+  "predicted": "snack"
+ },
+ {
+  "name": "italian style diced tomatoes",
+  "label": "vegetable",
+  "predicted": "vegetable"
+ },
+ {
+  "name": "italian style basil & oregano sliced stewed tomatoes, italian style basil & oregano",
+  "label": "vegetable",
+  "predicted": "vegetable"
+ },
+ {
+  "name": "good life chilli guntur with stem",
+  "label": "pantry",
+  "predicted": "unknown"
+ },
+ {
+  "name": "let's try kerala garlic mix",
+  "label": "snack",
+  "predicted": "unknown"
+ },
+ {
+  "name": "toned milk a+",
+  "label": "dairy",
+  "predicted": "dairy"
+ },
+ {
+  "name": "medium fat ice cream",
+  "label": "frozen",
+  "predicted": "frozen"
+ },
+ {
+  "name": "whole strawberries",
+  "label": "fruit",
+  "predicted": "unknown"
+ },
+ {
+  "name": "magnum no added sugar",
+  "label": "frozen",
+  "predicted": "pantry"
+ },
+ {
+  "name": "turmeric",
+  "label": "pantry",
+  "predicted": "unknown"
+ },
+ {
+  "name": "oxygrannd drinking water",
+  "label": "beverage",
+  "predicted": "beverage"
+ },
+ {
+  "name": "ruchi gold oil",
+  "label": "pantry",
+  "predicted": "pantry"
+ },
+ {
+  "name": "jambon supérieur cuit à l’étouffée",
+  "label": "meat",
+  "predicted": "unknown"
+ },
+ {
+  "name": "cinnamon toast crunch cereal",
+  "label": "grain",
+  "predicted": "unknown"
+ },
+ {
+  "name": "coldpressed castor oil",
+  "label": "pantry",
+  "predicted": "pantry"
+ },
+ {
+  "name": "snickers 13x family treats",
+  "label": "snack",
+  "predicted": "unknown"
+ },
+ {
+  "name": "rôti de porc fumé",
+  "label": "meat",
+  "predicted": "unknown"
+ },
+ {
+  "name": "mentos pure and fresh gum",
+  "label": "snack",
+  "predicted": "unknown"
+ },
+ {
+  "name": "kiwi ice cream indian jackfruit",
+  "label": "frozen",
+  "predicted": "frozen"
+ },
+ {
+  "name": "arun ice cream",
+  "label": "frozen",
+  "predicted": "frozen"
+ },
+ {
+  "name": "sunrich aqua packaged drinking water",
+  "label": "beverage",
+  "predicted": "beverage"
+ },
+ {
+  "name": "teriyaki beef jerky",
+  "label": "meat",
+  "predicted": "meat"
+ },
+ {
+  "name": "tedhe medhe - bingo",
+  "label": "snack",
+  "predicted": "unknown"
+ },
+ {
+  "name": "chunk chicken breast",
+  "label": "meat",
+  "predicted": "meat"
+ },
+ {
+  "name": "maaza gold tea",
+  "label": "beverage",
+  "predicted": "beverage"
+ },
+ {
+  "name": "fresh & easy, green split peas",
+  "label": "vegetable",
+  "predicted": "vegetable"
+ },
+ {
+  "name": "glucon-d",
+  "label": "beverage",
+  "predicted": "unknown"
+ },
+ {
+  "name": "instant elaichi tea",
+  "label": "beverage",
+  "predicted": "beverage"
+ },
+ {
+  "name": "cadbury crackle",
+  "label": "frozen",
+  "predicted": "unknown"
+ },
+ {
+  "name": "full cream milk",
+  "label": "dairy",
+  "predicted": "dairy"
+ },
+ {
+  "name": "yippee noodles",
+  "label": "grain",
+  "predicted": "grain"
+ },
+ {
+  "name": "abricot sec",
+  "label": "fruit",
+  "predicted": "unknown"
+ },
+ {
+  "name": "mixed fruit granola",
+  "label": "grain",
+  "predicted": "unknown"
+ },
+ {
+  "name": "ailes de poulet assaisonnées à la mexicaine",
+  "label": "meat",
+  "predicted": "unknown"
+ },
+ {
+  "name": "farmhouse, fresh eggs",
+  "label": "meat",
+  "predicted": "meat"
+ },
+ {
+  "name": "skyr high protein plain yoghurt",
+  "label": "dairy",
+  "predicted": "unknown"
+ },
+ {
+  "name": "taka tak",
+  "label": "snack",
+  "predicted": "unknown"
+ },
+ {
+  "name": "green peas 500g",
+  "label": "grain",
+  "predicted": "vegetable"
+ },
+ {
+  "name": "super dahi",
+  "label": "dairy",
+  "predicted": "unknown"
+ },
+ {
+  "name": "cowpea beans",
+  "label": "vegetable",
+  "predicted": "vegetable"
+ },
+ {
+  "name": "organic whole peeled plum tomatoes",
+  "label": "vegetable",
+  "predicted": "vegetable"
+ },
+ {
+  "name": "jodhpuri jeera",
+  "label": "beverage",
+  "predicted": "unknown"
+ },
+ {
+  "name": "amul pasteurised butter",
+  "label": "dairy",
+  "predicted": "dairy"
+ },
+ {
+  "name": "italian style tomato sauce",
+  "label": "vegetable",
+  "predicted": "pantry"
+ },
+ {
+  "name": "just cranberries",
+  "label": "fruit",
+  "predicted": "unknown"
+ },
+ {
+  "name": "sorbet",
+  "label": "frozen",
+  "predicted": "unknown"
+ },
+ {
+  "name": "strawberry jam classic recipe",
+  "label": "fruit",
+  "predicted": "unknown"
+ },
+ {
+  "name": "diced tomatoes with green chiles",
+  "label": "vegetable",
+  "predicted": "vegetable"
+ },
+ {
+  "name": "butterball, turkey breast",
+  "label": "meat",
+  "predicted": "meat"
+ },
+ {
+  "name": "jaggery bites",
+  "label": "pantry",
+  "predicted": "unknown"
+ },
+ {
+  "name": "tata sampann unpolished chana dal",
+  "label": "grain",
+  "predicted": "grain"
+ },
+ {
+  "name": "soulfull ragi bites",
+  "label": "grain",
+  "predicted": "unknown"
+ },
+ {
+  "name": "real guava juice 180ml tpk",
+  "label": "beverage",
+  "predicted": "beverage"
+ },
+ {
+  "name": "crushed tomatillos",
+  "label": "vegetable",
+  "predicted": "unknown"
+ },
+ {
+  "name": "badam drink mix",
+  "label": "beverage",
+  "predicted": "beverage"
+ },
+ {
+  "name": "del monte, diced tomatoes with garlic & onion",
+  "label": "vegetable",
+  "predicted": "vegetable"
+ },
+ {
+  "name": "fortune physically refined rice bran oil",
+  "label": "pantry",
+  "predicted": "pantry"
+ },
+ {
+  "name": "haldhiram aloo bhujia 410g",
+  "label": "snack",
+  "predicted": "vegetable"
+ },
+ {
+  "name": "asparagus tips",
+  "label": "vegetable",
+  "predicted": "unknown"
+ },
+ {
+  "name": "mozzarella",
+  "label": "dairy",
+  "predicted": "unknown"
+ },
+ {
+  "name": "prosciutto panino",
+  "label": "meat",
+  "predicted": "unknown"
+ },
+ {
+  "name": "fudge swirl light ice cream, fudge swirl",
+  "label": "frozen",
+  "predicted": "frozen"
+ },
+ {
+  "name": "city gold premium 1kg pet",
+  "label": "beverage",
+  "predicted": "unknown"
+ },
+ {
+  "name": "biona: organic chopped tomatoes - 400g",
+  "label": "vegetable",
+  "predicted": "vegetable"
+ },
+ {
+  "name": "storia mango juice 750ml",
+  "label": "beverage",
+  "predicted": "beverage"
+ },
+ {
+  "name": "red raspberries",
+  "label": "fruit",
+  "predicted": "unknown"
+ },
+ {
+  "name": "pepsi brand mirinda orange flv 2ltr",
+  "label": "beverage",
+  "predicted": "fruit"
+ },
+ {
+  "name": "classic lemonade",
+  "label": "beverage",
+  "predicted": "unknown"
+ },
+ {
+  "name": "polo",
+  "label": "snack",
+  "predicted": "unknown"
+ },
+ {
+  "name": "garlic 100% veggie chips",
+  "label": "snack",
+  "predicted": "snack"
+ },
+ {
+  "name": "vedic tea",
+  "label": "beverage",
+  "predicted": "beverage"
+ },
+ {
+  "name": "imli tree veg mayonnaise 250g",
+  "label": "pantry",
+  "predicted": "unknown"
+ },
+ {
+  "name": "epigamia everyday yogurt mango",
+  "label": "dairy",
+  "predicted": "fruit"
+ },
+ {
+  "name": "independence water with minerals",
+  "label": "beverage",
+  "predicted": "beverage"
+ },
+ {
+  "name": "multigrain atta",
+  "label": "grain",
+  "predicted": "unknown"
+ },
+ {
+  "name": "honey dude",
+  "label": "fruit",
+  "predicted": "unknown"
+ },
+ {
+  "name": "dal makhani",
+  "label": "pantry",
+  "predicted": "unknown"
+ },
+ {
+  "name": "peanut chikki",
+  "label": "snack",
+  "predicted": "unknown"
+ },
+ {
+  "name": "horlicks protein+ chocolate",
+  "label": "beverage",
+  "predicted": "snack"
+ },
+ {
+  "name": "chana besan",
+  "label": "grain",
+  "predicted": "unknown"
+ },
+ {
+  "name": "high protein pav",
+  "label": "bakery",
+  "predicted": "unknown"
+ },
+ {
+  "name": "dill tzatziki",
+  "label": "pantry",
+  "predicted": "unknown"
+ },
+ {
+  "name": "premium ice cream sandwiches",
+  "label": "frozen",
+  "predicted": "frozen"
+ },
+ {
+  "name": "cooked and peeled wild shrimp",
+  "label": "frozen",
+  "predicted": "meat"
+ },
+ {
+  "name": "crunchem",
+  "label": "snack",
+  "predicted": "unknown"
+ },
+ {
+  "name": "fabbox peri peri ragi chips",
+  "label": "snack",
+  "predicted": "snack"
+ },
+ {
+  "name": "sooji",
+  "label": "grain",
+  "predicted": "unknown"
+ },
+ {
+  "name": "chach masala",
+  "label": "pantry",
+  "predicted": "pantry"
+ },
+ {
+  "name": "pretzel perfection, eggnog clusters",
+  "label": "meat",
+  "predicted": "unknown"
+ },
+ {
+  "name": "sea salt & cracked pepper glazed salmon fillets",
+  "label": "frozen",
+  "predicted": "vegetable"
+ },
+ {
+  "name": "premium basmati rice 1kg(3)",
+  "label": "grain",
+  "predicted": "grain"
+ },
+ {
+  "name": "latta's egg ranch, cage free chickens",
+  "label": "meat",
+  "predicted": "meat"
+ },
+ {
+  "name": "asian naturals general tso's chicken",
+  "label": "frozen",
+  "predicted": "meat"
+ },
+ {
+  "name": "french yogurt strawberry",
+  "label": "dairy",
+  "predicted": "dairy"
+ },
+ {
+  "name": "pure burst orange candy",
+  "label": "snack",
+  "predicted": "snack"
+ },
+ {
+  "name": "porsaan tomahawk steak",
+  "label": "meat",
+  "predicted": "unknown"
+ },
+ {
+  "name": "mysore pak 150 mrp",
+  "label": "snack",
+  "predicted": "unknown"
+ },
+ {
+  "name": "deglet nour dates - stones removed",
+  "label": "fruit",
+  "predicted": "unknown"
+ },
+ {
+  "name": "cherries",
+  "label": "fruit",
+  "predicted": "unknown"
+ },
+ {
+  "name": "no salt added crushed tomatoes in heavy puree",
+  "label": "vegetable",
+  "predicted": "vegetable"
+ },
+ {
+  "name": "hallmark byadgi chilli with stem",
+  "label": "pantry",
+  "predicted": "unknown"
+ },
+ {
+  "name": "sprouted ragi powder porridge",
+  "label": "grain",
+  "predicted": "unknown"
+ },
+ {
+  "name": "kellogg's fruit loops",
+  "label": "grain",
+  "predicted": "unknown"
+ },
+ {
+  "name": "italian crushed tomatoes",
+  "label": "vegetable",
+  "predicted": "vegetable"
+ },
+ {
+  "name": "wrap tortilla",
+  "label": "bakery",
+  "predicted": "unknown"
+ },
+ {
+  "name": "clementines",
+  "label": "fruit",
+  "predicted": "unknown"
+ },
+ {
+  "name": "choizo pork sausage",
+  "label": "meat",
+  "predicted": "meat"
+ },
+ {
+  "name": "fruit biscuits",
+  "label": "snack",
+  "predicted": "bakery"
+ },
+ {
+  "name": "american style cream and onion chips",
+  "label": "snack",
+  "predicted": "snack"
+ },
+ {
+  "name": "queso",
+  "label": "dairy",
+  "predicted": "unknown"
+ },
+ {
+  "name": "thums up 300ml can",
+  "label": "beverage",
+  "predicted": "unknown"
+ },
+ {
+  "name": "gold standard 100% whey extreme milk chocolate flavour",
+  "label": "dairy",
+  "predicted": "snack"
+ },
+ {
+  "name": "organic cow milk",
+  "label": "dairy",
+  "predicted": "dairy"
+ },
+ {
+  "name": "icy ocean, raw ez peel pink shrimp wild caught",
+  "label": "frozen",
+  "predicted": "meat"
+ },
+ {
+  "name": "chana jor",
+  "label": "grain",
+  "predicted": "unknown"
+ },
+ {
+  "name": "kandi podi",
+  "label": "pantry",
+  "predicted": "unknown"
+ },
+ {
+  "name": "bioäpfel",
+  "label": "fruit",
+  "predicted": "unknown"
+ },
+ {
+  "name": "kosher valley, breaded chicken breast nuggets",
+  "label": "meat",
+  "predicted": "frozen"
+ },
+ {
+  "name": "asitis",
+  "label": "dairy",
+  "predicted": "unknown"
+ },
+ {
+  "name": "butter bonn biscuits",
+  "label": "frozen",
+  "predicted": "bakery"
+ },
+ {
+  "name": "dairy day medium fat frozen dessert",
+  "label": "frozen",
+  "predicted": "frozen"
+ },
+ {
+  "name": "peanut butter",
+  "label": "dairy",
+  "predicted": "unknown"
+ },
+ {
+  "name": "too yummy",
+  "label": "snack",
+  "predicted": "unknown"
+ },
+ {
+  "name": "pinapple chunks in juice",
+  "label": "fruit",
+  "predicted": "beverage"
+ },
+ {
+  "name": "cadbury bournvita shakti 75g pp",
+  "label": "meat",
+  "predicted": "unknown"
+ },
+ {
+  "name": "garam masala",
+  "label": "pantry",
+  "predicted": "pantry"
+ },
+ {
+  "name": "atta shakti",
+  "label": "bakery",
+  "predicted": "unknown"
+ },
+ {
+  "name": "amul ghee",
+  "label": "dairy",
+  "predicted": "dairy"
+ },
+ {
+  "name": "big red jujube",
+  "label": "fruit",
+  "predicted": "unknown"
+ },
+ {
+  "name": "hot and sweet ketchup",
+  "label": "pantry",
+  "predicted": "pantry"
+ },
+ {
+  "name": "cookie dipped with chocolate cone",
+  "label": "frozen",
+  "predicted": "bakery"
+ },
+ {
+  "name": "bologna",
+  "label": "meat",
+  "predicted": "unknown"
+ },
+ {
+  "name": "jubli regular lng grn rice 1 kg",
+  "label": "grain",
+  "predicted": "grain"
+ },
+ {
+  "name": "agni strong leaf tea",
+  "label": "beverage",
+  "predicted": "beverage"
+ },
+ {
+  "name": "galaxy fusions dark chocolate",
+  "label": "snack",
+  "predicted": "snack"
+ },
+ {
+  "name": "kinley mineral water",
+  "label": "beverage",
+  "predicted": "beverage"
+ },
+ {
+  "name": "ham & cheese loaf",
+  "label": "meat",
+  "predicted": "dairy"
+ },
+ {
+  "name": "monaco",
+  "label": "snack",
+  "predicted": "unknown"
+ },
+ {
+  "name": "cut green beans",
+  "label": "frozen",
+  "predicted": "vegetable"
+ },
+ {
+  "name": "tata tea premium desh ki chai",
+  "label": "beverage",
+  "predicted": "beverage"
+ },
+ {
+  "name": "cento, crushed tomatoes",
+  "label": "vegetable",
+  "predicted": "vegetable"
+ },
+ {
+  "name": "frestea",
+  "label": "beverage",
+  "predicted": "unknown"
+ },
+ {
+  "name": "dartagnan saucisson a l' ail au vin rogue traditional",
+  "label": "meat",
+  "predicted": "unknown"
+ },
+ {
+  "name": "honeycrisp apples",
+  "label": "fruit",
+  "predicted": "fruit"
+ },
+ {
+  "name": "chocos moons & stars",
+  "label": "grain",
+  "predicted": "unknown"
+ },
+ {
+  "name": "sandwich chocolate and vanilla",
+  "label": "frozen",
+  "predicted": "snack"
+ },
+ {
+  "name": "mur gln crushed tom basil",
+  "label": "vegetable",
+  "predicted": "unknown"
+ },
+ {
+  "name": "ananda milk",
+  "label": "dairy",
+  "predicted": "dairy"
+ },
+ {
+  "name": "fresh ground beef",
+  "label": "meat",
+  "predicted": "meat"
+ },
+ {
+  "name": "tata salt",
+  "label": "pantry",
+  "predicted": "pantry"
+ },
+ {
+  "name": "italian tomato paste",
+  "label": "vegetable",
+  "predicted": "vegetable"
+ },
+ {
+  "name": "chocolate oat drink",
+  "label": "beverage",
+  "predicted": "snack"
+ },
+ {
+  "name": "trauben - rot und kernlos",
+  "label": "fruit",
+  "predicted": "unknown"
+ },
+ {
+  "name": "soft paneer",
+  "label": "dairy",
+  "predicted": "dairy"
+ },
+ {
+  "name": "philadelphia original cheese spread",
+  "label": "dairy",
+  "predicted": "dairy"
+ },
+ {
+  "name": "egg product",
+  "label": "meat",
+  "predicted": "meat"
+ },
+ {
+  "name": "sweet navel orange",
+  "label": "fruit",
+  "predicted": "fruit"
+ },
+ {
+  "name": "tata coffee grand classic",
+  "label": "beverage",
+  "predicted": "beverage"
+ },
+ {
+  "name": "nutrify honey roasted oats",
+  "label": "grain",
+  "predicted": "grain"
+ },
+ {
+  "name": "rice flour",
+  "label": "grain",
+  "predicted": "unknown"
+ },
+ {
+  "name": "banana",
+  "label": "fruit",
+  "predicted": "fruit"
+ },
+ {
+  "name": "tesco’s strawberries 1kg",
+  "label": "fruit",
+  "predicted": "unknown"
+ },
+ {
+  "name": "pomegranate delight",
+  "label": "beverage",
+  "predicted": "unknown"
+ },
+ {
+  "name": "lazza ice creams",
+  "label": "frozen",
+  "predicted": "frozen"
+ },
+ {
+  "name": "sunfeast yippee! noodles magic masala",
+  "label": "grain",
+  "predicted": "grain"
+ },
+ {
+  "name": "milma ghee",
+  "label": "dairy",
+  "predicted": "dairy"
+ },
+ {
+  "name": "munch crunchilious cereal",
+  "label": "grain",
+  "predicted": "unknown"
+ },
+ {
+  "name": "fruit yoghurt alphonso mango",
+  "label": "dairy",
+  "predicted": "fruit"
+ },
+ {
+  "name": "melon cantaloup",
+  "label": "fruit",
+  "predicted": "unknown"
+ },
+ {
+  "name": "lotto choco pie 12p",
+  "label": "snack",
+  "predicted": "unknown"
+ },
+ {
+  "name": "country smoked sausage",
+  "label": "meat",
+  "predicted": "meat"
+ },
+ {
+  "name": "veeba american mustard sauce",
+  "label": "pantry",
+  "predicted": "pantry"
+ },
+ {
+  "name": "fun days sundaes",
+  "label": "frozen",
+  "predicted": "unknown"
+ },
+ {
+  "name": "kurkure masala munch 20rs",
+  "label": "snack",
+  "predicted": "pantry"
+ },
+ {
+  "name": "pear slices",
+  "label": "fruit",
+  "predicted": "fruit"
+ },
+ {
+  "name": "good life rice flour",
+  "label": "grain",
+  "predicted": "unknown"
+ },
+ {
+  "name": "simply ice pops",
+  "label": "frozen",
+  "predicted": "unknown"
+ },
+ {
+  "name": "smoked sausage",
+  "label": "meat",
+  "predicted": "meat"
+ },
+ {
+  "name": "slurrp farm cereal",
+  "label": "grain",
+  "predicted": "unknown"
+ },
+ {
+  "name": "key food, hot dogs",
+  "label": "meat",
+  "predicted": "unknown"
+ },
+ {
+  "name": "7-in-1 mix",
+  "label": "snack",
+  "predicted": "unknown"
+ },
+ {
+  "name": "dmart premia sabudana small",
+  "label": "vegetable",
+  "predicted": "unknown"
+ },
+ {
+  "name": "alpino unsweetened super oats",
+  "label": "grain",
+  "predicted": "grain"
+ },
+ {
+  "name": "pilon de poulet s/v bio 120/160g",
+  "label": "meat",
+  "predicted": "unknown"
+ },
+ {
+  "name": "ritebite maxprotein snack",
+  "label": "snack",
+  "predicted": "snack"
+ },
+ {
+  "name": "scotch egg",
+  "label": "meat",
+  "predicted": "meat"
+ },
+ {
+  "name": "röstgemüse vier jahreszeiten",
+  "label": "frozen",
+  "predicted": "unknown"
+ },
+ {
+  "name": "maggi pichkoo tomato ketchup",
+  "label": "pantry",
+  "predicted": "pantry"
+ },
+ {
+  "name": "brooke bond red label natural care flavoured tea",
+  "label": "beverage",
+  "predicted": "beverage"
+ },
+ {
+  "name": "premium kachi gani pre mustard oil",
+  "label": "pantry",
+  "predicted": "pantry"
+ },
+ {
+  "name": "oven crispy breaded fish sticks",
+  "label": "frozen",
+  "predicted": "meat"
+ },
+ {
+  "name": "flipkart grocery kasuri methi",
+  "label": "pantry",
+  "predicted": "vegetable"
+ },
+ {
+  "name": "green chutney style",
+  "label": "snack",
+  "predicted": "unknown"
+ },
+ {
+  "name": "vanilla flavoured medium fat ice cream",
+  "label": "frozen",
+  "predicted": "frozen"
+ },
+ {
+  "name": "crushed tomatoes",
+  "label": "vegetable",
+  "predicted": "vegetable"
+ },
+ {
+  "name": "maggie veggie masala",
+  "label": "grain",
+  "predicted": "pantry"
+ },
+ {
+  "name": "protein total fat pany",
+  "label": "beverage",
+  "predicted": "unknown"
+ },
+ {
+  "name": "apple crumb pie",
+  "label": "frozen",
+  "predicted": "fruit"
+ },
+ {
+  "name": "yippee atta noodles",
+  "label": "grain",
+  "predicted": "grain"
+ },
+ {
+  "name": "d.o.p. with basil",
+  "label": "vegetable",
+  "predicted": "unknown"
+ },
+ {
+  "name": "modern family special bread",
+  "label": "bakery",
+  "predicted": "bakery"
+ },
+ {
+  "name": "buffalo milk a2",
+  "label": "dairy",
+  "predicted": "dairy"
+ },
+ {
+  "name": "peeled tomatoes",
+  "label": "vegetable",
+  "predicted": "vegetable"
+ },
+ {
+  "name": "sauté de poulet blanc bbc/na s/v 50/70g",
+  "label": "meat",
+  "predicted": "unknown"
+ },
+ {
+  "name": "haldiram aloo bhujia 220g",
+  "label": "snack",
+  "predicted": "vegetable"
+ },
+ {
+  "name": "dnv ajwain",
+  "label": "pantry",
+  "predicted": "unknown"
+ },
+ {
+  "name": "elephant dates",
+  "label": "fruit",
+  "predicted": "unknown"
+ },
+ {
+  "name": "bingo! tedhe medhe masala tadka",
+  "label": "snack",
+  "predicted": "pantry"
+ },
+ {
+  "name": "organic diced tomatoes with garlic & onion",
+  "label": "vegetable",
+  "predicted": "vegetable"
+ },
+ {
+  "name": "punjabi kulfi mawa elaichi",
+  "label": "frozen",
+  "predicted": "unknown"
+ },
+ {
+  "name": "vanilla crem bun",
+  "label": "bakery",
+  "predicted": "bakery"
+ },
+ {
+  "name": "country boy jumbo eggs",
+  "label": "meat",
+  "predicted": "meat"
+ },
+ {
+  "name": "sunfeast yippee! masala magic",
+  "label": "grain",
+  "predicted": "pantry"
+ },
+ {
+  "name": "spicy sambar powder",
+  "label": "pantry",
+  "predicted": "unknown"
+ },
+ {
+  "name": "idli karam podi",
+  "label": "pantry",
+  "predicted": "unknown"
+ },
+ {
+  "name": "haldiram moong dal",
+  "label": "grain",
+  "predicted": "grain"
+ },
+ {
+  "name": "raw pressery 250ml pet sugarcane juice",
+  "label": "beverage",
+  "predicted": "beverage"
+ },
+ {
+  "name": "catch chatpata chat masala",
+  "label": "pantry",
+  "predicted": "pantry"
+ },
+ {
+  "name": "india gate basmati rice dubar",
+  "label": "grain",
+  "predicted": "grain"
+ },
+ {
+  "name": "malasa masti",
+  "label": "snack",
+  "predicted": "unknown"
+ },
+ {
+  "name": "amul kool badam flv 180ml",
+  "label": "beverage",
+  "predicted": "unknown"
+ },
+ {
+  "name": "carving board applewood smoked turkey breast",
+  "label": "meat",
+  "predicted": "meat"
+ },
+ {
+  "name": "groviva",
+  "label": "beverage",
+  "predicted": "unknown"
+ },
+ {
+  "name": "4 aberdeen angus quarter pounders",
+  "label": "meat",
+  "predicted": "unknown"
+ },
+ {
+  "name": "jumbo raw black tiger shrimp",
+  "label": "frozen",
+  "predicted": "meat"
+ },
+ {
+  "name": "packaged drinking water",
+  "label": "beverage",
+  "predicted": "beverage"
+ },
+ {
+  "name": "spartan, cream puffs, vanilla",
+  "label": "frozen",
+  "predicted": "dairy"
+ },
+ {
+  "name": "shri neelkamal",
+  "label": "grain",
+  "predicted": "unknown"
+ },
+ {
+  "name": "fire roasted diced tomatoes with garlic, fire roasted with garlic",
+  "label": "vegetable",
+  "predicted": "vegetable"
+ },
+ {
+  "name": "victoria, marinated artichoke hearts",
+  "label": "vegetable",
+  "predicted": "unknown"
+ },
+ {
+  "name": "elaichi rusk",
+  "label": "bakery",
+  "predicted": "unknown"
+ },
+ {
+  "name": "delallo, crushed tomatoes",
+  "label": "vegetable",
+  "predicted": "vegetable"
+ },
+ {
+  "name": "act ii classic salted",
+  "label": "snack",
+  "predicted": "unknown"
+ },
+ {
+  "name": "7up lemon 250ml",
+  "label": "beverage",
+  "predicted": "unknown"
+ },
+ {
+  "name": "dabur real activ coconut water",
+  "label": "beverage",
+  "predicted": "beverage"
+ },
+ {
+  "name": "complan rich chocolate flavor",
+  "label": "beverage",
+  "predicted": "snack"
+ },
+ {
+  "name": "small batch artisan ice cream",
+  "label": "frozen",
+  "predicted": "frozen"
+ },
+ {
+  "name": "mili strong leaf tea",
+  "label": "beverage",
+  "predicted": "beverage"
+ },
+ {
+  "name": "milkybar moosha",
+  "label": "snack",
+  "predicted": "unknown"
+ },
+ {
+  "name": "dry-cured pork shoulder",
+  "label": "meat",
+  "predicted": "meat"
+ },
+ {
+  "name": "haldiram's bhujia",
+  "label": "snack",
+  "predicted": "unknown"
+ },
+ {
+  "name": "kissan fresh tomato",
+  "label": "pantry",
+  "predicted": "vegetable"
+ },
+ {
+  "name": "white rose, chopped collard greens",
+  "label": "frozen",
+  "predicted": "unknown"
+ },
+ {
+  "name": "berry cherry & nuts",
+  "label": "fruit",
+  "predicted": "fruit"
+ },
+ {
+  "name": "premium deli applewood smoked turkey breast",
+  "label": "meat",
+  "predicted": "meat"
+ },
+ {
+  "name": "gourmet lasagna with meat sauce",
+  "label": "frozen",
+  "predicted": "meat"
+ },
+ {
+  "name": "dry rub seasoned pork loin filet",
+  "label": "meat",
+  "predicted": "meat"
+ },
+ {
+  "name": "quinoa muesli - chocolate and banana",
+  "label": "grain",
+  "predicted": "snack"
+ },
+ {
+  "name": "spartan, mandarin oranges in light syrup",
+  "label": "fruit",
+  "predicted": "fruit"
+ },
+ {
+  "name": "wafer style sundried chilli flavour",
+  "label": "snack",
+  "predicted": "unknown"
+ },
+ {
+  "name": "the red edition energy drink",
+  "label": "beverage",
+  "predicted": "beverage"
+ },
+ {
+  "name": "tomatos",
+  "label": "vegetable",
+  "predicted": "vegetable"
+ },
+ {
+  "name": "white eggs",
+  "label": "meat",
+  "predicted": "meat"
+ },
+ {
+  "name": "filet de poulet rôti",
+  "label": "meat",
+  "predicted": "unknown"
+ },
+ {
+  "name": "soft figs",
+  "label": "fruit",
+  "predicted": "unknown"
+ },
+ {
+  "name": "seedless green grapes",
+  "label": "fruit",
+  "predicted": "fruit"
+ },
+ {
+  "name": "2-minute noodles",
+  "label": "grain",
+  "predicted": "grain"
+ },
+ {
+  "name": "mandarin orange",
+  "label": "fruit",
+  "predicted": "fruit"
+ },
+ {
+  "name": "sunfeast yeppi noodles",
+  "label": "grain",
+  "predicted": "grain"
+ },
+ {
+  "name": "kitchenfeast garam masala",
+  "label": "pantry",
+  "predicted": "pantry"
+ },
+ {
+  "name": "มะม่วงพร้อมกะปิหวาน",
+  "label": "fruit",
+  "predicted": "unknown"
+ },
+ {
+  "name": "fruit nik electro rehydrate orange drink",
+  "label": "beverage",
+  "predicted": "beverage"
+ },
+ {
+  "name": "cherry tomatoes",
+  "label": "vegetable",
+  "predicted": "vegetable"
+ },
+ {
+  "name": "artichoke hearts",
+  "label": "vegetable",
+  "predicted": "unknown"
+ },
+ {
+  "name": "asparagus spears",
+  "label": "vegetable",
+  "predicted": "unknown"
+ },
+ {
+  "name": "masala flavour instant tea premix",
+  "label": "beverage",
+  "predicted": "beverage"
+ },
+ {
+  "name": "frozen wafer sandwich",
+  "label": "frozen",
+  "predicted": "frozen"
+ },
+ {
+  "name": "frozen chicken breast in halves, boneless, skinless, without innerfillet",
+  "label": "meat",
+  "predicted": "frozen"
+ },
+ {
+  "name": "sliced peaches in 100% juice",
+  "label": "fruit",
+  "predicted": "beverage"
+ },
+ {
+  "name": "vitarich sandwich premium white bread",
+  "label": "bakery",
+  "predicted": "bakery"
+ },
+ {
+  "name": "nectarines",
+  "label": "fruit",
+  "predicted": "unknown"
+ },
+ {
+  "name": "milk rich",
+  "label": "dairy",
+  "predicted": "dairy"
+ },
+ {
+  "name": "fresh white eggs",
+  "label": "meat",
+  "predicted": "meat"
+ },
+ {
+  "name": "daily pour gold tea",
+  "label": "beverage",
+  "predicted": "beverage"
+ },
+ {
+  "name": "whole wheat bread",
+  "label": "bakery",
+  "predicted": "bakery"
+ },
+ {
+  "name": "green cardamom",
+  "label": "pantry",
+  "predicted": "unknown"
+ },
+ {
+  "name": "western family, whole peeled choice tomatoes",
+  "label": "vegetable",
+  "predicted": "vegetable"
+ },
+ {
+  "name": "mount blue bread sticks",
+  "label": "bakery",
+  "predicted": "bakery"
+ },
+ {
+  "name": "storia 100% tender coconut water 1l",
+  "label": "beverage",
+  "predicted": "beverage"
+ },
+ {
+  "name": "datte",
+  "label": "fruit",
+  "predicted": "unknown"
+ },
+ {
+  "name": "3 s moong dal dhuli",
+  "label": "grain",
+  "predicted": "grain"
+ },
+ {
+  "name": "women's plus",
+  "label": "beverage",
+  "predicted": "unknown"
+ },
+ {
+  "name": "sunrise",
+  "label": "beverage",
+  "predicted": "unknown"
+ },
+ {
+  "name": "italian style with onion, celery & bell pepper stewed tomatoes, italian style with onion, celery & bell pepper",
+  "label": "vegetable",
+  "predicted": "vegetable"
+ },
+ {
+  "name": "masala masti",
+  "label": "snack",
+  "predicted": "pantry"
+ },
+ {
+  "name": "haywards",
+  "label": "beverage",
+  "predicted": "unknown"
+ },
+ {
+  "name": "tropicana apple juice 100%",
+  "label": "beverage",
+  "predicted": "beverage"
+ },
+ {
+  "name": "punjabi khichdi",
+  "label": "grain",
+  "predicted": "unknown"
+ },
+ {
+  "name": "large grade a eggs",
+  "label": "meat",
+  "predicted": "meat"
+ },
+ {
+  "name": "galaxy fusions",
+  "label": "snack",
+  "predicted": "unknown"
+ },
+ {
+  "name": "berry crunch",
+  "label": "grain",
+  "predicted": "fruit"
+ },
+ {
+  "name": "fruit & nut",
+  "label": "frozen",
+  "predicted": "unknown"
+ },
+ {
+  "name": "rusk ilaichi toast",
+  "label": "bakery",
+  "predicted": "unknown"
+ },
+ {
+  "name": "good life fard dates",
+  "label": "fruit",
+  "predicted": "unknown"
+ },
+ {
+  "name": "sundae gudbud",
+  "label": "frozen",
+  "predicted": "unknown"
+ },
+ {
+  "name": "mango",
+  "label": "fruit",
+  "predicted": "fruit"
+ },
+ {
+  "name": "max protein daily choco almond",
+  "label": "snack",
+  "predicted": "unknown"
+ },
+ {
+  "name": "organic pitted dates deglet noor",
+  "label": "fruit",
+  "predicted": "unknown"
+ },
+ {
+  "name": "pastrami deli style",
+  "label": "meat",
+  "predicted": "unknown"
+ },
+ {
+  "name": "mixed fruit",
+  "label": "beverage",
+  "predicted": "unknown"
+ },
+ {
+  "name": "choco classic bar",
+  "label": "snack",
+  "predicted": "unknown"
+ },
+ {
+  "name": "mushroom fettuccine",
+  "label": "frozen",
+  "predicted": "vegetable"
+ },
+ {
+  "name": "sliced canadian bacon",
+  "label": "meat",
+  "predicted": "meat"
+ },
+ {
+  "name": "white label sugar",
+  "label": "pantry",
+  "predicted": "pantry"
+ },
+ {
+  "name": "diced tomatoes in rich, thick juice",
+  "label": "vegetable",
+  "predicted": "beverage"
+ },
+ {
+  "name": "rillettes de saumon",
+  "label": "meat",
+  "predicted": "unknown"
+ },
+ {
+  "name": "godrej jersey full cream milk",
+  "label": "dairy",
+  "predicted": "dairy"
+ },
+ {
+  "name": "triple-filled light ice cream with chocolate fudge cores",
+  "label": "frozen",
+  "predicted": "frozen"
+ },
+ {
+  "name": "liquid egg whites",
+  "label": "meat",
+  "predicted": "meat"
+ },
+ {
+  "name": "beef & cheese taco flavour pizza snacks",
+  "label": "frozen",
+  "predicted": "snack"
+ },
+ {
+  "name": "rainbow hearts",
+  "label": "snack",
+  "predicted": "unknown"
+ },
+ {
+  "name": "molsis zahidi dates",
+  "label": "snack",
+  "predicted": "unknown"
+ },
+ {
+  "name": "parmesan breaded chicken breast cutlets",
+  "label": "meat",
+  "predicted": "meat"
+ },
+ {
+  "name": "superior mp atta",
+  "label": "grain",
+  "predicted": "unknown"
+ },
+ {
+  "name": "jennie-o, turkey breast, cracked pepper",
+  "label": "meat",
+  "predicted": "vegetable"
+ },
+ {
+  "name": "pizza & pasta sauce",
+  "label": "pantry",
+  "predicted": "grain"
+ },
+ {
+  "name": "steak mince 4 %",
+  "label": "meat",
+  "predicted": "unknown"
+ },
+ {
+  "name": "biryani masala",
+  "label": "pantry",
+  "predicted": "pantry"
+ },
+ {
+  "name": "nero",
+  "label": "beverage",
+  "predicted": "unknown"
+ },
+ {
+  "name": "dark chocolate 55%",
+  "label": "snack",
+  "predicted": "snack"
+ },
+ {
+  "name": "medjool dates",
+  "label": "fruit",
+  "predicted": "unknown"
+ },
+ {
+  "name": "amul masti",
+  "label": "dairy",
+  "predicted": "unknown"
+ },
+ {
+  "name": "badam ghee laddoo",
+  "label": "snack",
+  "predicted": "dairy"
+ },
+ {
+  "name": "boudin blanc nature",
+  "label": "meat",
+  "predicted": "unknown"
+ },
+ {
+  "name": "myrtille bio",
+  "label": "fruit",
+  "predicted": "unknown"
+ },
+ {
+  "name": "chunk chicken breast with rib meat in water",
+  "label": "meat",
+  "predicted": "beverage"
+ },
+ {
+  "name": "everest chicken masala",
+  "label": "pantry",
+  "predicted": "pantry"
+ },
+ {
+  "name": "dodla milk",
+  "label": "dairy",
+  "predicted": "dairy"
+ },
+ {
+  "name": "cocacola zero",
+  "label": "beverage",
+  "predicted": "unknown"
+ },
+ {
+  "name": "spaghetti n.12",
+  "label": "grain",
+  "predicted": "unknown"
+ },
+ {
+  "name": "pizza seasoning",
+  "label": "pantry",
+  "predicted": "unknown"
+ },
+ {
+  "name": "kroger, sweet italian",
+  "label": "meat",
+  "predicted": "unknown"
+ },
+ {
+  "name": "tetley immuno chai",
+  "label": "beverage",
+  "predicted": "unknown"
+ },
+ {
+  "name": "dairy whitener",
+  "label": "dairy",
+  "predicted": "unknown"
+ },
+ {
+  "name": "mr. green tea ice cream co., red bean ice cream",
+  "label": "frozen",
+  "predicted": "frozen"
+ },
+ {
+  "name": "roma tomatoes paste",
+  "label": "vegetable",
+  "predicted": "vegetable"
+ },
+ {
+  "name": "sona raw rice",
+  "label": "grain",
+  "predicted": "grain"
+ },
+ {
+  "name": "quail eggs",
+  "label": "meat",
+  "predicted": "meat"
+ },
+ {
+  "name": "patanjali divya jal",
+  "label": "beverage",
+  "predicted": "unknown"
+ },
+ {
+  "name": "roundy's, select, cheese tortellacci",
+  "label": "frozen",
+  "predicted": "dairy"
+ },
+ {
+  "name": "milky bar",
+  "label": "snack",
+  "predicted": "unknown"
+ },
+ {
+  "name": "aachi mixed masala powder",
+  "label": "pantry",
+  "predicted": "pantry"
+ },
+ {
+  "name": "lemon chilli",
+  "label": "snack",
+  "predicted": "unknown"
+ },
+ {
+  "name": "frooti mango drink",
+  "label": "beverage",
+  "predicted": "beverage"
+ },
+ {
+  "name": "instant",
+  "label": "beverage",
+  "predicted": "unknown"
+ },
+ {
+  "name": "first crop cream onion potato chips 50g",
+  "label": "snack",
+  "predicted": "snack"
+ },
+ {
+  "name": "oreo and cream",
+  "label": "frozen",
+  "predicted": "dairy"
+ },
+ {
+  "name": "côtes de porc marinées sans os x4",
+  "label": "meat",
+  "predicted": "unknown"
+ },
+ {
+  "name": "courgettes",
+  "label": "vegetable",
+  "predicted": "unknown"
+ },
+ {
+  "name": "bluedots blueberries",
+  "label": "fruit",
+  "predicted": "unknown"
+ },
+ {
+  "name": "pie",
+  "label": "frozen",
+  "predicted": "unknown"
+ },
+ {
+  "name": "7up 2.25",
+  "label": "beverage",
+  "predicted": "unknown"
+ },
+ {
+  "name": "oatmilk peanut butter and raspberry frozen dessert",
+  "label": "frozen",
+  "predicted": "frozen"
+ },
+ {
+  "name": "one dozen eggs",
+  "label": "meat",
+  "predicted": "meat"
+ },
+ {
+  "name": "greek yogurt mango flavour",
+  "label": "dairy",
+  "predicted": "fruit"
+ },
+ {
+  "name": "maida",
+  "label": "grain",
+  "predicted": "unknown"
+ },
+ {
+  "name": "khoa",
+  "label": "dairy",
+  "predicted": "unknown"
+ },
+ {
+  "name": "veeba pazta sauce",
+  "label": "pantry",
+  "predicted": "pantry"
+ },
+ {
+  "name": "refined soyabean oil",
+  "label": "pantry",
+  "predicted": "pantry"
+ },
+ {
+  "name": "sunfeast smoothies strawberry with chia seeds 300ml",
+  "label": "beverage",
+  "predicted": "unknown"
+ },
+ {
+  "name": "100% liquid egg whites made from real eggs",
+  "label": "meat",
+  "predicted": "meat"
+ },
+ {
+  "name": "dexolac 1",
+  "label": "dairy",
+  "predicted": "unknown"
+ },
+ {
+  "name": "olive oil extra virgin",
+  "label": "pantry",
+  "predicted": "pantry"
+ },
+ {
+  "name": "amul pasteurized butter",
+  "label": "dairy",
+  "predicted": "dairy"
+ },
+ {
+  "name": "mtr 3 minute breakfast khatta meetha poha",
+  "label": "grain",
+  "predicted": "unknown"
+ },
+ {
+  "name": "organic green seedless table grapes",
+  "label": "fruit",
+  "predicted": "fruit"
+ },
+ {
+  "name": "thrifty, ice cream, french vanilla",
+  "label": "frozen",
+  "predicted": "frozen"
+ },
+ {
+  "name": "choice tomatoes crushed in puree",
+  "label": "vegetable",
+  "predicted": "vegetable"
+ },
+ {
+  "name": "bananen",
+  "label": "fruit",
+  "predicted": "unknown"
+ },
+ {
+  "name": "mini corn on the cob",
+  "label": "frozen",
+  "predicted": "unknown"
+ },
+ {
+  "name": "metropolitan market, purely crushed tomatoes",
+  "label": "vegetable",
+  "predicted": "vegetable"
+ },
+ {
+  "name": "escalope de poulet",
+  "label": "meat",
+  "predicted": "unknown"
+ },
+ {
+  "name": "premium ice cream",
+  "label": "frozen",
+  "predicted": "frozen"
+ },
+ {
+  "name": "chips cream & onion",
+  "label": "snack",
+  "predicted": "snack"
+ },
+ {
+  "name": "catch super garam masala",
+  "label": "pantry",
+  "predicted": "pantry"
+ },
+ {
+  "name": "california diced tomatoes with natural sea salt",
+  "label": "vegetable",
+  "predicted": "vegetable"
+ },
+ {
+  "name": "roasted chana cracker heeng jeera",
+  "label": "snack",
+  "predicted": "snack"
+ },
+ {
+  "name": "flipkart grocery classic mustard (rai small)",
+  "label": "pantry",
+  "predicted": "unknown"
+ },
+ {
+  "name": "tata tea gold care",
+  "label": "beverage",
+  "predicted": "beverage"
+ },
+ {
+  "name": "thirumala cow ghee",
+  "label": "dairy",
+  "predicted": "dairy"
+ },
+ {
+  "name": "atta kulcha bread",
+  "label": "bakery",
+  "predicted": "bakery"
+ },
+ {
+  "name": "rienzi, selected italian peeled plum tomatoes with basil",
+  "label": "vegetable",
+  "predicted": "vegetable"
+ },
+ {
+  "name": "select dates",
+  "label": "fruit",
+  "predicted": "unknown"
+ },
+ {
+  "name": "gluco charge",
+  "label": "beverage",
+  "predicted": "unknown"
+ },
+ {
+  "name": "tuborg",
+  "label": "beverage",
+  "predicted": "unknown"
+ },
+ {
+  "name": "gippi masala noodles",
+  "label": "grain",
+  "predicted": "grain"
+ },
+ {
+  "name": "modern sandwich supreme",
+  "label": "bakery",
+  "predicted": "unknown"
+ },
+ {
+  "name": "good life poha/aval mota",
+  "label": "grain",
+  "predicted": "unknown"
+ },
+ {
+  "name": "carrot",
+  "label": "vegetable",
+  "predicted": "vegetable"
+ },
+ {
+  "name": "gram flour",
+  "label": "grain",
+  "predicted": "grain"
+ },
+ {
+  "name": "yippee! noodles mood masala",
+  "label": "grain",
+  "predicted": "grain"
+ },
+ {
+  "name": "chocolairs gold coffee",
+  "label": "snack",
+  "predicted": "beverage"
+ },
+ {
+  "name": "peaches, sliced yellow cling in heavy syrup",
+  "label": "fruit",
+  "predicted": "unknown"
+ },
+ {
+  "name": "chicken jumbo hotdog",
+  "label": "meat",
+  "predicted": "meat"
+ },
+ {
+  "name": "chopped tomatoes pack 4",
+  "label": "vegetable",
+  "predicted": "vegetable"
+ },
+ {
+  "name": "patanwala dahi",
+  "label": "dairy",
+  "predicted": "unknown"
+ },
+ {
+  "name": "chicken breast fillets",
+  "label": "meat",
+  "predicted": "meat"
+ },
+ {
+  "name": "haldi powder turmeric powder",
+  "label": "pantry",
+  "predicted": "unknown"
+ },
+ {
+  "name": "tata sampann unpolished kabuli chana",
+  "label": "grain",
+  "predicted": "unknown"
+ },
+ {
+  "name": "dalda",
+  "label": "pantry",
+  "predicted": "unknown"
+ },
+ {
+  "name": "pork chipolatas sausage",
+  "label": "meat",
+  "predicted": "meat"
+ },
+ {
+  "name": "real fruit power alphonso mango nectar",
+  "label": "beverage",
+  "predicted": "fruit"
+ },
+ {
+  "name": "smoked sausage with ole smoky tennessee moonshine apple pie",
+  "label": "meat",
+  "predicted": "fruit"
+ },
+ {
+  "name": "whole tilapia fillet",
+  "label": "frozen",
+  "predicted": "unknown"
+ },
+ {
+  "name": "peach mojito",
+  "label": "beverage",
+  "predicted": "unknown"
+ },
+ {
+  "name": "horlicks",
+  "label": "beverage",
+  "predicted": "unknown"
+ },
+ {
+  "name": "white peas dry",
+  "label": "grain",
+  "predicted": "vegetable"
+ },
+ {
+  "name": "elemental manga+",
+  "label": "beverage",
+  "predicted": "unknown"
+ },
+ {
+  "name": "bio-ananasstücke",
+  "label": "fruit",
+  "predicted": "unknown"
+ },
+ {
+  "name": "brussels sprouts",
+  "label": "vegetable",
+  "predicted": "unknown"
+ },
+ {
+  "name": "farmley berry mix",
+  "label": "fruit",
+  "predicted": "fruit"
+ },
+ {
+  "name": "jambon cuit superieur",
+  "label": "meat",
+  "predicted": "unknown"
+ },
+ {
+  "name": "santra",
+  "label": "beverage",
+  "predicted": "unknown"
+ },
+ {
+  "name": "100% whole wheat chapati",
+  "label": "bakery",
+  "predicted": "grain"
+ },
+ {
+  "name": "shaved brussels sprouts",
+  "label": "vegetable",
+  "predicted": "unknown"
+ },
+ {
+  "name": "sopressa",
+  "label": "meat",
+  "predicted": "unknown"
+ },
+ {
+  "name": "chicken thighs",
+  "label": "meat",
+  "predicted": "meat"
+ },
+ {
+  "name": "kishlay",
+  "label": "snack",
+  "predicted": "unknown"
+ },
+ {
+  "name": "lean ground beef",
+  "label": "meat",
+  "predicted": "meat"
+ },
+ {
+  "name": "layina dates",
+  "label": "fruit",
+  "predicted": "unknown"
+ },
+ {
+  "name": "ketchup",
+  "label": "pantry",
+  "predicted": "pantry"
+ },
+ {
+  "name": "bingo mad angles",
+  "label": "snack",
+  "predicted": "unknown"
+ },
+ {
+  "name": "coca cola",
+  "label": "beverage",
+  "predicted": "beverage"
+ },
+ {
+  "name": "no salt added tomato sauce",
+  "label": "vegetable",
+  "predicted": "pantry"
+ },
+ {
+  "name": "himbeeren",
+  "label": "fruit",
+  "predicted": "unknown"
+ },
+ {
+  "name": "mrs. t's, pierogies, traditional sauerkraut",
+  "label": "frozen",
+  "predicted": "unknown"
+ },
+ {
+  "name": "doritos sweet chilli",
+  "label": "snack",
+  "predicted": "unknown"
+ },
+ {
+  "name": "kroger, country pork ground sausage",
+  "label": "meat",
+  "predicted": "meat"
+ },
+ {
+  "name": "peri peri seasoning",
+  "label": "pantry",
+  "predicted": "unknown"
+ },
+ {
+  "name": "the louie andouille, smoked andouille sausage",
+  "label": "meat",
+  "predicted": "meat"
+ },
+ {
+  "name": "rich tomato ketchup",
+  "label": "pantry",
+  "predicted": "pantry"
+ },
+ {
+  "name": "clear drinking water",
+  "label": "beverage",
+  "predicted": "beverage"
+ },
+ {
+  "name": "pringles",
+  "label": "snack",
+  "predicted": "unknown"
+ },
+ {
+  "name": "kesar rasbari barfi",
+  "label": "snack",
+  "predicted": "unknown"
+ },
+ {
+  "name": "elderberries",
+  "label": "fruit",
+  "predicted": "unknown"
+ },
+ {
+  "name": "yum nuts roasted & salted",
+  "label": "snack",
+  "predicted": "unknown"
+ },
+ {
+  "name": "boost sandwich",
+  "label": "frozen",
+  "predicted": "unknown"
+ },
+ {
+  "name": "turkey sausages",
+  "label": "meat",
+  "predicted": "meat"
+ },
+ {
+  "name": "fruit & nut silk",
+  "label": "snack",
+  "predicted": "unknown"
+ },
+ {
+  "name": "mochi oat milk frozen dessert",
+  "label": "frozen",
+  "predicted": "frozen"
+ },
+ {
+  "name": "cipla levolin inhaler",
+  "label": "meat",
+  "predicted": "unknown"
+ },
+ {
+  "name": "the original diced tomatoes & red chilies, original",
+  "label": "vegetable",
+  "predicted": "vegetable"
+ },
+ {
+  "name": "creme glacée à la vanille",
+  "label": "frozen",
+  "predicted": "unknown"
+ },
+ {
+  "name": "parachute",
+  "label": "pantry",
+  "predicted": "unknown"
+ },
+ {
+  "name": "frozen fruit cup",
+  "label": "frozen",
+  "predicted": "frozen"
+ },
+ {
+  "name": "protien bar",
+  "label": "snack",
+  "predicted": "unknown"
+ },
+ {
+  "name": "more atta bread",
+  "label": "bakery",
+  "predicted": "bakery"
+ },
+ {
+  "name": "chicago town",
+  "label": "frozen",
+  "predicted": "unknown"
+ },
+ {
+  "name": "green peas - unpeeled",
+  "label": "vegetable",
+  "predicted": "vegetable"
+ },
+ {
+  "name": "real fruit power orange",
+  "label": "beverage",
+  "predicted": "fruit"
+ },
+ {
+  "name": "kachhi ghani mustard oil agmark grade-i",
+  "label": "pantry",
+  "predicted": "pantry"
+ },
+ {
+  "name": "chicken breast portions",
+  "label": "meat",
+  "predicted": "meat"
+ },
+ {
+  "name": "heechki refined oil",
+  "label": "pantry",
+  "predicted": "pantry"
+ }
+]

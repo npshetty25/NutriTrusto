@@ -1,0 +1,31 @@
+{
+  "test_rows": 510,
+  "rules": {
+    "accuracy": 0.4255,
+    "macro_precision": 0.7623,
+    "macro_recall": 0.4353,
+    "macro_f1": 0.543,
+    "fell_through_to_unknown": 228,
+    "unknown_rate": 0.4471,
+    "accuracy_when_it_answers": 0.7695,
+    "answered": 282,
+    "per_class_f1": {
+      "bakery": 0.5714,
+      "beverage": 0.5714,
+      "dairy": 0.5926,
+      "frozen": 0.481,
+      "fruit": 0.3704,
+      "grain": 0.5479,
+      "meat": 0.6724,
+      "pantry": 0.619,
+      "snack": 0.2927,
+      "vegetable": 0.7111
+    }
+  },
+  "model": {
+    "accuracy": 0.8529,
+    "macro_precision": 0.871,
+    "macro_recall": 0.8469,
+    "macro_f1": 0.856
+  }
+}
