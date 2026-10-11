@@ -97,6 +97,14 @@ export class FakeBackend {
   off: unknown = OFF_BUTTER;
   api: Record<string, { status?: number; body: unknown }> = {
     "analyze-food": { body: ANALYSIS_OK },
+    categorize: {
+      body: {
+        success: true,
+        source: "model",
+        modelVersion: "category-v1",
+        predictions: [{ name: "Amul Salted Butter 100 g", category: "dairy", confidence: 0.91 }],
+      },
+    },
   };
 
   seedPantry(rows: Array<{ name: string; days_left: number; purchase_date?: string }>) {

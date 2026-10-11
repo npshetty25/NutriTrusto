@@ -21,10 +21,29 @@ services:
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       OFF_USER_ID: ${OFF_USER_ID:-}
       OFF_PASSWORD: ${OFF_PASSWORD:-}
+      # The web app falls back to keyword rules if this service is down.
+      ML_SERVICE_URL: http://ml:8000
+    depends_on:
+      ml:
+        condition: service_healthy
     restart: unless-stopped
     read_only: true
     tmpfs:
       - /tmp
       - /app/.next/cache
+    security_opt:
+      - no-new-privileges:true
+
+  # The trained category model (ml/README.md). Optional at runtime: /api/categorize
+  # answers from the keyword rules when this service is unreachable.
+  ml:
+    build:
+      context: .
+      dockerfile: ml/service/Dockerfile
+    image: nutri-trust-ml:local
+    ports:
+      - "127.0.0.1:8000:8000"
+    restart: unless-stopped
+    read_only: true
     security_opt:
       - no-new-privileges:true
