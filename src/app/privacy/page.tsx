@@ -104,6 +104,9 @@ export default function PrivacyPage() {
             <strong className="text-foreground">Google (Gemini API)</strong> — receives the images
             you upload for text extraction, and the names of your pantry items when you request a
             recipe or ask the in-app assistant a question. It does not receive your email or name.
+            This app uses Gemini&apos;s free tier, under whose terms Google may use what is sent
+            to improve its products. Please don&apos;t scan anything you would not want shared,
+            such as a receipt showing your address or card details.
           </li>
           <li>
             <strong className="text-foreground">Open Food Facts</strong> and{" "}
