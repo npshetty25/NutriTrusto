@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence, MotionConfig, type Variants } from "framer-motion";
 import { useAuth } from "@/context/auth-context";
@@ -352,6 +353,13 @@ export default function LoginPage() {
               </motion.div>
             )}
           </AnimatePresence>
+
+          <p className="mt-6 text-center text-xs text-foreground/55">
+            {mode === "signup" ? "By creating an account you agree to our " : "Read our "}
+            <Link href="/privacy" className="inline-flex min-h-11 items-center font-semibold text-foreground underline underline-offset-2">
+              Privacy Policy
+            </Link>
+          </p>
         </motion.div>
       </div>
     </MotionConfig>
