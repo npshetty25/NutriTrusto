@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
 import { toast } from "sonner";
-import { LogOut, Settings, Users, ChevronDown, Bell, Loader2, ShoppingCart, History, Leaf } from "lucide-react";
+import { LogOut, Settings, Users, ChevronDown, Bell, Loader2, ShoppingCart, History, Leaf, ShieldCheck } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { DietPreferenceToggle } from "@/components/diet-preference-toggle";
 import { HouseholdModal } from "@/components/household-modal";
@@ -156,6 +156,9 @@ export function ProfileDropdown({ onOpenShoppingList }: ProfileDropdownProps) {
         </button>
         <button onClick={() => showComingSoon("Account Settings")} role="menuitem" className={itemClass}>
           <Settings size={15} className="text-foreground/50" /> Account Settings
+        </button>
+        <button onClick={() => { setOpen(false); router.push("/privacy"); }} role="menuitem" className={itemClass}>
+          <ShieldCheck size={15} className="text-foreground/50" /> Privacy Policy
         </button>
       </div>
 

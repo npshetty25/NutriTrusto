@@ -22,7 +22,6 @@ flowchart LR
   GEM[Google Gemini<br/>OCR + recipes + chat]
   OFF[Open Food Facts<br/>barcode lookup]
   ML[FastAPI category service<br/>scikit-learn, optional]
-  MONGO[(MongoDB Atlas<br/>raw OCR log, optional)]
 
   UI -- "sign-in, pantry reads/writes (anon key, RLS)" --> AUTH
   UI -- "PostgREST + realtime" --> PG
@@ -34,17 +33,15 @@ flowchart LR
   NEXT -- "vision + text" --> GEM
   NEXT -- "UPC fallback" --> OFF
   NEXT -- "POST /predict (2 s timeout)" --> ML
-  NEXT -. "raw payload, fail-open" .-> MONGO
 ```
 
-Dotted edges are optional: the app works with the ML service and MongoDB absent.
+The dotted edge is optional: the app works without the ML service.
 
 ## Where each datastore is used, and why
 
 | Store | Holds | Why this store |
 |---|---|---|
 | **PostgreSQL** (Supabase) | pantry, households, membership, shopping list, scan history, outcomes | Relational, needs transactions (`create_household` is atomic) and per-user/household isolation, which row-level security gives at the database rather than in application code |
-| **MongoDB** *(proposed, not live)* | raw model responses, one document per scan | Shapes differ per route and drift with the model; append-only; never read to render the pantry. See [ADR 0001](adr/0001-postgres-plus-mongodb.md) |
 | **Browser storage** | theme preference, Supabase session | Per-device convenience only |
 
 ## Trust boundaries
@@ -59,7 +56,7 @@ Dotted edges are optional: the app works with the ML service and MongoDB absent.
 3. **Uploads are checked by their bytes**, not their declared type, and capped
    at 10 MB, before any paid call (`src/lib/upload-validation.ts`).
 4. **Secrets**: only `NEXT_PUBLIC_*` values (public by design) are build
-   arguments. `GEMINI_API_KEY`, `MONGODB_URI` and Open Food Facts credentials
+   values. `GEMINI_API_KEY` and Open Food Facts credentials
    are runtime variables and never enter an image layer.
 
 ## Request flow: scanning a receipt
@@ -68,8 +65,7 @@ Dotted edges are optional: the app works with the ML service and MongoDB absent.
 2. Route verifies the token, applies the 10-per-minute limit, validates the file.
 3. Gemini reads the receipt and returns JSON.
 4. The route normalises it (trim names, clamp days to 1–3650, map risk) and
-   returns the items plus a `scan_id`. If `MONGODB_URI` is set, the untouched
-   model answer is also written, bounded by a 1.5 s timeout, never failing the scan.
+   returns the items.
 5. The browser inserts the rows into `pantry_items` through PostgREST, where
    RLS applies, and logs the scan to `scan_history`.
 
@@ -86,8 +82,6 @@ a model prediction.
 | Shape | Status |
 |---|---|
 | Vercel from `master` | **Live.** `https://nutri-trusto.vercel.app` |
-| Docker image + compose (web + ML) | **Built and probed in CI** on every push. Not deployed anywhere |
-| Azure Container Apps | **Not done.** Needs an Azure account |
 
 ## Health and observability
 

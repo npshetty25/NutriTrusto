@@ -128,3 +128,11 @@ test.describe("sign-up and sign-in checks", () => {
     await expect(page.getByRole("heading", { name: "Check your inbox" })).toHaveCount(0);
   });
 });
+
+test("the Google button stays hidden until it is switched on", async ({ anonymous, page }) => {
+  void anonymous;
+  await page.goto("/login");
+  await expect(page.getByPlaceholder("name@example.com")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Continue with Google" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Privacy Policy" })).toBeVisible();
+});
