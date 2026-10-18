@@ -5,6 +5,14 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence, MotionConfig, type Variants } from "framer-motion";
 import { useAuth } from "@/context/auth-context";
+import {
+  PASSWORD_MIN_LENGTH,
+  friendlyAuthError,
+  normaliseEmail,
+  validateEmail,
+  validateName,
+  validateNewPassword,
+} from "@/lib/auth-validation";
 import { Eye, EyeOff, Loader2, ArrowRight } from "lucide-react";
 
 const container: Variants = {
@@ -53,33 +61,32 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
+    // Checked here so mistakes show before a round trip. Not the security
+    // boundary: Supabase must enforce its own rules too (see auth-validation.ts).
+    const cleanEmail = normaliseEmail(email);
+    const problem =
+      validateEmail(cleanEmail) ??
+      (mode === "signup" ? validateName(name) ?? validateNewPassword(password) : password ? null : "Enter your password.");
+    if (problem) {
+      setError(problem);
+      return;
+    }
+
     setLoading(true);
-
-    let result;
     if (mode === "signin") {
-      result = await signIn(email, password);
-    } else {
-      if (!name.trim()) { setError("Please enter your name."); setLoading(false); return; }
-
-      // Complete sign up immediately
-      result = await signUp(name.trim(), email, password, dietaryPreference);
+      const result = await signIn(cleanEmail, password);
+      setLoading(false);
+      if (result.error) setError(friendlyAuthError(result.error));
+      else router.push("/");
+      return;
     }
 
+    const result = await signUp(name.trim(), cleanEmail, password, dietaryPreference);
     setLoading(false);
-    if (result.error) {
-      // Show a friendlier message for common Supabase errors
-      if (result.error.toLowerCase().includes("email not confirmed")) {
-        setError("Please confirm your email first. Check your inbox for a confirmation link.");
-      } else {
-        setError(result.error);
-      }
-    } else if (mode === "signup") {
-      // Supabase requires email confirmation — show success message
-      setEmailSent(true);
-    } else {
-      router.push("/"); // Sign in went straight through — go to dashboard
-    }
-
+    if (result.error) setError(friendlyAuthError(result.error));
+    else if (result.needsConfirmation) setEmailSent(true);
+    else router.push("/"); // the project signed them straight in
   };
 
   const inputClass =
@@ -230,6 +237,8 @@ export default function LoginPage() {
                               <input
                                 type="text"
                                 placeholder="Alex Smith"
+                                autoComplete="name"
+                                maxLength={50}
                                 value={name}
                                 onChange={(e) => setName(e.target.value)}
                                 required
@@ -283,6 +292,8 @@ export default function LoginPage() {
                       <label className="text-[12px] font-semibold uppercase tracking-widest text-foreground/60">Email Address</label>
                       <input
                         type="email"
+                        autoComplete="email"
+                        inputMode="email"
                         placeholder="name@example.com"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
@@ -297,6 +308,8 @@ export default function LoginPage() {
                         <input
                           type={showPassword ? "text" : "password"}
                           placeholder="••••••••"
+                          autoComplete={mode === "signup" ? "new-password" : "current-password"}
+                          minLength={mode === "signup" ? PASSWORD_MIN_LENGTH : undefined}
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
                           required
@@ -312,6 +325,11 @@ export default function LoginPage() {
                           {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                         </button>
                       </div>
+                      {mode === "signup" && (
+                        <p className="text-xs text-foreground/55">
+                          At least {PASSWORD_MIN_LENGTH} characters, with a letter and a number.
+                        </p>
+                      )}
                     </div>
 
                     <motion.button

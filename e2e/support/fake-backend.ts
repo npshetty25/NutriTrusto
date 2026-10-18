@@ -95,6 +95,8 @@ export class FakeBackend {
   /** Emails that fail password sign-in, mapped to the message Supabase would send. */
   rejectedLogins = new Map<string, string>([["wrong@example.test", "Invalid login credentials"]]);
   off: unknown = OFF_BUTTER;
+  /** Mirrors Supabase's "Confirm email" setting: when true, sign-up returns a session. */
+  autoConfirm = false;
   api: Record<string, { status?: number; body: unknown }> = {
     "analyze-food": { body: ANALYSIS_OK },
     categorize: {
@@ -231,6 +233,7 @@ export class FakeBackend {
     if (path === "/logout") return route.fulfill({ status: 204, headers: CORS });
     if (path === "/signup") {
       const { email, data } = (body ?? {}) as { email?: string; data?: Record<string, unknown> };
+      if (this.autoConfirm) return this.json(route, sessionFor({ ...this.user, email: email ?? this.user.email }));
       // Email confirmation required: a user, and no session.
       return this.json(route, { id: uuid(), email, user_metadata: data ?? {}, aud: "authenticated", role: "" });
     }

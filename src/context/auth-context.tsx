@@ -15,7 +15,8 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error?: string }>;
-  signUp: (name: string, email: string, password: string, dietaryPreference: string) => Promise<{ error?: string }>;
+  /** needsConfirmation: false when Supabase signed the user straight in (email confirmation off). */
+  signUp: (name: string, email: string, password: string, dietaryPreference: string) => Promise<{ error?: string; needsConfirmation?: boolean }>;
   signOut: () => Promise<void>;
   household: HouseholdInfo | null;
   householdLoading: boolean;
@@ -127,14 +128,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return {};
   };
 
-  const signUp = async (name: string, email: string, password: string, dietaryPreference: string): Promise<{ error?: string }> => {
-    const { error } = await supabase.auth.signUp({
+  const signUp = async (name: string, email: string, password: string, dietaryPreference: string): Promise<{ error?: string; needsConfirmation?: boolean }> => {
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: { data: { full_name: name, dietary_preference: dietaryPreference } },
     });
     if (error) return { error: error.message };
-    return {};
+    // A session back means the project does not require email confirmation.
+    return { needsConfirmation: !data.session };
   };
 
   const signOut = async () => {
