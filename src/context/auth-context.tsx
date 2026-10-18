@@ -18,6 +18,8 @@ interface AuthContextType {
   /** needsConfirmation: false when Supabase signed the user straight in (email confirmation off). */
   signUp: (name: string, email: string, password: string, dietaryPreference: string) => Promise<{ error?: string; needsConfirmation?: boolean }>;
   signOut: () => Promise<void>;
+  /** Redirects to Google. Only offered when NEXT_PUBLIC_GOOGLE_SIGNIN=1. */
+  signInWithGoogle: () => Promise<{ error?: string }>;
   household: HouseholdInfo | null;
   householdLoading: boolean;
   refreshHousehold: () => Promise<void>;
@@ -139,12 +141,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { needsConfirmation: !data.session };
   };
 
+  const signInWithGoogle = async (): Promise<{ error?: string }> => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: `${window.location.origin}/` },
+    });
+    return error ? { error: error.message } : {};
+  };
+
   const signOut = async () => {
     await supabase.auth.signOut();
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, signIn, signUp, signOut, household, householdLoading, refreshHousehold, householdSchemaReady, ingredientsSchemaReady, healthScoreSchemaReady }}>
+    <AuthContext.Provider value={{ user, session, loading, signIn, signUp, signOut, signInWithGoogle, household, householdLoading, refreshHousehold, householdSchemaReady, ingredientsSchemaReady, healthScoreSchemaReady }}>
       {children}
     </AuthContext.Provider>
   );

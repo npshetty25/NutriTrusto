@@ -34,7 +34,21 @@ const rise: Variants = {
 };
 
 export default function LoginPage() {
-  const { user, loading: authLoading, signIn, signUp } = useAuth();
+  const { user, loading: authLoading, signIn, signUp, signInWithGoogle } = useAuth();
+  // Hidden until Google is configured in Supabase (see README); a button that
+  // errors on a live site is worse than no button.
+  const googleEnabled = process.env.NEXT_PUBLIC_GOOGLE_SIGNIN === "1";
+
+  const handleGoogle = async () => {
+    setError(null);
+    setLoading(true);
+    const result = await signInWithGoogle();
+    // On success the browser has already left for Google.
+    if (result.error) {
+      setLoading(false);
+      setError(friendlyAuthError(result.error));
+    }
+  };
   const router = useRouter();
 
   // Already signed in — go to dashboard
@@ -199,6 +213,22 @@ export default function LoginPage() {
                     </button>
                   ))}
                 </motion.div>
+
+                {googleEnabled && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => { void handleGoogle(); }}
+                      disabled={loading}
+                      className="neu-pressable w-full min-h-11 rounded-xl py-3 text-base font-semibold text-foreground disabled:opacity-60"
+                    >
+                      Continue with Google
+                    </button>
+                    <div className="my-5 flex items-center gap-3 text-xs text-foreground/45" aria-hidden="true">
+                      <span className="h-px flex-1 bg-border" /> or with email <span className="h-px flex-1 bg-border" />
+                    </div>
+                  </>
+                )}
 
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <AnimatePresence>
