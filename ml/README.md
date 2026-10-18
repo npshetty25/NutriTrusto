@@ -112,7 +112,6 @@ python ml/compare.py                       # ml/artifacts/comparison.json
 
 pytest ml/service                          # service tests
 uvicorn ml.service.app:app --port 8000     # run the service
-docker compose up --build                  # web + ml together
 ```
 
 The web app reads `ML_SERVICE_URL`. When it is unset, or the service is down
@@ -126,4 +125,4 @@ percentage. A keyword guess is never presented as a model prediction.
 in the file and returned by `/health` and `/predict`. A joblib file only loads
 under the scikit-learn that wrote it, so `ml/service/requirements.txt` pins
 `scikit-learn==1.9.1`. Retraining writes a new file; bump `MODEL_VERSION` in
-`train.py` and the path in `ml/service/Dockerfile`.
+`train.py` and `DEFAULT_MODEL` in `ml/service/app.py`.

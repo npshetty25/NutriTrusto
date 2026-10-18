@@ -38,23 +38,21 @@ flowchart LR
   API --> GEM[Gemini]
   API --> OFF[Open Food Facts]
   API -.-> ML[FastAPI category model]
-  API -.-> MONGO[(MongoDB raw OCR log)]
 ```
 
-Dotted edges are optional. Full diagram, trust boundaries and request flows:
+The dotted edge is optional. Full diagram, trust boundaries and request flows:
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Engineering evidence
 
 | | |
 |---|---|
-| **Tests & CI** | Vitest unit/component/API-route tests, RLS policies run against real Postgres (PGlite), Playwright browser journeys on phone and desktop, a pytest job for the model service, and a Docker job. All on every push: [workflow](.github/workflows/ci.yml) |
+| **Tests & CI** | Vitest unit/component/API-route tests, RLS policies run against real Postgres (PGlite), Playwright browser journeys on phone and desktop and a pytest job for the model service. All on every push: [workflow](.github/workflows/ci.yml) |
 | **RLS & the 42P17 fix** | [db/rls.test.ts](db/rls.test.ts) proves the policies and includes a negative control that *does* raise `42P17`. It also pins a real cross-household write issue and a tested, **unapplied** fix in [db/proposed/](db/proposed/) |
 | **Responsive & PWA** | Before/after measurements in [docs/audit/PHASE1_RESULTS.md](docs/audit/PHASE1_RESULTS.md); a browser test fails the build if a tap target drops below 44px |
 | **Load test** | [docs/perf/LOAD_TEST.md](docs/perf/LOAD_TEST.md) — labelled synthetic, with its limits stated |
 | **ML model** | [ml/README.md](ml/README.md) — dataset, licence, metrics against the existing keyword rules, calibration, known misses |
-| **Decision record** | [docs/adr/0001-postgres-plus-mongodb.md](docs/adr/0001-postgres-plus-mongodb.md) |
-| **Audit & honest status** | [docs/audit/PHASE0_AUDIT.md](docs/audit/PHASE0_AUDIT.md), [PORTFOLIO_REPORT.md](PORTFOLIO_REPORT.md) |
+| **Audit** | [docs/audit/PHASE0_AUDIT.md](docs/audit/PHASE0_AUDIT.md) |
 
 ## Stack
 
@@ -64,7 +62,7 @@ Dotted edges are optional. Full diagram, trust boundaries and request flows:
 - **Open Food Facts** — barcode lookup
 - **scikit-learn + FastAPI** — category classifier service
 - **Vitest, Testing Library, PGlite, Playwright, pytest** — tests
-- **Docker, GitHub Actions** — container image and CI
+- **GitHub Actions** — CI
 - **Vercel** — hosting
 
 ## Run it
@@ -82,15 +80,8 @@ npm run dev                        # http://localhost:3000
 | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase project (public values) |
 | `GEMINI_API_KEY` | Scanning, recipes and chat (server only) |
 | `ML_SERVICE_URL` | *(optional)* category model service; unset → keyword rules |
-| `MONGODB_URI` | *(optional, branch `feat/p4-mongodb`, not merged)* raw OCR log |
+| `NEXT_PUBLIC_GOOGLE_SIGNIN` | *(optional)* `1` shows "Continue with Google" once it is set up in Supabase |
 | `OFF_USER_ID`, `OFF_PASSWORD` | *(optional)* contribute barcodes to Open Food Facts |
-
-### With Docker
-
-```bash
-cp .env.local.example .env         # compose reads .env
-docker compose up --build          # web on :3000, model service on :8000
-```
 
 ### Database
 
@@ -111,15 +102,12 @@ pytest ml/service         # model service
 
 ## Known limitations
 
-Short list; the full one is in [PORTFOLIO_REPORT.md](PORTFOLIO_REPORT.md).
-
 - Rate limiting is per server instance, in memory.
 - `src/app/page.tsx` is ~2,900 lines; it is covered by browser tests, not unit tests.
 - Statement coverage is about a third of `src/` — high where logic lives
   (`lib`, API routes), near zero on the big page component.
 - The category model is trained on packaged-product names and mislabels fresh
   produce; it is not wired to anything that spends money.
-- Not deployed to Azure; MongoDB is merged only as a branch, awaiting an Atlas cluster.
 
 ## Layout
 
