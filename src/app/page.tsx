@@ -105,6 +105,7 @@ import { toast } from "sonner";
 import { apiFetch } from "@/lib/api-client";
 import type { FoodAnalysis } from "@/lib/food-analysis";
 import { isAdminEmail } from "@/lib/admin";
+import { DEFAULT_NOTIFY_DAYS_BEFORE } from "@/components/notification-preferences-modal";
 
 interface Item {
   id: string;
@@ -639,10 +640,16 @@ export default function Home() {
   }, [user]);
 
   // ─── Expiry nudge ───────────────────────────────────────────────
+  // Both read straight from user_metadata — see NotificationPreferencesModal,
+  // which is the only writer. Defaults match what this effect always did
+  // before preferences existed, so an account that has never opened that
+  // modal keeps today's behaviour unchanged.
+  const notificationsEnabled = (user?.user_metadata?.notifications_enabled as boolean | undefined) ?? true;
+  const notifyDaysBefore = Number(user?.user_metadata?.notify_days_before ?? DEFAULT_NOTIFY_DAYS_BEFORE);
   useEffect(() => {
-    if (!user) return;
+    if (!user || !notificationsEnabled) return;
     const t = setTimeout(() => {
-      const soonToSpoil = items.filter(i => i.daysLeft > 0 && i.daysLeft <= 3);
+      const soonToSpoil = items.filter(i => i.daysLeft > 0 && i.daysLeft <= notifyDaysBefore);
       soonToSpoil.forEach((item) => {
         const key = `expiry-notify-${user.id}-${item.id}-${new Date().toDateString()}`;
         if (typeof window !== "undefined" && localStorage.getItem(key)) return;
@@ -669,7 +676,7 @@ export default function Home() {
       });
     }, 4000);
     return () => clearTimeout(t);
-  }, [user, items]);
+  }, [user, items, notificationsEnabled, notifyDaysBefore]);
 
   // ─── Delete item ────────────────────────────────────────────────
   // One removal path, two meanings. The outcome used to be *guessed* from

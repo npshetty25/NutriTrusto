@@ -4,13 +4,14 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
-import { toast } from "sonner";
 import { LogOut, Settings, Users, ChevronDown, Bell, Loader2, ShoppingCart, History, Leaf, ShieldCheck } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { DietPreferenceToggle } from "@/components/diet-preference-toggle";
 import { HouseholdModal } from "@/components/household-modal";
 import { ScanHistoryModal } from "@/components/scan-history-modal";
 import { ImpactDashboardModal } from "@/components/impact-dashboard-modal";
+import { NotificationPreferencesModal } from "@/components/notification-preferences-modal";
+import { AccountSettingsModal } from "@/components/account-settings-modal";
 
 interface ProfileDropdownProps {
   onOpenShoppingList?: () => void;
@@ -24,6 +25,8 @@ export function ProfileDropdown({ onOpenShoppingList }: ProfileDropdownProps) {
   const [showHousehold, setShowHousehold] = useState(false);
   const [showScanHistory, setShowScanHistory] = useState(false);
   const [showImpactDashboard, setShowImpactDashboard] = useState(false);
+  const [showNotificationPreferences, setShowNotificationPreferences] = useState(false);
+  const [showAccountSettings, setShowAccountSettings] = useState(false);
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -101,11 +104,6 @@ export function ProfileDropdown({ onOpenShoppingList }: ProfileDropdownProps) {
     }
   };
 
-  const showComingSoon = (feature: string) => {
-    setOpen(false);
-    toast("Coming Soon", { description: `${feature} will be available in the next update.` });
-  };
-
   const toggleOpen = () => {
     if (!open) positionMenu();
     setOpen((v) => !v);
@@ -151,10 +149,10 @@ export function ProfileDropdown({ onOpenShoppingList }: ProfileDropdownProps) {
         <button onClick={() => { setOpen(false); setShowImpactDashboard(true); }} role="menuitem" className={itemClass}>
           <Leaf size={15} className="text-foreground/50" /> Impact Dashboard
         </button>
-        <button onClick={() => showComingSoon("Notification Preferences")} role="menuitem" className={itemClass}>
+        <button onClick={() => { setOpen(false); setShowNotificationPreferences(true); }} role="menuitem" className={itemClass}>
           <Bell size={15} className="text-foreground/50" /> Notification Preferences
         </button>
-        <button onClick={() => showComingSoon("Account Settings")} role="menuitem" className={itemClass}>
+        <button onClick={() => { setOpen(false); setShowAccountSettings(true); }} role="menuitem" className={itemClass}>
           <Settings size={15} className="text-foreground/50" /> Account Settings
         </button>
         <button onClick={() => { setOpen(false); router.push("/privacy"); }} role="menuitem" className={itemClass}>
@@ -198,6 +196,8 @@ export function ProfileDropdown({ onOpenShoppingList }: ProfileDropdownProps) {
       {showHousehold && <HouseholdModal onClose={() => setShowHousehold(false)} />}
       {showScanHistory && <ScanHistoryModal onClose={() => setShowScanHistory(false)} />}
       {showImpactDashboard && <ImpactDashboardModal onClose={() => setShowImpactDashboard(false)} />}
+      {showNotificationPreferences && <NotificationPreferencesModal onClose={() => setShowNotificationPreferences(false)} />}
+      {showAccountSettings && <AccountSettingsModal onClose={() => setShowAccountSettings(false)} />}
     </div>
   );
 }

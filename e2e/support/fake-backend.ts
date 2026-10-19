@@ -32,8 +32,12 @@ export const TEST_USER = {
   aud: "authenticated",
   role: "authenticated",
   email: "asha@example.test",
-  app_metadata: {},
-  user_metadata: { full_name: "Asha Rao", dietary_preference: "vegetarian" },
+  app_metadata: { provider: "email" },
+  // Record<string, unknown>, not a fixed shape: tests write arbitrary keys
+  // here (notifications_enabled, notify_days_before, …) through the fake
+  // PUT /auth/v1/user handler below, the same way the real one would.
+  user_metadata: { full_name: "Asha Rao", dietary_preference: "vegetarian" } as Record<string, unknown>,
+  identities: [{ provider: "email" }],
   created_at: "2026-01-01T00:00:00.000Z",
 };
 
@@ -230,6 +234,18 @@ export class FakeBackend {
       return this.json(route, sessionFor(this.user));
     }
     if (path === "/user" && method === "GET") return this.json(route, this.user);
+    if (path === "/user" && (method === "PUT" || method === "PATCH")) {
+      // supabase.auth.updateUser(). Merges data into user_metadata (matching
+      // Postgres jsonb merge semantics, which is what Supabase really does),
+      // and applies a top-level email/password straight onto the user. A real
+      // email change sends a confirmation link instead of updating
+      // immediately; this fake applies it at once; nothing in this app reads
+      // new_email, so that gap doesn't matter for what gets tested here.
+      const { data, email } = (body ?? {}) as { data?: Record<string, unknown>; email?: string; password?: string };
+      if (data) this.user = { ...this.user, user_metadata: { ...this.user.user_metadata, ...data } };
+      if (email) this.user = { ...this.user, email };
+      return this.json(route, this.user);
+    }
     if (path === "/logout") return route.fulfill({ status: 204, headers: CORS });
     if (path === "/signup") {
       const { email, data } = (body ?? {}) as { email?: string; data?: Record<string, unknown> };
