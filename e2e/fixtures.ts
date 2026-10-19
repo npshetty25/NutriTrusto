@@ -1,11 +1,16 @@
 import { test as base, expect, type Page } from "@playwright/test";
-import { FakeBackend } from "./support/fake-backend";
+import { FakeBackend, TEST_USER } from "./support/fake-backend";
+
+/** Must match playwright.config.ts's NEXT_PUBLIC_ADMIN_EMAILS for this to be admin. */
+export const ADMIN_TEST_EMAIL = "admin@example.test";
 
 type Fixtures = {
   /** A fake backend installed on a signed-out context. */
   anonymous: FakeBackend;
   /** A fake backend installed with a session already in storage. */
   backend: FakeBackend;
+  /** Same, but signed in as the email NEXT_PUBLIC_ADMIN_EMAILS was built with. */
+  adminBackend: FakeBackend;
 };
 
 export const test = base.extend<Fixtures>({
@@ -17,6 +22,15 @@ export const test = base.extend<Fixtures>({
   },
   backend: async ({ context, page }, provide) => {
     const backend = new FakeBackend();
+    await backend.install(context, { signedIn: true });
+    await backend.quietRealtime(page);
+    await provide(backend);
+  },
+  adminBackend: async ({ context, page }, provide) => {
+    const backend = new FakeBackend();
+    // Must be set before install(): install() bakes the session into an
+    // addInitScript closure, evaluated once, at that call.
+    backend.user = { ...TEST_USER, email: ADMIN_TEST_EMAIL };
     await backend.install(context, { signedIn: true });
     await backend.quietRealtime(page);
     await provide(backend);

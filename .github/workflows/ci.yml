@@ -19,6 +19,9 @@ jobs:
       NEXT_PUBLIC_SUPABASE_URL: https://e2e.supabase.test
       NEXT_PUBLIC_SUPABASE_ANON_KEY: e2e-anon-key
       GEMINI_API_KEY: e2e-not-a-real-key
+      # Matches e2e/fixtures.ts's adminBackend fixture, so the "Add Demo Data"
+      # visibility test can actually exercise the true branch in CI.
+      NEXT_PUBLIC_ADMIN_EMAILS: admin@example.test
     steps:
       - uses: actions/checkout@v4
         with:

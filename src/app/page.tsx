@@ -104,6 +104,7 @@ import { motion, AnimatePresence, MotionConfig } from "framer-motion";
 import { toast } from "sonner";
 import { apiFetch } from "@/lib/api-client";
 import type { FoodAnalysis } from "@/lib/food-analysis";
+import { isAdminEmail } from "@/lib/admin";
 
 interface Item {
   id: string;
@@ -158,6 +159,10 @@ const INVENTORY_PAGE_SIZE = 6;
 
 export default function Home() {
   const { user, loading: authLoading, household, householdSchemaReady, ingredientsSchemaReady, healthScoreSchemaReady } = useAuth();
+  // UI-only gate, not a security one — see lib/admin.ts. Hides "Add Demo
+  // Data" from everyone but the project owner, so a real user never sees a
+  // button that fills their pantry with sample groceries.
+  const isAdmin = isAdminEmail(user?.email, process.env.NEXT_PUBLIC_ADMIN_EMAILS);
 
   // Spread into a pantry_items insert payload. Omits the key entirely
   // (rather than sending null) until we've confirmed the household_id
@@ -2103,15 +2108,17 @@ if (nutritionFieldsFilled < 2) {
                   </div>
                 </div>
 
-                <button
-                  onClick={() => { void addMockInventoryData(); }}
-                  disabled={isSeedingMockData}
-                  className="neu-raised-sm h-11 rounded-xl text-xs font-semibold disabled:opacity-60 flex items-center justify-center gap-2 text-foreground/80"
-                  title="Insert a sample pantry for testing and demos"
-                >
-                  {isSeedingMockData ? <Loader2 size={14} className="animate-spin" /> : <Package size={14} />}
-                  Add Demo Data
-                </button>
+                {isAdmin && (
+                  <button
+                    onClick={() => { void addMockInventoryData(); }}
+                    disabled={isSeedingMockData}
+                    className="neu-raised-sm h-11 rounded-xl text-xs font-semibold disabled:opacity-60 flex items-center justify-center gap-2 text-foreground/80"
+                    title="Insert a sample pantry for testing and demos"
+                  >
+                    {isSeedingMockData ? <Loader2 size={14} className="animate-spin" /> : <Package size={14} />}
+                    Add Demo Data
+                  </button>
+                )}
               </div>
             </motion.div>
           )}
@@ -2141,14 +2148,16 @@ if (nutritionFieldsFilled < 2) {
               >
                 <Camera size={16} /> Scan Receipt
               </button>
-              <button
-                onClick={() => { void addMockInventoryData(); }}
-                disabled={isSeedingMockData}
-                className="flex items-center gap-2 border border-border bg-card text-foreground text-sm font-semibold px-5 py-2.5 rounded-xl hover:bg-foreground/5 transition-colors disabled:opacity-60"
-              >
-                {isSeedingMockData ? <Loader2 size={16} className="animate-spin" /> : <Package size={16} />}
-                Add Demo Data
-              </button>
+              {isAdmin && (
+                <button
+                  onClick={() => { void addMockInventoryData(); }}
+                  disabled={isSeedingMockData}
+                  className="flex items-center gap-2 border border-border bg-card text-foreground text-sm font-semibold px-5 py-2.5 rounded-xl hover:bg-foreground/5 transition-colors disabled:opacity-60"
+                >
+                  {isSeedingMockData ? <Loader2 size={16} className="animate-spin" /> : <Package size={16} />}
+                  Add Demo Data
+                </button>
+              )}
             </div>
           </div>
         ) : (

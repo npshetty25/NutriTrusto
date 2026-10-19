@@ -21,6 +21,8 @@ const serverEnv = {
   // Present so the routes' "not configured" branch is not what gets exercised.
   // Never used: the browser-side mock answers /api/* before it leaves the page.
   GEMINI_API_KEY: "e2e-not-a-real-key",
+  // Matches e2e/fixtures.ts's adminBackend fixture (ADMIN_TEST_EMAIL).
+  NEXT_PUBLIC_ADMIN_EMAILS: "admin@example.test",
 };
 
 export default defineConfig({

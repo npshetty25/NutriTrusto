@@ -71,6 +71,7 @@ const ALLOWED: Allow[] = [
   { file: "app/api/extract/route.ts", match: '["high", "critical", "urgent"].includes(value)', reason: "enum membership on a risk level" },
   { file: "app/api/extract/route.ts", match: '["medium", "med", "soon"].includes(value)', reason: "enum membership on a risk level" },
   { file: "lib/upload-validation.ts", match: "[0x68, 0x6d].includes(b[8])", reason: "magic-byte check on a file header" },
+  { file: "lib/admin.ts", match: ".includes(target)", reason: "exact-match membership check of a signed-in email against a fixed admin allow-list — never a food term" },
   { file: "lib/colour-semantics.ts", match: "className.includes(token)", reason: "CSS class-name token check" },
   { file: "lib/shelf-life-data.ts", match: "all.indexOf(id) !== i", reason: "duplicate-id detection over row ids" },
   { file: "components/shopping-list-modal.tsx", match: 'name.indexOf(" — ")', reason: "splits a display label into name and quantity" },
