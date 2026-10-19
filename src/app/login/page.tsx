@@ -15,6 +15,7 @@ import {
   validateNewPassword,
 } from "@/lib/auth-validation";
 import { Eye, EyeOff, Loader2, ArrowRight } from "lucide-react";
+import { GoogleGlyph } from "@/components/google-glyph";
 
 const container: Variants = {
   hidden: { opacity: 0 },
@@ -187,6 +188,36 @@ export default function LoginPage() {
                 exit={{ opacity: 0, scale: 0.98 }}
                 transition={{ duration: 0.25 }}
               >
+                {googleEnabled && (
+                  <>
+                    {/* Google, not "a button that happens to say Google": white
+                        pill, the real four-colour mark, Google's own documented
+                        border/text colours (#DADCE0 / #3C4043). The app's own
+                        neu-pressable style reads as just another control until
+                        the word is actually read — the brand mark is what lets
+                        someone tap it without reading anything at all.
+                        Sign-in is the priority path, so this is the first
+                        thing offered, above the Sign In/Sign Up choice —
+                        Google needs no such choice, since the same button
+                        creates the account on a first use. */}
+                    <motion.button
+                      variants={rise}
+                      type="button"
+                      onClick={() => { void handleGoogle(); }}
+                      disabled={loading}
+                      whileHover={{ scale: loading ? 1 : 1.01 }}
+                      whileTap={{ scale: loading ? 1 : 0.98 }}
+                      className="flex w-full min-h-12 items-center justify-center gap-3 rounded-xl border border-[#DADCE0] bg-white py-3.5 text-base font-semibold text-[#3C4043] shadow-sm transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:opacity-60 disabled:shadow-none mb-6"
+                    >
+                      <GoogleGlyph size={20} />
+                      Continue with Google
+                    </motion.button>
+                    <motion.div variants={rise} className="mb-6 flex items-center gap-3 text-xs font-medium text-foreground/45" aria-hidden="true">
+                      <span className="h-px flex-1 bg-border" /> or with email <span className="h-px flex-1 bg-border" />
+                    </motion.div>
+                  </>
+                )}
+
                 {/* Segmented control — the active pill is a single shared
                     element that slides between tabs via layoutId. */}
                 <motion.div variants={rise} className="neu-inset flex items-center rounded-2xl p-1.5 mb-7">
@@ -213,22 +244,6 @@ export default function LoginPage() {
                     </button>
                   ))}
                 </motion.div>
-
-                {googleEnabled && (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => { void handleGoogle(); }}
-                      disabled={loading}
-                      className="neu-pressable w-full min-h-11 rounded-xl py-3 text-base font-semibold text-foreground disabled:opacity-60"
-                    >
-                      Continue with Google
-                    </button>
-                    <div className="my-5 flex items-center gap-3 text-xs text-foreground/45" aria-hidden="true">
-                      <span className="h-px flex-1 bg-border" /> or with email <span className="h-px flex-1 bg-border" />
-                    </div>
-                  </>
-                )}
 
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <AnimatePresence>
