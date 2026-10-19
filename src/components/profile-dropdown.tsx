@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
-import { LogOut, Settings, Users, ChevronDown, Bell, Loader2, ShoppingCart, History, Leaf, ShieldCheck } from "lucide-react";
+import { LogOut, Settings, Users, ChevronDown, Bell, Loader2, ShoppingCart, History, Leaf, ShieldCheck, Sparkles } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { DietPreferenceToggle } from "@/components/diet-preference-toggle";
 import { HouseholdModal } from "@/components/household-modal";
@@ -15,9 +15,13 @@ import { AccountSettingsModal } from "@/components/account-settings-modal";
 
 interface ProfileDropdownProps {
   onOpenShoppingList?: () => void;
+  /** Re-opens the first-time walkthrough on demand — the only way back to it
+   * once an account has dismissed it, since that dismissal is permanent by
+   * design (see src/components/onboarding-tour.tsx). */
+  onReplayTour?: () => void;
 }
 
-export function ProfileDropdown({ onOpenShoppingList }: ProfileDropdownProps) {
+export function ProfileDropdown({ onOpenShoppingList, onReplayTour }: ProfileDropdownProps) {
   const { user, signOut } = useAuth();
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -155,6 +159,11 @@ export function ProfileDropdown({ onOpenShoppingList }: ProfileDropdownProps) {
         <button onClick={() => { setOpen(false); setShowAccountSettings(true); }} role="menuitem" className={itemClass}>
           <Settings size={15} className="text-foreground/50" /> Account Settings
         </button>
+        {onReplayTour && (
+          <button onClick={() => { setOpen(false); onReplayTour(); }} role="menuitem" className={itemClass}>
+            <Sparkles size={15} className="text-foreground/50" /> Show App Tour
+          </button>
+        )}
         <button onClick={() => { setOpen(false); router.push("/privacy"); }} role="menuitem" className={itemClass}>
           <ShieldCheck size={15} className="text-foreground/50" /> Privacy Policy
         </button>

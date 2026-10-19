@@ -147,7 +147,10 @@ export class FakeBackend {
     return this.requests.filter((r) => r.method === method && r.path === `/rest/v1/${table}`);
   }
 
-  async install(context: BrowserContext, { signedIn = false }: { signedIn?: boolean } = {}) {
+  async install(
+    context: BrowserContext,
+    { signedIn = false, freshOnboarding = false }: { signedIn?: boolean; freshOnboarding?: boolean } = {}
+  ) {
     if (signedIn) {
       await context.addInitScript(
         ([key, session]) => {
@@ -159,6 +162,26 @@ export class FakeBackend {
         },
         [SESSION_KEY, sessionFor(this.user)] as const
       );
+
+      // Most tests are exercising the app as someone who has used it before —
+      // the onboarding tour (src/components/onboarding-tour.tsx) popping up
+      // and sitting above everything would otherwise block their very first
+      // click. `freshOnboarding: true` (the fixtures.ts `freshBackend`
+      // fixture) opts back into the real first-sign-in state, for the one
+      // spec file actually testing that flow.
+      // `onboarding-seen-` must match STORAGE_PREFIX there.
+      if (!freshOnboarding) {
+        await context.addInitScript(
+          ([key]) => {
+            try {
+              localStorage.setItem(key as string, "1");
+            } catch {
+              /* storage unavailable */
+            }
+          },
+          [`onboarding-seen-${this.user.id}`] as const
+        );
+      }
     }
 
     await context.route(/\.supabase\.test\//, (route) => this.handleSupabase(route));

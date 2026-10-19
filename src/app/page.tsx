@@ -106,6 +106,7 @@ import { apiFetch } from "@/lib/api-client";
 import type { FoodAnalysis } from "@/lib/food-analysis";
 import { isAdminEmail } from "@/lib/admin";
 import { DEFAULT_NOTIFY_DAYS_BEFORE } from "@/components/notification-preferences-modal";
+import { OnboardingTour, hasSeenOnboarding, markOnboardingSeen } from "@/components/onboarding-tour";
 
 interface Item {
   id: string;
@@ -244,6 +245,7 @@ export default function Home() {
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [showShoppingList, setShowShoppingList] = useState(false);
   const [showPantryChat, setShowPantryChat] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   const [showReceiptMenu, setShowReceiptMenu] = useState(false);
 
@@ -589,6 +591,22 @@ export default function Home() {
   useEffect(() => {
     if (!authLoading && !user) router.push("/login");
   }, [user, authLoading, router]);
+
+  // ─── First-time walkthrough ─────────────────────────────────────
+  // Checked once per sign-in, not on every render: the flag is read from
+  // localStorage, which is this component's only source of truth for "has
+  // this account seen it", so re-checking it every render would be pointless
+  // work that could never produce a different answer within one session.
+  useEffect(() => {
+    if (!user) return;
+    if (!hasSeenOnboarding(user.id)) setShowOnboarding(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
+
+  const finishOnboarding = () => {
+    setShowOnboarding(false);
+    if (user) markOnboardingSeen(user.id);
+  };
 
   // ─── Fetch pantry from Supabase ────────────────────────────────
   useEffect(() => {
@@ -1672,7 +1690,7 @@ if (nutritionFieldsFilled < 2) {
                 </motion.span>
               )}
             </motion.button>
-            <ProfileDropdown onOpenShoppingList={() => setShowShoppingList(true)} />
+            <ProfileDropdown onOpenShoppingList={() => setShowShoppingList(true)} onReplayTour={() => setShowOnboarding(true)} />
           </div>
         </motion.div>
 
@@ -2368,7 +2386,7 @@ if (nutritionFieldsFilled < 2) {
         )}
 
         <div className="flex items-center justify-between w-full bg-card/95 border border-border shadow-lg rounded-2xl p-2 gap-1 backdrop-blur-md">
-          <button onClick={() => setShowBarcodeScanner(true)} className="flex-1 min-w-0 flex flex-col items-center justify-center gap-1 hover:bg-foreground/5 text-foreground/80 hover:text-foreground h-16 px-2 rounded-xl transition-all">
+          <button data-tour="barcode" onClick={() => setShowBarcodeScanner(true)} className="flex-1 min-w-0 flex flex-col items-center justify-center gap-1 hover:bg-foreground/5 text-foreground/80 hover:text-foreground h-16 px-2 rounded-xl transition-all">
             <ScanLine size={18} /><span className="text-[10px] tracking-wide">Barcode</span>
           </button>
 
@@ -2385,6 +2403,7 @@ if (nutritionFieldsFilled < 2) {
           <div className="w-px h-8 bg-border" />
 
           <button
+            data-tour="receipt"
             onClick={() => setShowReceiptMenu(!showReceiptMenu)}
             disabled={isUploading}
             className={`flex-1 min-w-0 flex flex-col items-center justify-center gap-1 hover:bg-foreground/5 h-16 px-2 rounded-xl transition-all disabled:opacity-50 ${showReceiptMenu ? 'bg-foreground/10 text-foreground' : 'text-foreground/80 hover:text-foreground'}`}
@@ -2395,11 +2414,13 @@ if (nutritionFieldsFilled < 2) {
 
           <div className="w-px h-8 bg-border" />
 
-          <button onClick={() => setShowPantryChat(true)} className="flex-1 min-w-0 flex flex-col items-center justify-center gap-1 hover:bg-foreground/5 text-foreground/80 hover:text-foreground h-16 px-2 rounded-xl transition-all">
+          <button data-tour="askAi" onClick={() => setShowPantryChat(true)} className="flex-1 min-w-0 flex flex-col items-center justify-center gap-1 hover:bg-foreground/5 text-foreground/80 hover:text-foreground h-16 px-2 rounded-xl transition-all">
             <Sparkles size={18} /><span className="text-[10px] tracking-wide">Ask AI</span>
           </button>
         </div>
       </nav>
+
+      {showOnboarding && <OnboardingTour onFinish={finishOnboarding} />}
 
       {showBarcodeScanner && (
         <BarcodeScanner 

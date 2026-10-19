@@ -7,10 +7,15 @@ export const ADMIN_TEST_EMAIL = "admin@example.test";
 type Fixtures = {
   /** A fake backend installed on a signed-out context. */
   anonymous: FakeBackend;
-  /** A fake backend installed with a session already in storage. */
+  /** A fake backend installed with a session already in storage, and the
+   * onboarding tour pre-dismissed — "someone who has used the app before",
+   * which is what almost every test actually wants. */
   backend: FakeBackend;
   /** Same, but signed in as the email NEXT_PUBLIC_ADMIN_EMAILS was built with. */
   adminBackend: FakeBackend;
+  /** Signed in as a genuinely first-time user: the onboarding tour WILL show.
+   * Only onboarding.spec.ts should need this. */
+  freshBackend: FakeBackend;
 };
 
 export const test = base.extend<Fixtures>({
@@ -32,6 +37,12 @@ export const test = base.extend<Fixtures>({
     // addInitScript closure, evaluated once, at that call.
     backend.user = { ...TEST_USER, email: ADMIN_TEST_EMAIL };
     await backend.install(context, { signedIn: true });
+    await backend.quietRealtime(page);
+    await provide(backend);
+  },
+  freshBackend: async ({ context, page }, provide) => {
+    const backend = new FakeBackend();
+    await backend.install(context, { signedIn: true, freshOnboarding: true });
     await backend.quietRealtime(page);
     await provide(backend);
   },
