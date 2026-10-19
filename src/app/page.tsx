@@ -104,6 +104,9 @@ import { motion, AnimatePresence, MotionConfig } from "framer-motion";
 import { toast } from "sonner";
 import { apiFetch } from "@/lib/api-client";
 import type { FoodAnalysis } from "@/lib/food-analysis";
+import { isAdminEmail } from "@/lib/admin";
+import { DEFAULT_NOTIFY_DAYS_BEFORE } from "@/components/notification-preferences-modal";
+import { OnboardingTour, hasSeenOnboarding, markOnboardingSeen } from "@/components/onboarding-tour";
 
 interface Item {
   id: string;
@@ -158,6 +161,10 @@ const INVENTORY_PAGE_SIZE = 6;
 
 export default function Home() {
   const { user, loading: authLoading, household, householdSchemaReady, ingredientsSchemaReady, healthScoreSchemaReady } = useAuth();
+  // UI-only gate, not a security one — see lib/admin.ts. Hides "Add Demo
+  // Data" from everyone but the project owner, so a real user never sees a
+  // button that fills their pantry with sample groceries.
+  const isAdmin = isAdminEmail(user?.email, process.env.NEXT_PUBLIC_ADMIN_EMAILS);
 
   // Spread into a pantry_items insert payload. Omits the key entirely
   // (rather than sending null) until we've confirmed the household_id
@@ -238,6 +245,7 @@ export default function Home() {
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [showShoppingList, setShowShoppingList] = useState(false);
   const [showPantryChat, setShowPantryChat] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   const [showReceiptMenu, setShowReceiptMenu] = useState(false);
 
@@ -584,6 +592,22 @@ export default function Home() {
     if (!authLoading && !user) router.push("/login");
   }, [user, authLoading, router]);
 
+  // ─── First-time walkthrough ─────────────────────────────────────
+  // Checked once per sign-in, not on every render: the flag is read from
+  // localStorage, which is this component's only source of truth for "has
+  // this account seen it", so re-checking it every render would be pointless
+  // work that could never produce a different answer within one session.
+  useEffect(() => {
+    if (!user) return;
+    if (!hasSeenOnboarding(user.id)) setShowOnboarding(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
+
+  const finishOnboarding = () => {
+    setShowOnboarding(false);
+    if (user) markOnboardingSeen(user.id);
+  };
+
   // ─── Fetch pantry from Supabase ────────────────────────────────
   useEffect(() => {
     if (!user) return;
@@ -634,10 +658,16 @@ export default function Home() {
   }, [user]);
 
   // ─── Expiry nudge ───────────────────────────────────────────────
+  // Both read straight from user_metadata — see NotificationPreferencesModal,
+  // which is the only writer. Defaults match what this effect always did
+  // before preferences existed, so an account that has never opened that
+  // modal keeps today's behaviour unchanged.
+  const notificationsEnabled = (user?.user_metadata?.notifications_enabled as boolean | undefined) ?? true;
+  const notifyDaysBefore = Number(user?.user_metadata?.notify_days_before ?? DEFAULT_NOTIFY_DAYS_BEFORE);
   useEffect(() => {
-    if (!user) return;
+    if (!user || !notificationsEnabled) return;
     const t = setTimeout(() => {
-      const soonToSpoil = items.filter(i => i.daysLeft > 0 && i.daysLeft <= 3);
+      const soonToSpoil = items.filter(i => i.daysLeft > 0 && i.daysLeft <= notifyDaysBefore);
       soonToSpoil.forEach((item) => {
         const key = `expiry-notify-${user.id}-${item.id}-${new Date().toDateString()}`;
         if (typeof window !== "undefined" && localStorage.getItem(key)) return;
@@ -664,7 +694,7 @@ export default function Home() {
       });
     }, 4000);
     return () => clearTimeout(t);
-  }, [user, items]);
+  }, [user, items, notificationsEnabled, notifyDaysBefore]);
 
   // ─── Delete item ────────────────────────────────────────────────
   // One removal path, two meanings. The outcome used to be *guessed* from
@@ -1660,7 +1690,7 @@ if (nutritionFieldsFilled < 2) {
                 </motion.span>
               )}
             </motion.button>
-            <ProfileDropdown onOpenShoppingList={() => setShowShoppingList(true)} />
+            <ProfileDropdown onOpenShoppingList={() => setShowShoppingList(true)} onReplayTour={() => setShowOnboarding(true)} />
           </div>
         </motion.div>
 
@@ -2103,15 +2133,17 @@ if (nutritionFieldsFilled < 2) {
                   </div>
                 </div>
 
-                <button
-                  onClick={() => { void addMockInventoryData(); }}
-                  disabled={isSeedingMockData}
-                  className="neu-raised-sm h-11 rounded-xl text-xs font-semibold disabled:opacity-60 flex items-center justify-center gap-2 text-foreground/80"
-                  title="Insert a sample pantry for testing and demos"
-                >
-                  {isSeedingMockData ? <Loader2 size={14} className="animate-spin" /> : <Package size={14} />}
-                  Add Demo Data
-                </button>
+                {isAdmin && (
+                  <button
+                    onClick={() => { void addMockInventoryData(); }}
+                    disabled={isSeedingMockData}
+                    className="neu-raised-sm h-11 rounded-xl text-xs font-semibold disabled:opacity-60 flex items-center justify-center gap-2 text-foreground/80"
+                    title="Insert a sample pantry for testing and demos"
+                  >
+                    {isSeedingMockData ? <Loader2 size={14} className="animate-spin" /> : <Package size={14} />}
+                    Add Demo Data
+                  </button>
+                )}
               </div>
             </motion.div>
           )}
@@ -2141,14 +2173,16 @@ if (nutritionFieldsFilled < 2) {
               >
                 <Camera size={16} /> Scan Receipt
               </button>
-              <button
-                onClick={() => { void addMockInventoryData(); }}
-                disabled={isSeedingMockData}
-                className="flex items-center gap-2 border border-border bg-card text-foreground text-sm font-semibold px-5 py-2.5 rounded-xl hover:bg-foreground/5 transition-colors disabled:opacity-60"
-              >
-                {isSeedingMockData ? <Loader2 size={16} className="animate-spin" /> : <Package size={16} />}
-                Add Demo Data
-              </button>
+              {isAdmin && (
+                <button
+                  onClick={() => { void addMockInventoryData(); }}
+                  disabled={isSeedingMockData}
+                  className="flex items-center gap-2 border border-border bg-card text-foreground text-sm font-semibold px-5 py-2.5 rounded-xl hover:bg-foreground/5 transition-colors disabled:opacity-60"
+                >
+                  {isSeedingMockData ? <Loader2 size={16} className="animate-spin" /> : <Package size={16} />}
+                  Add Demo Data
+                </button>
+              )}
             </div>
           </div>
         ) : (
@@ -2352,7 +2386,7 @@ if (nutritionFieldsFilled < 2) {
         )}
 
         <div className="flex items-center justify-between w-full bg-card/95 border border-border shadow-lg rounded-2xl p-2 gap-1 backdrop-blur-md">
-          <button onClick={() => setShowBarcodeScanner(true)} className="flex-1 min-w-0 flex flex-col items-center justify-center gap-1 hover:bg-foreground/5 text-foreground/80 hover:text-foreground h-16 px-2 rounded-xl transition-all">
+          <button data-tour="barcode" onClick={() => setShowBarcodeScanner(true)} className="flex-1 min-w-0 flex flex-col items-center justify-center gap-1 hover:bg-foreground/5 text-foreground/80 hover:text-foreground h-16 px-2 rounded-xl transition-all">
             <ScanLine size={18} /><span className="text-[10px] tracking-wide">Barcode</span>
           </button>
 
@@ -2369,6 +2403,7 @@ if (nutritionFieldsFilled < 2) {
           <div className="w-px h-8 bg-border" />
 
           <button
+            data-tour="receipt"
             onClick={() => setShowReceiptMenu(!showReceiptMenu)}
             disabled={isUploading}
             className={`flex-1 min-w-0 flex flex-col items-center justify-center gap-1 hover:bg-foreground/5 h-16 px-2 rounded-xl transition-all disabled:opacity-50 ${showReceiptMenu ? 'bg-foreground/10 text-foreground' : 'text-foreground/80 hover:text-foreground'}`}
@@ -2379,11 +2414,13 @@ if (nutritionFieldsFilled < 2) {
 
           <div className="w-px h-8 bg-border" />
 
-          <button onClick={() => setShowPantryChat(true)} className="flex-1 min-w-0 flex flex-col items-center justify-center gap-1 hover:bg-foreground/5 text-foreground/80 hover:text-foreground h-16 px-2 rounded-xl transition-all">
+          <button data-tour="askAi" onClick={() => setShowPantryChat(true)} className="flex-1 min-w-0 flex flex-col items-center justify-center gap-1 hover:bg-foreground/5 text-foreground/80 hover:text-foreground h-16 px-2 rounded-xl transition-all">
             <Sparkles size={18} /><span className="text-[10px] tracking-wide">Ask AI</span>
           </button>
         </div>
       </nav>
+
+      {showOnboarding && <OnboardingTour onFinish={finishOnboarding} />}
 
       {showBarcodeScanner && (
         <BarcodeScanner 
