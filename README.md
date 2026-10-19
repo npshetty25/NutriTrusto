@@ -48,7 +48,7 @@ The dotted edge is optional. Full diagram, trust boundaries and request flows:
 | | |
 |---|---|
 | **Tests & CI** | Vitest unit/component/API-route tests, RLS policies run against real Postgres (PGlite), Playwright browser journeys on phone and desktop and a pytest job for the model service. All on every push: [workflow](.github/workflows/ci.yml) |
-| **RLS & the 42P17 fix** | [db/rls.test.ts](db/rls.test.ts) proves the policies and includes a negative control that *does* raise `42P17`. It also pins a real cross-household write issue and a tested, **unapplied** fix in [db/proposed/](db/proposed/) |
+| **RLS & the 42P17 fix** | [db/rls.test.ts](db/rls.test.ts) proves the policies and includes a negative control that *does* raise `42P17`. It also guards the fix for a cross-household write issue the tests found (`db/supabase-schema-household-guard.sql`) |
 | **Responsive & PWA** | Before/after measurements in [docs/audit/PHASE1_RESULTS.md](docs/audit/PHASE1_RESULTS.md); a browser test fails the build if a tap target drops below 44px |
 | **Load test** | [docs/perf/LOAD_TEST.md](docs/perf/LOAD_TEST.md) — labelled synthetic, with its limits stated |
 | **ML model** | [ml/README.md](ml/README.md) — dataset, licence, metrics against the existing keyword rules, calibration, known misses |
@@ -86,7 +86,8 @@ npm run dev                        # http://localhost:3000
 ### Database
 
 Run in the Supabase SQL editor, in order: `db/supabase-schema.sql`,
-`db/supabase-schema-additions.sql`, `db/supabase-schema-hardening.sql`. All are
+`db/supabase-schema-additions.sql`, `db/supabase-schema-hardening.sql`,
+`db/supabase-schema-household-guard.sql`. All are
 idempotent. There is no migration ledger; the repo cannot tell you which have
 been applied to a given project.
 
