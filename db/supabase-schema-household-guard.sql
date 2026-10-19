@@ -1,6 +1,6 @@
 -- ============================================================
--- PROPOSED — NOT APPLIED. Needs the owner's review before it goes anywhere
--- near the production project.
+-- Applied to production by the owner on 2026-10-19 (SQL editor).
+-- Run this AFTER supabase-schema-hardening.sql.
 --
 -- Problem (reproduced in db/rls.test.ts against the real migrations):
 --   The pantry_items policy's WITH CHECK is

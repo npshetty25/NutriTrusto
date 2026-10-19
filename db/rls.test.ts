@@ -23,6 +23,7 @@ const MIGRATIONS = [
   "supabase-schema.sql",
   "supabase-schema-additions.sql",
   "supabase-schema-hardening.sql",
+  "supabase-schema-household-guard.sql",
 ];
 
 const ALICE = "00000000-0000-4000-8000-00000000000a";
@@ -298,9 +299,9 @@ describe("household isolation", () => {
 
 /**
  * The pantry_items policy accepts `auth.uid() = user_id` in WITH CHECK without
- * looking at household_id, so a non-member can write into someone else's
- * household. The migration that would close it lives in db/proposed/ and has
- * NOT been applied; these two blocks pin the problem and prove the proposal.
+ * looking at household_id, so on its own it would let a non-member write into
+ * someone else's household. supabase-schema-household-guard.sql closes that
+ * with a trigger (applied to production 2026-10-19); these tests keep it closed.
  */
 describe("cross-household writes on pantry_items", () => {
   const injectAsNonMember = async (db: PGlite, householdId: string) => {
@@ -312,7 +313,7 @@ describe("cross-household writes on pantry_items", () => {
     );
   };
 
-  describe("current schema", () => {
+  describe("with every migration applied", () => {
     let db: PGlite;
     let householdId: string;
     beforeAll(async () => {
@@ -324,20 +325,16 @@ describe("cross-household writes on pantry_items", () => {
     }, 60_000);
     afterAll(async () => db.close());
 
-    // KNOWN ISSUE. This asserts the behaviour we WANT (the insert is refused),
-    // so it fails today and `it.fails` keeps the suite green. The day the
-    // proposed migration is applied this starts passing, `it.fails` then
-    // fails the run, and whoever applies it removes the marker.
-    it.fails("a non-member cannot insert a row into another user's household", async () => {
+    it("a non-member cannot insert a row into another user's household", async () => {
       await expect(injectAsNonMember(db, householdId)).rejects.toMatchObject({ code: "42501" });
     });
   });
 
-  describe("with db/proposed/pantry-household-write-guard.sql applied", () => {
+  describe("the guard, case by case", () => {
     let db: PGlite;
     let householdId: string;
     beforeAll(async () => {
-      db = await freshDatabase(["proposed/pantry-household-write-guard.sql"]);
+      db = await freshDatabase();
       const r = await as(db, ALICE, () =>
         db.query<{ id: string }>(`select * from public.create_household('Alice home')`)
       );
