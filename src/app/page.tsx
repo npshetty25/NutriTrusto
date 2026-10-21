@@ -1,10 +1,12 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import Image from "next/image";
 import {
   getItemDietType, resolveItemDiet, isDietConflict, normalizeDietPreference, dietChipLabel,
   type DietPreference, type ItemDietType,
+  filterByDiet,
+  lockedDietScope,
 } from "@/lib/diet";
 
 import { calculateCurrentDaysLeft, calculateDaysPastEstimate } from "@/lib/item-age";
@@ -194,10 +196,10 @@ export default function Home() {
   const [recipeExcludedCount, setRecipeExcludedCount] = useState(0);
   const [showRecipe, setShowRecipe] = useState(false);
   const [isAddingToShoppingList, setIsAddingToShoppingList] = useState(false);
-  // Defaults to the account's own preference once it loads (see the effect
-  // below), so a vegetarian does not have to re-filter on every visit.
+  // Only reachable by accounts that are NOT locked to a diet (non-veg or
+  // unset), who may narrow a mixed pantry. A veg or eggtarian account is
+  // scoped by `visibleItems` below and never sees this control.
   const [dietFilter, setDietFilter] = useState<"veg" | "egg" | "all">("all");
-  const [dietFilterTouched, setDietFilterTouched] = useState(false);
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
   const [isAnalyzingFood, setIsAnalyzingFood] = useState(false);
   const [scannedResult, setScannedResult] = useState<ScannedResultEntry | null>(null);
@@ -252,12 +254,22 @@ export default function Home() {
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
   const invoiceInputRef = useRef<HTMLInputElement>(null);
+  const userDietPreference = normalizeDietPreference(String(user?.user_metadata?.dietary_preference || "none"));
+  const dietLocked = lockedDietScope(userDietPreference) !== null;
+  // What this account's diet allows it to see — the single source for the
+  // count in the header, the tiles, the list, the nudges and the AI chat.
+  // `items` is everything stored; a vegetarian never sees the eggs in it.
+  // Before this, the header said "5 items" over a list that showed none,
+  // because only the list had been filtered.
+  // Memoised: the expiry-nudge effect depends on it, and a fresh array every
+  // render would restart that effect's timer on every render.
+  const visibleItems = useMemo(() => filterByDiet(userDietPreference, items), [userDietPreference, items]);
   // Three-way, not a veg/all binary. Eggtarian was not representable at
   // all: the old toggle hid every egg item along with the meat.
   const displayedItems =
-    dietFilter === "all"
-      ? items
-      : items.filter((i) => {
+    dietFilter === "all" || dietLocked
+      ? visibleItems
+      : visibleItems.filter((i) => {
           // Same resolver the card uses, so the filter and the mark on the
           // card can never disagree about the same item.
           const t = resolveItemDiet(i.name, i.ingredientsText);
@@ -321,13 +333,11 @@ export default function Home() {
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
   const firstName = String(user?.user_metadata?.full_name || "").trim().split(" ")[0];
   const pantrySummary =
-    items.length === 0
+    visibleItems.length === 0
       ? "your pantry is empty"
       : highRiskItems.length === 0
-        ? `${items.length} ${items.length === 1 ? "item" : "items"}, nothing urgent`
+        ? `${visibleItems.length} ${visibleItems.length === 1 ? "item" : "items"}, nothing urgent`
         : `${highRiskItems.length} ${highRiskItems.length === 1 ? "item needs" : "items need"} eating soon`;
-
-  const userDietPreference = normalizeDietPreference(String(user?.user_metadata?.dietary_preference || "none"));
 
   // Counts only settings that are actually narrowing the list, so the badge
   // on the collapsed Filter button never claims a filter that isn't applied.
@@ -419,14 +429,6 @@ export default function Home() {
   // "day(s)" is a programmer's plural. It appeared in five user-facing
   // strings while the item card next to them printed "1 day" correctly.
   const days = (n: number) => `${n} ${n === 1 ? "day" : "days"}`;
-
-  // Adopt the account's preference the first time it loads. Guarded on
-  // dietFilterTouched so it never overrides a choice the user just made.
-  useEffect(() => {
-    if (dietFilterTouched) return;
-    if (userDietPreference === "veg") setDietFilter("veg");
-    else if (userDietPreference === "eggtarian") setDietFilter("egg");
-  }, [userDietPreference, dietFilterTouched]);
 
   const notificationIconMap = {
     vegetable: Carrot,
@@ -667,7 +669,7 @@ export default function Home() {
   useEffect(() => {
     if (!user || !notificationsEnabled) return;
     const t = setTimeout(() => {
-      const soonToSpoil = items.filter(i => i.daysLeft > 0 && i.daysLeft <= notifyDaysBefore);
+      const soonToSpoil = visibleItems.filter(i => i.daysLeft > 0 && i.daysLeft <= notifyDaysBefore);
       soonToSpoil.forEach((item) => {
         const key = `expiry-notify-${user.id}-${item.id}-${new Date().toDateString()}`;
         if (typeof window !== "undefined" && localStorage.getItem(key)) return;
@@ -694,7 +696,7 @@ export default function Home() {
       });
     }, 4000);
     return () => clearTimeout(t);
-  }, [user, items, notificationsEnabled, notifyDaysBefore]);
+  }, [user, visibleItems, notificationsEnabled, notifyDaysBefore]);
 
   // ─── Delete item ────────────────────────────────────────────────
   // One removal path, two meanings. The outcome used to be *guessed* from
@@ -2077,31 +2079,35 @@ if (nutritionFieldsFilled < 2) {
                 {/* Three options, not two. "Veg only / All items" could not
                     express eggtarian at all — it hid every egg item along
                     with the meat, so an eggtarian user had no view that
-                    matched how they actually eat. Defaults to the
-                    preference on the account. */}
-                <div role="group" aria-label="Filter by diet" className="grid grid-cols-3 gap-2">
-                  {([
-                    { id: "veg", label: "Veg", Icon: Leaf, tone: "bg-safe/20 text-safe-strong" },
-                    { id: "egg", label: "Egg OK", Icon: EggIcon, tone: "bg-warning/20 text-warning-strong" },
-                    { id: "all", label: "All", Icon: UtensilsCrossed, tone: "bg-foreground/10 text-foreground" },
-                  ] as const).map(({ id, label, Icon, tone }) => (
-                    <button
-                      key={id}
-                      onClick={() => { setDietFilter(id); setDietFilterTouched(true); }}
-                      aria-pressed={dietFilter === id}
-                      title={
-                        id === "veg" ? "Show only vegetarian items"
-                        : id === "egg" ? "Show vegetarian items and egg"
-                        : "Show everything in your pantry"
-                      }
-                      className={`h-11 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
-                        dietFilter === id ? tone : "neu-raised-sm text-foreground/70 hover:text-foreground"
-                      }`}
-                    >
-                      <Icon size={14} /> {label}
-                    </button>
-                  ))}
-                </div>
+                    matched how they actually eat. Hidden for veg and
+                    eggtarian accounts: their diet is already a hard scope on
+                    everything shown, so a chip that could widen it back to
+                    "All" would be a way to un-hide the eggs. */}
+                {!dietLocked && (
+                  <div role="group" aria-label="Filter by diet" className="grid grid-cols-3 gap-2">
+                    {([
+                      { id: "veg", label: "Veg", Icon: Leaf, tone: "bg-safe/20 text-safe-strong" },
+                      { id: "egg", label: "Egg OK", Icon: EggIcon, tone: "bg-warning/20 text-warning-strong" },
+                      { id: "all", label: "All", Icon: UtensilsCrossed, tone: "bg-foreground/10 text-foreground" },
+                    ] as const).map(({ id, label, Icon, tone }) => (
+                      <button
+                        key={id}
+                        onClick={() => setDietFilter(id)}
+                        aria-pressed={dietFilter === id}
+                        title={
+                          id === "veg" ? "Show only vegetarian items"
+                          : id === "egg" ? "Show vegetarian items and egg"
+                          : "Show everything in your pantry"
+                        }
+                        className={`h-11 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+                          dietFilter === id ? tone : "neu-raised-sm text-foreground/70 hover:text-foreground"
+                        }`}
+                      >
+                        <Icon size={14} /> {label}
+                      </button>
+                    ))}
+                  </div>
+                )}
 
                 <div className="grid grid-cols-2 gap-2">
                   <div className="flex flex-col gap-1.5">
@@ -2159,11 +2165,11 @@ if (nutritionFieldsFilled < 2) {
               <ScanLine size={24} className="text-foreground/40" />
             </div>
             <h3 className="font-semibold text-foreground mb-2">
-              {items.length > 0 ? "Nothing matches those filters" : "Your pantry is empty"}
+              {visibleItems.length > 0 ? "Nothing matches those filters" : "Your pantry is empty"}
             </h3>
             <p className="text-sm text-foreground/60 max-w-60 leading-relaxed mb-6">
-              {items.length > 0
-                ? "Try widening the diet or risk filter to see the rest of your items."
+              {visibleItems.length > 0
+                ? "Try widening the filters to see the rest of your items."
                 : "Snap a grocery receipt and we will add everything on it, or scan one barcode to start. We will tell you what to eat before it goes off."}
             </p>
             <div className="flex flex-wrap items-center justify-center gap-2">
@@ -2926,7 +2932,7 @@ if (nutritionFieldsFilled < 2) {
 
       {showPantryChat && (
         <PantryChatModal
-          items={items.map((i) => ({ name: i.name, daysLeft: i.daysLeft, risk: i.risk, ingredientsText: i.ingredientsText }))}
+          items={visibleItems.map((i) => ({ name: i.name, daysLeft: i.daysLeft, risk: i.risk, ingredientsText: i.ingredientsText }))}
           dietaryPreference={String(user?.user_metadata?.dietary_preference || "none")}
           onClose={() => setShowPantryChat(false)}
         />
