@@ -903,9 +903,14 @@ export default function Home() {
     // (the recipe card only appears when it does) without being all red.
     const sample = <T,>(pool: T[], n: number) =>
       [...pool].sort(() => Math.random() - 0.5).slice(0, n);
-    const mockPlan = sample(CATALOGUE.slice(0, 6), 3)
-      .concat(sample(CATALOGUE.slice(6, 12), 3))
-      .concat(sample(CATALOGUE.slice(12), 4));
+    // Demo items follow the account's diet too. A vegetarian pressing this
+    // used to be handed chicken and eggs that the rest of the app then hid,
+    // so the button appeared to add fewer items than it said. Filtered per
+    // freshness band, not up front, so each band keeps its intended size.
+    const forDiet = (band: typeof CATALOGUE) => filterByDiet(userDietPreference, band);
+    const mockPlan = sample(forDiet(CATALOGUE.slice(0, 6)), 3)
+      .concat(sample(forDiet(CATALOGUE.slice(6, 12)), 3))
+      .concat(sample(forDiet(CATALOGUE.slice(12)), 4));
 
     const plan: { name: string; daysIntoShelfLife?: number; offsetFromEstimate?: number }[] =
       [...mockPlan, ...ALWAYS];
