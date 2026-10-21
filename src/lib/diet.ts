@@ -184,6 +184,34 @@ export function isDietConflict(userDiet: DietPreference, itemDiet: ItemDietType)
   return itemDiet === "non-veg";
 }
 
+/**
+ * The preference as a hard scope on what the app SHOWS, not just a filter the
+ * user can switch off. A vegetarian account was being shown eggs and chicken
+ * behind a "Veg" chip that one tap turned into "All", and the headline count,
+ * the notifications and the AI chat never looked at the preference at all.
+ *
+ * "veg" and "eggtarian" accounts are locked to that scope; "non-veg" and
+ * "none" see everything (and may still narrow it with the on-screen chips).
+ * `uncertain` stays visible for the reason isDietConflict gives: it carries
+ * its own "Check the label" mark, and hiding it would assert it is meat.
+ */
+export type DietScope = "veg" | "egg";
+
+export function lockedDietScope(userDiet: DietPreference): DietScope | null {
+  if (userDiet === "veg") return "veg";
+  if (userDiet === "eggtarian") return "egg";
+  return null;
+}
+
+/** Items this account's diet allows it to see. Same resolver as the item card. */
+export function filterByDiet<T extends { name: string; ingredientsText?: string | null }>(
+  userDiet: DietPreference,
+  items: readonly T[]
+): T[] {
+  if (lockedDietScope(userDiet) === null) return [...items];
+  return items.filter((i) => !isDietConflict(userDiet, resolveItemDiet(i.name, i.ingredientsText)));
+}
+
 /** Short label for the chip on an item card. */
 export function dietChipLabel(userDiet: DietPreference, itemDiet: ItemDietType): string {
   // Never "Matches Diet": we do not know that it does.

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getItemDietType, resolveItemDiet, hasWord, isDietConflict, dietChipLabel } from "./diet";
+import { getItemDietType, resolveItemDiet, hasWord, isDietConflict, dietChipLabel, filterByDiet, lockedDietScope } from "./diet";
 import { findDietViolations } from "./diet-check";
 
 /**
@@ -174,5 +174,46 @@ describe("resolveItemDiet takes the stricter of name and ingredients", () => {
 
   it("keeps a vegetarian item vegetarian", () => {
     expect(resolveItemDiet("Biscuits", "wheat flour, sugar, palm oil")).toBe("veg");
+  });
+});
+
+describe("filterByDiet — the account's diet is a hard scope", () => {
+  const pantry = [
+    { name: "Palak (Spinach)" },
+    { name: "Eggs" },
+    { name: "Chicken Breast" },
+    { name: "Paneer" },
+    { name: "Eggplant" },
+    { name: "Prawns" },
+  ];
+  const names = (xs: { name: string }[]) => xs.map((x) => x.name);
+
+  it("shows a vegetarian nothing with egg or meat in it", () => {
+    expect(names(filterByDiet("veg", pantry))).toEqual(["Palak (Spinach)", "Paneer", "Eggplant"]);
+  });
+
+  it("shows an eggtarian egg but no meat or fish", () => {
+    expect(names(filterByDiet("eggtarian", pantry))).toEqual(["Palak (Spinach)", "Eggs", "Paneer", "Eggplant"]);
+  });
+
+  it("shows non-veg and unset accounts everything", () => {
+    expect(filterByDiet("non-veg", pantry)).toHaveLength(pantry.length);
+    expect(filterByDiet("none", pantry)).toHaveLength(pantry.length);
+  });
+
+  it("reads the ingredient text, not just the name", () => {
+    const sneaky = [{ name: "Protein Bar", ingredientsText: "whey, gelatin, prawns" }];
+    expect(filterByDiet("veg", sneaky)).toEqual([]);
+  });
+
+  it("keeps an item it cannot classify, because hiding it would claim it is meat", () => {
+    expect(names(filterByDiet("veg", [{ name: "Chicken Masala" }]))).toEqual(["Chicken Masala"]);
+  });
+
+  it("only veg and eggtarian accounts are locked", () => {
+    expect(lockedDietScope("veg")).toBe("veg");
+    expect(lockedDietScope("eggtarian")).toBe("egg");
+    expect(lockedDietScope("non-veg")).toBeNull();
+    expect(lockedDietScope("none")).toBeNull();
   });
 });
