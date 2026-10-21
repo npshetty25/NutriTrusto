@@ -68,6 +68,35 @@ describe("POST /api/pantry-chat", () => {
     expect(prompt).toContain("Dietary preference: vegetarian.");
   });
 
+  it("never names egg or meat to a vegetarian, whatever the request body carries", async () => {
+    await ask({
+      question: "What's expiring soon?",
+      dietaryPreference: "veg",
+      items: [
+        { name: "Paneer", daysLeft: 2, risk: "high" },
+        { name: "Chicken Breast", daysLeft: 0, risk: "high" },
+        { name: "Eggs", daysLeft: 0, risk: "high" },
+      ],
+    });
+    const prompt = promptSent();
+    expect(prompt).toContain("- Paneer:");
+    expect(prompt).not.toContain("Chicken");
+    expect(prompt).not.toContain("Eggs");
+  });
+
+  it("lets an eggtarian hear about eggs but not chicken", async () => {
+    await ask({
+      question: "What's expiring soon?",
+      dietaryPreference: "eggtarian",
+      items: [
+        { name: "Chicken Breast", daysLeft: 0, risk: "high" },
+        { name: "Eggs", daysLeft: 0, risk: "high" },
+      ],
+    });
+    expect(promptSent()).toContain("- Eggs:");
+    expect(promptSent()).not.toContain("Chicken");
+  });
+
   it("tells the model the pantry is empty rather than sending a blank list", async () => {
     await ask({ question: "What can I make?", items: [] });
     expect(promptSent()).toContain("The pantry is currently empty.");
