@@ -109,6 +109,7 @@ import type { FoodAnalysis } from "@/lib/food-analysis";
 import { isAdminEmail } from "@/lib/admin";
 import { DEFAULT_NOTIFY_DAYS_BEFORE } from "@/components/notification-preferences-modal";
 import { OnboardingTour, hasSeenOnboarding, markOnboardingSeen } from "@/components/onboarding-tour";
+import { DietPromptModal } from "@/components/diet-prompt-modal";
 
 interface Item {
   id: string;
@@ -619,11 +620,15 @@ export default function Home() {
   // localStorage, which is this component's only source of truth for "has
   // this account seen it", so re-checking it every render would be pointless
   // work that could never produce a different answer within one session.
+  // Held back until the diet question is answered: a Google sign-in has no
+  // diet yet, and two overlays at once is a worse first minute than two in
+  // sequence. Answering the prompt flips `needsDiet`, which re-runs this.
+  const needsDiet = !!user && userDietPreference === "none";
   useEffect(() => {
-    if (!user) return;
+    if (!user || needsDiet) return;
     if (!hasSeenOnboarding(user.id)) setShowOnboarding(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id]);
+  }, [user?.id, needsDiet]);
 
   const finishOnboarding = () => {
     setShowOnboarding(false);
@@ -2450,6 +2455,8 @@ if (nutritionFieldsFilled < 2) {
           </button>
         </div>
       </nav>
+
+      {needsDiet && <DietPromptModal />}
 
       {showOnboarding && <OnboardingTour onFinish={finishOnboarding} />}
 
