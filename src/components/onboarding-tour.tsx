@@ -23,8 +23,8 @@ export const TOUR_STEPS: TourStep[] = [
     target: "receipt",
   },
   {
-    title: "Scan one product",
-    body: "Bought just one thing? Scan its barcode to add it by itself — or add it by hand.",
+    title: "Scan a barcode",
+    body: "Scan any packaged product to see its nutrition and whether it fits your diet — then add it to your pantry in one tap.",
     target: "barcode",
   },
   {
