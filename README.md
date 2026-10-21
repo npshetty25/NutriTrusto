@@ -1,4 +1,4 @@
-# Nutri-Trust — Smart Pantry
+  # Nutri-Trust — Smart Pantry
 
 [![CI](https://github.com/npshetty25/NutriTrusto/actions/workflows/ci.yml/badge.svg)](https://github.com/npshetty25/NutriTrusto/actions/workflows/ci.yml)
 
