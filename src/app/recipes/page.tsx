@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/auth-context";
 import { ProfileDropdown } from "@/components/profile-dropdown";
 import { ArrowLeft, Search, Loader2, ExternalLink, ChevronRight, Leaf, Egg, UtensilsCrossed, CircleAlert } from "lucide-react";
-import { getItemDietType, normalizeDietPreference, type ItemDietType } from "@/lib/diet";
+import { getItemDietType, lockedDietScope, normalizeDietPreference, type ItemDietType } from "@/lib/diet";
 import { VegMark } from "@/components/veg-mark";
 import { motion } from "framer-motion";
 
@@ -93,8 +93,13 @@ export default function RecipesPage() {
   // India-first product met beef first. Beef in particular is not a mild
   // mismatch here: it is restricted by law in much of the country.
   const userDiet = normalizeDietPreference(String(user?.user_metadata?.dietary_preference || "none"));
-  const [dietFilter, setDietFilter] = useState<"veg" | "egg" | "all">("all");
-  const [dietFilterTouched, setDietFilterTouched] = useState(false);
+  // A veg or eggtarian account is locked to its diet: no chip can widen it
+  // back to "All". Everyone else picks. Derived rather than set in an effect,
+  // which also removes the first-render window where `user` was still null and
+  // a vegetarian briefly met Beef Mandi.
+  const lockedScope = lockedDietScope(userDiet);
+  const [pickedFilter, setPickedFilter] = useState<"veg" | "egg" | "all">("all");
+  const dietFilter = lockedScope ?? pickedFilter;
   // idMeal -> diet resolved from the real ingredient list. A dish title is a
   // marketing name, not a declaration: it is the only thing filter.php
   // returns, so on a strict filter the survivors get checked properly.
@@ -144,15 +149,6 @@ export default function RecipesPage() {
     return () => { cancelled = true; };
   }, [meals, dietFilter, verified]);
 
-  // Not a lazy useState initialiser: `user` is still null on first render
-  // while auth resolves, so the initialiser would lock in "all" and never
-  // reconsider. Verified — a vegetarian account was still being shown Beef
-  // Mandi until this ran as an effect instead.
-  useEffect(() => {
-    if (dietFilterTouched) return;
-    if (userDiet === "veg") setDietFilter("veg");
-    else if (userDiet === "eggtarian") setDietFilter("egg");
-  }, [userDiet, dietFilterTouched]);
   const [mealDetail, setMealDetail] = useState<MealDetail | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
 
@@ -364,25 +360,28 @@ export default function RecipesPage() {
             </div>
 
             {/* A filter that hides results has to be visible, or the list
-                just looks short. Defaults to the account's preference. */}
-            <div role="group" aria-label="Filter recipes by diet" className="grid grid-cols-3 gap-2 mb-5">
-              {([
-                { id: "veg", label: "Veg", Icon: Leaf, tone: "bg-safe/20 text-safe-strong" },
-                { id: "egg", label: "Egg OK", Icon: Egg, tone: "bg-warning/20 text-warning-strong" },
-                { id: "all", label: "All", Icon: UtensilsCrossed, tone: "bg-foreground/10 text-foreground" },
-              ] as const).map(({ id, label, Icon, tone }) => (
-                <button
-                  key={id}
-                  onClick={() => { setDietFilter(id); setDietFilterTouched(true); }}
-                  aria-pressed={dietFilter === id}
-                  className={`h-10 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
-                    dietFilter === id ? tone : "neu-raised-sm text-foreground/70 hover:text-foreground"
-                  }`}
-                >
-                  <Icon size={14} /> {label}
-                </button>
-              ))}
-            </div>
+                just looks short. Only shown to accounts that are not locked
+                to a diet — for the rest the diet is already the filter. */}
+            {!lockedScope && (
+              <div role="group" aria-label="Filter recipes by diet" className="grid grid-cols-3 gap-2 mb-5">
+                {([
+                  { id: "veg", label: "Veg", Icon: Leaf, tone: "bg-safe/20 text-safe-strong" },
+                  { id: "egg", label: "Egg OK", Icon: Egg, tone: "bg-warning/20 text-warning-strong" },
+                  { id: "all", label: "All", Icon: UtensilsCrossed, tone: "bg-foreground/10 text-foreground" },
+                ] as const).map(({ id, label, Icon, tone }) => (
+                  <button
+                    key={id}
+                    onClick={() => setPickedFilter(id)}
+                    aria-pressed={dietFilter === id}
+                    className={`h-10 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+                      dietFilter === id ? tone : "neu-raised-sm text-foreground/70 hover:text-foreground"
+                    }`}
+                  >
+                    <Icon size={14} /> {label}
+                  </button>
+                ))}
+              </div>
+            )}
 
             {loading ? (
               <div className="flex flex-col items-center justify-center gap-3 py-20 text-foreground/40">
@@ -410,8 +409,9 @@ export default function RecipesPage() {
                 </div>
                 <p className="text-sm font-semibold">Nothing here matches your diet</p>
                 <p className="text-xs text-foreground/60 mt-1 leading-relaxed">
-                  All {meals.length} {selectedCountry} dishes in this catalogue contain meat or fish.
-                  Switch to All above to see them anyway.
+                  {lockedScope
+                    ? `None of the ${meals.length} ${selectedCountry} dishes in this catalogue fit your diet. Try another cuisine.`
+                    : `All ${meals.length} ${selectedCountry} dishes in this catalogue contain meat or fish. Switch to All above to see them anyway.`}
                 </p>
               </div>
             ) : (
