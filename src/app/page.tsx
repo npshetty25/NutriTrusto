@@ -505,27 +505,47 @@ export default function Home() {
   const loadNotifications = async (reset = false) => {
     if (!user || notificationsLoading) return;
 
-    const targetPage = reset ? 0 : notificationPage;
-    const from = targetPage * NOTIFICATIONS_PAGE_SIZE;
-    const to = from + NOTIFICATIONS_PAGE_SIZE - 1;
-
     setNotificationsLoading(true);
-    const { data, error } = await supabase
-      .from("pantry_items")
-      .select("id, name, days_left, purchase_date, created_at")
-      .order("created_at", { ascending: false })
-      .range(from, to);
+    // ingredients_text only once the migration that adds it is known to have
+    // run — PostgREST rejects a select naming an unknown column outright.
+    const columns = ingredientsSchemaReady
+      ? "id, name, days_left, purchase_date, created_at, ingredients_text"
+      : "id, name, days_left, purchase_date, created_at";
 
-    if (error) {
-      setInlineError("Could not fetch notifications. Please refresh and try again.");
-      setNotificationsLoading(false);
-      return;
+    // Pages are cut from the stored rows, but a vegetarian's notifications
+    // must not mention the eggs in them. Filtering after the cut can leave a
+    // page empty (so nothing to scroll and no way to ask for the next one),
+    // so keep reading raw pages until a page's worth survives the diet.
+    let rawPage = reset ? 0 : notificationPage;
+    let hasMore = true;
+    const collected: ReturnType<typeof buildNotificationFromRow>[] = [];
+    for (let reads = 0; reads < 5 && hasMore && collected.length < NOTIFICATIONS_PAGE_SIZE; reads++) {
+      const from = rawPage * NOTIFICATIONS_PAGE_SIZE;
+      const { data, error } = await supabase
+        .from("pantry_items")
+        .select(columns)
+        .order("created_at", { ascending: false })
+        .range(from, from + NOTIFICATIONS_PAGE_SIZE - 1);
+
+      if (error) {
+        setInlineError("Could not fetch notifications. Please refresh and try again.");
+        setNotificationsLoading(false);
+        return;
+      }
+
+      const rows = (data || []) as unknown as (Parameters<typeof buildNotificationFromRow>[0] & { ingredients_text?: string | null })[];
+      hasMore = rows.length === NOTIFICATIONS_PAGE_SIZE;
+      rawPage += 1;
+      const allowed = filterByDiet(
+        userDietPreference,
+        rows.map((r) => ({ ...r, name: r.name ?? "", ingredientsText: r.ingredients_text ?? null }))
+      );
+      collected.push(...allowed.map(buildNotificationFromRow));
     }
 
-    const mapped = (data || []).map(buildNotificationFromRow);
-    setNotifications(prev => (reset ? mapped : [...prev, ...mapped]));
-    setHasMoreNotifications((data || []).length === NOTIFICATIONS_PAGE_SIZE);
-    setNotificationPage(reset ? 1 : targetPage + 1);
+    setNotifications(prev => (reset ? collected : [...prev, ...collected]));
+    setHasMoreNotifications(hasMore);
+    setNotificationPage(rawPage);
     setNotificationsLoading(false);
   };
 
