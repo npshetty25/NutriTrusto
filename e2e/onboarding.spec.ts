@@ -40,7 +40,7 @@ test.describe("first-time walkthrough", () => {
     await expect(page.getByRole("heading", { name: "Scan a receipt" })).toBeVisible();
 
     await page.getByRole("button", { name: /Next/ }).click();
-    await expect(page.getByRole("heading", { name: "Scan one product" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Scan a barcode" })).toBeVisible();
 
     await page.getByRole("button", { name: /Next/ }).click();
     await expect(page.getByRole("heading", { name: "Ask your pantry anything" })).toBeVisible();

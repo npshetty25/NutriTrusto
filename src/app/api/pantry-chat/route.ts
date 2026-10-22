@@ -3,6 +3,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { createRequestContext } from "@/lib/server-logger";
 import { getRequestUser, unauthorized } from "@/lib/api-auth";
 import { checkRateLimit, rateLimited } from "@/lib/rate-limit";
+import { filterByDiet, normalizeDietPreference } from "@/lib/diet";
 
 const apiKey = process.env.GEMINI_API_KEY;
 const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null;
@@ -44,8 +45,18 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: "GEMINI_API_KEY is not configured" }, { status: 500 });
     }
 
-    const pantryList = Array.isArray(items) && items.length > 0
-      ? items
+    // The client already sends only what the account's diet allows, but the
+    // client is not the trust boundary: a vegetarian's chat must not be able
+    // to name the eggs in their pantry whatever the request body carries.
+    const allowedItems = Array.isArray(items)
+      ? filterByDiet(
+          normalizeDietPreference(dietaryPreference),
+          items.map((i) => ({ ...i, name: String(i?.name || "Unknown item") }))
+        )
+      : [];
+
+    const pantryList = allowedItems.length > 0
+      ? allowedItems
           .map((item) => {
             const name = String(item?.name || "Unknown item");
             const daysLeft = Number.isFinite(item?.daysLeft) ? item?.daysLeft : "?";
@@ -56,7 +67,7 @@ export async function POST(req: Request) {
           .join("\n")
       : "The pantry is currently empty.";
 
-    log.info("Payload parsed", { itemCount: Array.isArray(items) ? items.length : 0, questionLength: trimmedQuestion.length });
+    log.info("Payload parsed", { itemCount: allowedItems.length, questionLength: trimmedQuestion.length });
 
     const prompt = `You are a helpful, concise kitchen assistant inside a smart pantry app called Nutri-Trust.
 

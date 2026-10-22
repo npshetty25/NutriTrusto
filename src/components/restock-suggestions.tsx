@@ -5,6 +5,7 @@ import { RefreshCw } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/auth-context";
 import { matchesTerm } from "@/lib/text-match";
+import { filterByDiet, normalizeDietPreference } from "@/lib/diet";
 
 interface RestockSuggestionsProps {
   currentItemNames: string[];
@@ -87,7 +88,13 @@ export function RestockSuggestions({ currentItemNames }: RestockSuggestionsProps
       }
 
       results.sort((a, b) => (b.daysSinceLastScan - b.avgIntervalDays) - (a.daysSinceLastScan - a.avgIntervalDays));
-      setSuggestions(results.slice(0, 3));
+      // Scan history is not diet-scoped: a vegetarian who scanned eggs twice
+      // last month (or before switching diet) would be told to restock them.
+      const dietAllowed = filterByDiet(
+        normalizeDietPreference(String(user.user_metadata?.dietary_preference || "none")),
+        results
+      );
+      setSuggestions(dietAllowed.slice(0, 3));
     })();
 
     return () => { cancelled = true; };

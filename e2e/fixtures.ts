@@ -4,6 +4,21 @@ import { FakeBackend, TEST_USER } from "./support/fake-backend";
 /** Must match playwright.config.ts's NEXT_PUBLIC_ADMIN_EMAILS for this to be admin. */
 export const ADMIN_TEST_EMAIL = "admin@example.test";
 
+/**
+ * The signed-in account's stored diet, for specs that care. `undefined` keeps
+ * the default account (vegetarian); a string sets it (`test.use({ diet: "non-veg" })`);
+ * `""` leaves the account with no diet at all, as a fresh Google sign-in is.
+ */
+type Options = { diet: string | undefined };
+
+function applyDiet(backend: FakeBackend, diet: string | undefined) {
+  if (diet === undefined) return;
+  const metadata = { ...backend.user.user_metadata };
+  if (diet === "") delete metadata.dietary_preference;
+  else metadata.dietary_preference = diet;
+  backend.user = { ...backend.user, user_metadata: metadata };
+}
+
 type Fixtures = {
   /** A fake backend installed on a signed-out context. */
   anonymous: FakeBackend;
@@ -18,15 +33,17 @@ type Fixtures = {
   freshBackend: FakeBackend;
 };
 
-export const test = base.extend<Fixtures>({
+export const test = base.extend<Fixtures & Options>({
+  diet: [undefined, { option: true }],
   anonymous: async ({ context, page }, provide) => {
     const backend = new FakeBackend();
     await backend.install(context);
     await backend.quietRealtime(page);
     await provide(backend);
   },
-  backend: async ({ context, page }, provide) => {
+  backend: async ({ context, page, diet }, provide) => {
     const backend = new FakeBackend();
+    applyDiet(backend, diet);
     await backend.install(context, { signedIn: true });
     await backend.quietRealtime(page);
     await provide(backend);
@@ -40,8 +57,9 @@ export const test = base.extend<Fixtures>({
     await backend.quietRealtime(page);
     await provide(backend);
   },
-  freshBackend: async ({ context, page }, provide) => {
+  freshBackend: async ({ context, page, diet }, provide) => {
     const backend = new FakeBackend();
+    applyDiet(backend, diet);
     await backend.install(context, { signedIn: true, freshOnboarding: true });
     await backend.quietRealtime(page);
     await provide(backend);
