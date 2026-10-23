@@ -59,6 +59,8 @@ interface PantryCardProps {
   ifStoredDifferently?: IfStoredDifferently;
   /** Where this item is actually assumed to be kept, to highlight that column. */
   currentStorage?: "fridge" | "counter" | "freezer";
+  /** Short facts the person told us: "In the fridge", "Opened 3 Oct", "Date from pack". */
+  trackingTags?: string[];
   // Rendered in the card's own footer. These used to be free-floating
   // buttons absolutely positioned over the card by the dashboard, which
   // meant they overlapped whatever the card happened to render last.
@@ -88,7 +90,7 @@ const formatDayMonth = (iso: string) => {
   return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short" });
 };
 
-export function PantryCard({ name, daysLeft, risk, purchaseDate, healthScore, dietMatch = true, dietLabel, itemDiet = "veg", dietUnverified = false, riskLabel, shelfLifeCitation, shelfLifeConfidence, storageDisclaimer, ifStoredDifferently, currentStorage, detectedAllergens, healthierAlternative, actions }: PantryCardProps) {
+export function PantryCard({ name, daysLeft, risk, purchaseDate, healthScore, dietMatch = true, dietLabel, itemDiet = "veg", dietUnverified = false, riskLabel, shelfLifeCitation, shelfLifeConfidence, storageDisclaimer, ifStoredDifferently, currentStorage, trackingTags, detectedAllergens, healthierAlternative, actions }: PantryCardProps) {
   const score = healthScore != null ? Number.parseFloat(healthScore) : NaN;
   const hasScore = Number.isFinite(score);
   // Same thresholds the nutrition trend chart uses, so one score reads the
@@ -203,6 +205,16 @@ export function PantryCard({ name, daysLeft, risk, purchaseDate, healthScore, di
             <div className={`h-full rounded-full transition-all duration-500 ${freshnessWidthClass} ${config.bar}`} />
           </div>
         </div>
+
+        {trackingTags && trackingTags.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {trackingTags.map((tag) => (
+              <span key={tag} className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-foreground/8 text-foreground/70">
+                {tag}
+              </span>
+            ))}
+          </div>
+        )}
 
         {/* Provenance for the number above it. "Sourced" and "Rough guess"
             must not look alike — the same reason the allergen badge says
