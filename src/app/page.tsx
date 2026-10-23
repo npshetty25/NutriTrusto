@@ -3,13 +3,14 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import Image from "next/image";
 import {
-  getItemDietType, resolveItemDiet, isDietConflict, normalizeDietPreference, dietChipLabel,
+  getItemDietType, resolveItemDiet, isDietConflict, normalizeDietPreference, dietChipLabel, DIET_PREFERENCE_LABEL,
   type DietPreference, type ItemDietType,
   filterByDiet,
   lockedDietScope,
 } from "@/lib/diet";
 
 import { calculateCurrentDaysLeft, calculateDaysPastEstimate } from "@/lib/item-age";
+import { parseGs1, gs1UseByDate } from "@/lib/gs1";
 
 // One definition, in lib/risk-bands.ts. This was a byte-identical copy of
 // the rule in api/extract/route.ts — the same duplication that let the
@@ -96,9 +97,21 @@ import ExpiryDateScanner from "@/components/expiry-date-scanner";
 import PantryChatModal from "@/components/pantry-chat-modal";
 import { RestockSuggestions } from "@/components/restock-suggestions";
 import { RecipeModal, type GeneratedRecipe } from "@/components/recipe-modal";
+import { AddItemModal, type NewItem } from "@/components/add-item-modal";
+import {
+  STORAGE_OPTIONS,
+  OPENED_DAYS_OPTIONS,
+  daysLeftAfterMove,
+  daysLeftAfterOpening,
+  daysUntilDate,
+  defaultStorageFor,
+  storedDaysLeftFor,
+  type ExpirySource,
+} from "@/lib/item-tracking";
+import type { StorageLocation } from "@/lib/temperature";
 import {
   Camera, BrainCircuit, Loader2, TrendingUp, ScanLine,
-  Clock, X, Trash2, Info, Activity, Zap, AlertTriangle, CheckCircle2, Search, CircleAlert, Bell, Carrot, Apple, Milk, Drumstick, Wheat, CupSoda, Croissant, Snowflake, Candy, Package, ChevronLeft, ChevronRight, CalendarClock, Pencil, Sparkles, RefreshCw, SlidersHorizontal, Leaf, UtensilsCrossed, Check, Egg as EggIcon, Images, FileText
+  Clock, X, Trash2, Info, Activity, Zap, AlertTriangle, CheckCircle2, Search, CircleAlert, Bell, Carrot, Apple, Milk, Drumstick, Wheat, CupSoda, Croissant, Snowflake, Candy, Package, ChevronLeft, ChevronRight, CalendarClock, Pencil, Sparkles, Plus, RefreshCw, SlidersHorizontal, Leaf, UtensilsCrossed, Check, Egg as EggIcon, Images, FileText
 } from "lucide-react";
 import ShoppingListModal from "@/components/shopping-list-modal";
 import { CountUp } from "@/components/count-up";
@@ -127,6 +140,60 @@ interface Item {
   // allergen content must be shown as unknown, not assumed safe.
   ingredientsText?: string | null;
   healthScore?: string | null;
+  // What the person told us — see db/supabase-schema-item-tracking.sql.
+  // All undefined until that migration has run.
+  storage?: StorageLocation | null;
+  openedAt?: string | null;
+  expirySource?: ExpirySource;
+}
+
+type PantryRow = {
+  id: string;
+  name: string;
+  days_left: number;
+  purchase_date: string;
+  ingredients_text?: string | null;
+  health_score?: string | null;
+  storage?: string | null;
+  opened_at?: string | null;
+  expiry_source?: string | null;
+};
+
+const asStorage = (v: unknown): StorageLocation | null =>
+  v === "fridge" || v === "counter" || v === "freezer" ? v : null;
+const asExpirySource = (v: unknown): ExpirySource => (v === "printed" || v === "user" ? v : null);
+
+/** One mapping from a stored row to what the page shows, used by every fetch. */
+function rowToItem(row: PantryRow): Item {
+  const daysLeft = calculateCurrentDaysLeft(row.days_left, row.purchase_date);
+  return {
+    id: row.id,
+    name: row.name,
+    daysLeft,
+    daysPastEstimate: calculateDaysPastEstimate(row.days_left, row.purchase_date),
+    risk: deriveRisk(daysLeft, row.days_left, row.name),
+    purchaseDate: row.purchase_date,
+    ingredientsText: row.ingredients_text ?? null,
+    healthScore: row.health_score ?? null,
+    storage: asStorage(row.storage),
+    openedAt: row.opened_at ?? null,
+    expirySource: asExpirySource(row.expiry_source),
+  };
+}
+
+const STORAGE_TAG: Record<StorageLocation, string> = { fridge: "In the fridge", counter: "On the shelf", freezer: "In the freezer" };
+
+/** The small facts on a card that came from the person, not the estimate. */
+function trackingTagsFor(item: Item): string[] {
+  const tags: string[] = [];
+  if (item.expirySource === "printed") tags.push("Date from pack");
+  if (item.expirySource === "user") tags.push("Date set by you");
+  if (item.storage) tags.push(STORAGE_TAG[item.storage]);
+  if (item.openedAt) {
+    const d = new Date(item.openedAt);
+    tags.push(Number.isNaN(d.getTime()) ? "Opened" : `Opened ${d.toLocaleDateString(undefined, { day: "numeric", month: "short" })}`);
+  }
+  return tags;
 }
 
 interface NotificationEntry {
@@ -146,6 +213,24 @@ interface ScannedResultEntry {
   // never the "None provided..." placeholder used when no product data
   // was found. See PLACEHOLDER_INGREDIENTS_TEXT below.
   ingredients?: string | null;
+  // Open Food Facts' category list for the product, when it has one. Lets the
+  // shelf-life estimate use the product database when the name alone matches
+  // nothing in our table (tier 2 in lib/shelf-life.ts).
+  categories?: string | null;
+}
+
+/** A printed date (from a GS1 barcode) as the scan result's expiry entry. */
+function expiryFromPrintedDate(date: Date | null): ScannedExpiryEntry | null {
+  if (!date) return null;
+  const today = new Date();
+  const todayUtc = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
+  const daysLeft = Math.max(0, Math.round((date.getTime() - todayUtc) / (24 * 60 * 60 * 1000)));
+  return {
+    daysLeft,
+    expiryDate: date.toISOString().slice(0, 10),
+    source: "printed_expiry",
+    confidence: "high",
+  };
 }
 
 interface ScannedExpiryEntry {
@@ -163,7 +248,7 @@ const INVENTORY_PAGE_SIZE = 6;
 // No fallback items — real users start with an empty pantry.
 
 export default function Home() {
-  const { user, loading: authLoading, household, householdSchemaReady, ingredientsSchemaReady, healthScoreSchemaReady } = useAuth();
+  const { user, loading: authLoading, household, householdSchemaReady, ingredientsSchemaReady, healthScoreSchemaReady, trackingSchemaReady } = useAuth();
   // UI-only gate, not a security one — see lib/admin.ts. Hides "Add Demo
   // Data" from everyone but the project owner, so a real user never sees a
   // button that fills their pantry with sample groceries.
@@ -184,6 +269,12 @@ export default function Home() {
   // the migration adding it hasn't been run yet.
   const healthScoreField = (score: string | null | undefined): { health_score?: string | null } =>
     healthScoreSchemaReady ? { health_score: score ?? null } : {};
+
+  // And for storage / opened_at / expiry_source.
+  const trackingFields = (t: { storage?: StorageLocation | null; openedAt?: string | null; expirySource?: ExpirySource }) =>
+    trackingSchemaReady
+      ? { storage: t.storage ?? null, opened_at: t.openedAt ?? null, expiry_source: t.expirySource ?? null }
+      : {};
   const router = useRouter();
 
   const [items, setItems] = useState<Item[]>([]);
@@ -215,6 +306,10 @@ export default function Home() {
     source: "model" | "rules";
   } | null>(null);
   const [showExpiryScanner, setShowExpiryScanner] = useState(false);
+  // The printed date read out of a GS1 barcode, held across the lookup (and
+  // the "type the name" fallback when the product database has no entry), so
+  // it lands on whichever scan result eventually appears.
+  const pendingPrintedDate = useRef<Date | null>(null);
   const [barcodeRetryPrompt, setBarcodeRetryPrompt] = useState<{ code: string } | null>(null);
   const [showBarcodeRetryOptions, setShowBarcodeRetryOptions] = useState(false);
   const [manualRetryBarcode, setManualRetryBarcode] = useState("");
@@ -245,6 +340,11 @@ export default function Home() {
   const [editingItem, setEditingItem] = useState<Item | null>(null);
   const [editName, setEditName] = useState("");
   const [editDaysLeft, setEditDaysLeft] = useState("");
+  const [editDate, setEditDate] = useState("");
+  const [editStorage, setEditStorage] = useState<StorageLocation | null>(null);
+  const [editOpened, setEditOpened] = useState(false);
+  const [editOpenedDays, setEditOpenedDays] = useState<number | null>(null);
+  const [showAddItem, setShowAddItem] = useState(false);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [showShoppingList, setShowShoppingList] = useState(false);
   const [showPantryChat, setShowPantryChat] = useState(false);
@@ -374,21 +474,7 @@ export default function Home() {
 
       if (error || !data) return;
 
-      setItems(
-        data.map((row) => {
-          const daysLeft = calculateCurrentDaysLeft(row.days_left, row.purchase_date);
-          return {
-            id: row.id,
-            name: row.name,
-            daysLeft,
-            daysPastEstimate: calculateDaysPastEstimate(row.days_left, row.purchase_date),
-            risk: deriveRisk(daysLeft, row.days_left, row.name),
-            purchaseDate: row.purchase_date,
-            ingredientsText: row.ingredients_text ?? null,
-            healthScore: row.health_score ?? null,
-          };
-        })
-      );
+      setItems(data.map((row) => rowToItem(row as PantryRow)));
     };
 
     const now = new Date();
@@ -650,16 +736,7 @@ export default function Home() {
         console.warn("Supabase fetch error:", error.message);
         setItems([]);
       } else if (data && data.length > 0) {
-        setItems(data.map(row => ({
-          id: row.id,
-          name: row.name,
-          daysLeft: calculateCurrentDaysLeft(row.days_left, row.purchase_date),
-          daysPastEstimate: calculateDaysPastEstimate(row.days_left, row.purchase_date),
-          risk: deriveRisk(calculateCurrentDaysLeft(row.days_left, row.purchase_date), row.days_left, row.name),
-          purchaseDate: row.purchase_date,
-          ingredientsText: row.ingredients_text ?? null,
-          healthScore: row.health_score ?? null,
-        })));
+        setItems(data.map((row) => rowToItem(row as PantryRow)));
       } else {
         setItems([]);
       }
@@ -786,14 +863,22 @@ export default function Home() {
     setEditingItem(item);
     setEditName(item.name);
     setEditDaysLeft(String(item.daysLeft));
+    setEditDate("");
+    setEditStorage(item.storage ?? null);
+    setEditOpened(!!item.openedAt);
+    setEditOpenedDays(null);
   };
 
   const closeEditItem = () => {
     setEditingItem(null);
     setEditName("");
     setEditDaysLeft("");
+    setEditDate("");
   };
 
+  // The person's information wins, in this order: a date or day count they
+  // typed replaces our estimate; a storage move rescales only an estimate
+  // (lib/item-tracking.ts); opening only ever shortens what is left.
   const saveEditItem = async () => {
     if (!editingItem) return;
     const trimmedName = editName.trim();
@@ -801,23 +886,63 @@ export default function Home() {
       setInlineError("Item name can't be empty.");
       return;
     }
-    const parsedDaysLeft = Math.round(Number(editDaysLeft));
-    if (!Number.isFinite(parsedDaysLeft) || parsedDaysLeft < 0) {
-      setInlineError("Enter a valid number of days remaining.");
-      return;
+
+    let remaining = editingItem.daysLeft;
+    let source: ExpirySource = editingItem.expirySource ?? null;
+    if (editDate) {
+      const fromDate = daysUntilDate(editDate);
+      if (fromDate === null) {
+        setInlineError("That date doesn't look right.");
+        return;
+      }
+      remaining = fromDate;
+      source = "user";
+    } else if (editDaysLeft.trim() !== String(editingItem.daysLeft)) {
+      const parsedDaysLeft = Math.round(Number(editDaysLeft));
+      if (!editDaysLeft.trim() || !Number.isFinite(parsedDaysLeft) || parsedDaysLeft < 0) {
+        setInlineError("Enter a valid number of days remaining.");
+        return;
+      }
+      remaining = Math.min(3650, parsedDaysLeft);
+      source = "user";
     }
-    const clampedDaysLeft = Math.max(0, Math.min(3650, parsedDaysLeft));
+
+    let note = "";
+    const fromStorage = editingItem.storage ?? defaultStorageFor(editingItem.name);
+    if (trackingSchemaReady && editStorage && editStorage !== fromStorage) {
+      const moved = daysLeftAfterMove(trimmedName, remaining, fromStorage, editStorage, source);
+      remaining = moved.daysLeft;
+      if (!moved.changed) note = moved.reason;
+    }
+
+    const newlyOpened = !!trackingSchemaReady && editOpened && !editingItem.openedAt;
+    if (newlyOpened) {
+      if (!editOpenedDays) {
+        setInlineError("Pick how soon it should be used once opened.");
+        return;
+      }
+      remaining = daysLeftAfterOpening(remaining, editOpenedDays);
+    }
+    const openedAt = editOpened ? (editingItem.openedAt ?? new Date().toISOString()) : null;
+    const storage = editStorage ?? editingItem.storage ?? null;
+
+    // Keep the real purchase date: days_left is stored relative to it. This
+    // used to reset purchase_date to today on every edit, which erased when
+    // the item was actually bought.
+    const storedDays = storedDaysLeftFor(remaining, editingItem.purchaseDate);
+    const risk = deriveRisk(remaining, storedDays, trimmedName);
 
     setIsSavingEdit(true);
     setInlineError(null);
 
-    // Editing resets the aging clock: purchase_date becomes today, and
-    // days_left becomes exactly what the user typed as "days remaining".
-    const newPurchaseDate = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-
     const { error } = await supabase
       .from("pantry_items")
-      .update({ name: trimmedName, days_left: clampedDaysLeft, purchase_date: newPurchaseDate, risk: deriveRisk(clampedDaysLeft, clampedDaysLeft, trimmedName) })
+      .update({
+        name: trimmedName,
+        days_left: storedDays,
+        risk,
+        ...trackingFields({ storage, openedAt, expirySource: source }),
+      })
       .eq("id", editingItem.id);
 
     setIsSavingEdit(false);
@@ -828,10 +953,40 @@ export default function Home() {
     }
 
     setItems(prev => prev.map(i => i.id === editingItem.id
-      ? { ...i, name: trimmedName, daysLeft: clampedDaysLeft, risk: deriveRisk(clampedDaysLeft, clampedDaysLeft, trimmedName), purchaseDate: newPurchaseDate }
+      ? {
+          ...i,
+          name: trimmedName,
+          daysLeft: remaining,
+          daysPastEstimate: calculateDaysPastEstimate(storedDays, editingItem.purchaseDate),
+          risk,
+          ...(trackingSchemaReady ? { storage, openedAt, expirySource: source } : {}),
+        }
       : i));
-    toast("Item updated");
+    toast("Item updated", note ? { description: note } : undefined);
     closeEditItem();
+  };
+
+  // ─── Add by hand ────────────────────────────────────────────────
+  const addManualItem = async (entry: NewItem): Promise<boolean> => {
+    if (!user) return false;
+    const risk = deriveRisk(entry.daysLeft, entry.daysLeft, entry.name);
+    const { data, error } = await supabase
+      .from("pantry_items")
+      .insert([{
+        user_id: user.id,
+        ...householdIdField(),
+        name: entry.name,
+        days_left: entry.daysLeft,
+        risk,
+        purchase_date: new Date().toISOString(),
+        ...trackingFields(entry),
+      }])
+      .select("*")
+      .single();
+    if (error || !data) return false;
+    setItems((prev) => (prev.some((i) => i.id === data.id) ? prev : [rowToItem(data as PantryRow), ...prev]));
+    toast(`${entry.name} added`, { description: `${days(entry.daysLeft)} left.` });
+    return true;
   };
 
   const addMockInventoryData = async () => {
@@ -1227,7 +1382,13 @@ export default function Home() {
   };
 
   // ─── Barcode Processing ─────────────────────────────────────────
-  const handleBarcodeScan = async (decodedText: string) => {
+  const handleBarcodeScan = async (rawScan: string) => {
+    // A GS1 DataMatrix / GS1-128 code carries the product code AND the printed
+    // dates; an ordinary EAN-13 carries only the product code. Either way the
+    // lookup below needs just the product code.
+    const gs1 = parseGs1(rawScan);
+    const decodedText = gs1?.lookupCode ?? rawScan;
+    pendingPrintedDate.current = gs1UseByDate(gs1);
     setInlineError(null);
     setBarcodeRetryPrompt(null);
     setShowBarcodeRetryOptions(false);
@@ -1397,12 +1558,13 @@ if (nutritionFieldsFilled < 2) {
         setInlineError("This barcode appears to be a non-food item, so it wasn't added.");
       } else {
         logScanHistory(productName, "barcode", analysis.health_score);
-        setScannedExpiry(null);
+        setScannedExpiry(expiryFromPrintedDate(pendingPrintedDate.current));
         setScannedResult({
           name: productName,
           analysis,
           itemDiet: detectedItemDiet,
           ingredients: productIngredients !== PLACEHOLDER_INGREDIENTS_TEXT ? productIngredients : null,
+          categories: productCategories !== "Unknown" ? productCategories : null,
         });
       }
     } catch (e) {
@@ -1444,12 +1606,13 @@ if (nutritionFieldsFilled < 2) {
       } else {
         const detectedItemDiet = getItemDietType(`${typedName} ${manualBarcodeEntry.ingredients} ${manualBarcodeEntry.categories}`);
         logScanHistory(typedName, "manual", analysis.health_score);
-        setScannedExpiry(null);
+        setScannedExpiry(expiryFromPrintedDate(pendingPrintedDate.current));
         setScannedResult({
           name: typedName,
           analysis,
           itemDiet: detectedItemDiet,
           ingredients: manualBarcodeEntry.ingredients !== PLACEHOLDER_INGREDIENTS_TEXT ? manualBarcodeEntry.ingredients : null,
+          categories: manualBarcodeEntry.categories !== "Unknown" ? manualBarcodeEntry.categories : null,
         });
 
         if (contributeToOFF) {
@@ -1492,13 +1655,16 @@ if (nutritionFieldsFilled < 2) {
     // Every unscanned item used to get a flat 30 days, which put palak and
     // basmati rice on the same clock. The estimate now depends on what the
     // item is, and carries where the number came from.
-    const shelfLife = estimateShelfLife(scannedResult.name, scannedExpiry?.daysLeft);
+    const shelfLife = estimateShelfLife(scannedResult.name, scannedExpiry?.daysLeft, { databaseCategories: scannedResult.categories });
     const initialDaysLeft = shelfLife.days;
     const newItem = {
       user_id: user.id,
       ...householdIdField(),
       ...ingredientsTextField(scannedResult.ingredients),
       ...healthScoreField(scannedResult.analysis?.health_score),
+      // A date read off the pack (photo or GS1 barcode) is the pack's own
+      // claim; mark it so later storage changes never recompute it.
+      ...trackingFields({ expirySource: shelfLife.source === "scanned" ? "printed" : null }),
       name: scannedResult.name,
       days_left: initialDaysLeft,
       risk: deriveRisk(initialDaysLeft, initialDaysLeft, scannedResult.name),
@@ -1631,7 +1797,7 @@ if (nutritionFieldsFilled < 2) {
   // omitting those fields from the very first insert (confirmed
   // reproducible: the probes are still in flight for a beat after a fresh
   // signup, before the dashboard would otherwise already be interactive).
-  const schemaProbesPending = !!user && (householdSchemaReady === null || ingredientsSchemaReady === null || healthScoreSchemaReady === null);
+  const schemaProbesPending = !!user && (householdSchemaReady === null || ingredientsSchemaReady === null || healthScoreSchemaReady === null || trackingSchemaReady === null);
   if (authLoading || (!user && !authLoading) || schemaProbesPending) {
     return (
       <div className="flex flex-col items-center justify-center gap-5 min-h-screen">
@@ -2077,6 +2243,14 @@ if (nutritionFieldsFilled < 2) {
             />
           </div>
           <button
+            onClick={() => setShowAddItem(true)}
+            title="Add an item by hand"
+            aria-label="Add an item by hand"
+            className="neu-pressable h-11 w-11 shrink-0 rounded-xl flex items-center justify-center text-foreground/70"
+          >
+            <Plus size={18} />
+          </button>
+          <button
             onClick={() => setShowFilters((v) => !v)}
             aria-expanded={showFilters}
             aria-controls="pantry-filters"
@@ -2200,7 +2374,7 @@ if (nutritionFieldsFilled < 2) {
             <p className="text-sm text-foreground/60 max-w-60 leading-relaxed mb-6">
               {visibleItems.length > 0
                 ? "Try widening the filters to see the rest of your items."
-                : "Snap a grocery receipt and we will add everything on it, or scan one barcode to start. We will tell you what to eat before it goes off."}
+                : "Snap a grocery receipt, scan a barcode, or add something by hand. We will tell you what to eat before it goes off."}
             </p>
             <div className="flex flex-wrap items-center justify-center gap-2">
               <button
@@ -2208,6 +2382,12 @@ if (nutritionFieldsFilled < 2) {
                 className="flex items-center gap-2 bg-foreground text-background text-sm font-semibold px-5 py-2.5 rounded-xl hover:opacity-90 transition-opacity"
               >
                 <Camera size={16} /> Scan Receipt
+              </button>
+              <button
+                onClick={() => setShowAddItem(true)}
+                className="flex items-center gap-2 border border-border bg-card text-foreground text-sm font-semibold px-5 py-2.5 rounded-xl hover:bg-foreground/5 transition-colors"
+              >
+                <Plus size={16} /> Add by hand
               </button>
               {isAdmin && (
                 <button
@@ -2255,11 +2435,19 @@ if (nutritionFieldsFilled < 2) {
                   itemDiet={itemDiet}
                   dietUnverified={!item.ingredientsText}
                   riskLabel={riskLabelForDays(item.daysLeft)}
-                  shelfLifeCitation={formatProvenance(shelfEstimate)}
-                  shelfLifeConfidence={shelfEstimate.confidence}
-                  storageDisclaimer={shelfEstimate.disclaimer}
-                  ifStoredDifferently={shelfEstimate.ifStoredDifferently}
-                  currentStorage={shelfRow?.storage}
+                  // A date from the pack or from the person is not our
+                  // estimate, so it must not carry the estimate's provenance
+                  // line or its "if stored differently" figures.
+                  shelfLifeCitation={
+                    item.expirySource === "printed" ? "From the date on the pack"
+                    : item.expirySource === "user" ? "From the date you set"
+                    : formatProvenance(shelfEstimate)
+                  }
+                  shelfLifeConfidence={item.expirySource ? "high" : shelfEstimate.confidence}
+                  storageDisclaimer={item.expirySource ? undefined : shelfEstimate.disclaimer}
+                  ifStoredDifferently={item.expirySource ? undefined : shelfEstimate.ifStoredDifferently}
+                  currentStorage={item.storage ?? shelfRow?.storage}
+                  trackingTags={trackingTagsFor(item)}
                   healthierAlternative={healthierAlternative}
                   detectedAllergens={detectedAllergens}
                   actions={
@@ -2458,6 +2646,15 @@ if (nutritionFieldsFilled < 2) {
 
       {needsDiet && <DietPromptModal />}
 
+      {showAddItem && (
+        <AddItemModal
+          userDiet={userDietPreference}
+          trackingAvailable={!!trackingSchemaReady}
+          onAdd={addManualItem}
+          onClose={() => setShowAddItem(false)}
+        />
+      )}
+
       {showOnboarding && <OnboardingTour onFinish={finishOnboarding} />}
 
       {showBarcodeScanner && (
@@ -2513,7 +2710,7 @@ if (nutritionFieldsFilled < 2) {
                     // Shows the estimate it will actually use, and where
                     // that number came from, instead of promising a flat 30.
                     (() => {
-                      const est = estimateShelfLife(scannedResult.name);
+                      const est = estimateShelfLife(scannedResult.name, null, { databaseCategories: scannedResult.categories });
                       const scanRow = findShelfLifeRow(scannedResult.name)?.row;
                       return (
                         <>
@@ -2696,9 +2893,9 @@ if (nutritionFieldsFilled < 2) {
 
       {editingItem && (
         <div className="fixed inset-0 z-50 bg-background/85 backdrop-blur-sm flex items-center justify-center p-4">
-          <div role="dialog" aria-modal="true" aria-labelledby="edit-item-heading" className="neu-panel w-full max-w-md rounded-2xl p-5">
+          <div role="dialog" aria-modal="true" aria-labelledby="edit-item-heading" className="neu-panel w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl p-5">
             <div className="flex items-center justify-between mb-4">
-              <h3 id="edit-item-heading" className="text-lg font-bold tracking-tight">Edit Item</h3>
+              <h3 id="edit-item-heading" className="text-lg font-bold tracking-tight">Edit item</h3>
               <button onClick={closeEditItem} title="Close edit" aria-label="Close edit" className="w-11 h-11 flex items-center justify-center rounded-full bg-foreground/10 hover:bg-foreground/20 transition-colors">
                 <X size={16} />
               </button>
@@ -2724,8 +2921,78 @@ if (nutritionFieldsFilled < 2) {
                   onChange={(e) => setEditDaysLeft(e.target.value)}
                   className="w-full bg-background border border-border rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-1 focus:ring-foreground/20"
                 />
-                <p className="text-[11px] text-foreground/60">Saving resets the freshness clock to start counting down from today.</p>
               </div>
+              <div className="space-y-1.5">
+                <label htmlFor="edit-item-date" className="text-[11px] font-semibold uppercase tracking-widest text-foreground/60">
+                  Or the date on the pack
+                </label>
+                <input
+                  id="edit-item-date"
+                  type="date"
+                  value={editDate}
+                  onChange={(e) => setEditDate(e.target.value)}
+                  className="w-full bg-background border border-border rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-1 focus:ring-foreground/20"
+                />
+                <p className="text-[11px] text-foreground/60">A day count or date you enter replaces our estimate.</p>
+              </div>
+
+              {trackingSchemaReady && (
+                <>
+                  <div className="space-y-1.5">
+                    <p className="text-[11px] font-semibold uppercase tracking-widest text-foreground/60">Where is it kept?</p>
+                    <div role="group" aria-label="Where is it kept" className="grid grid-cols-3 gap-2">
+                      {STORAGE_OPTIONS.map((o) => {
+                        const active = (editStorage ?? editingItem.storage ?? defaultStorageFor(editingItem.name)) === o.id;
+                        return (
+                          <button
+                            key={o.id}
+                            type="button"
+                            aria-pressed={active}
+                            onClick={() => setEditStorage(o.id)}
+                            className={`min-h-11 rounded-xl text-xs font-semibold transition-all ${active ? "bg-foreground text-background" : "neu-raised-sm text-foreground/70"}`}
+                          >
+                            {o.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <p className="text-[11px] font-semibold uppercase tracking-widest text-foreground/60">Opened?</p>
+                    <div role="group" aria-label="Opened" className="grid grid-cols-2 gap-2">
+                      {[false, true].map((v) => (
+                        <button
+                          key={String(v)}
+                          type="button"
+                          aria-pressed={editOpened === v}
+                          onClick={() => setEditOpened(v)}
+                          className={`min-h-11 rounded-xl text-xs font-semibold transition-all ${editOpened === v ? "bg-foreground text-background" : "neu-raised-sm text-foreground/70"}`}
+                        >
+                          {v ? "Yes, opened" : "No, sealed"}
+                        </button>
+                      ))}
+                    </div>
+                    {editOpened && !editingItem.openedAt && (
+                      <div className="pt-1">
+                        <p className="text-[11px] text-foreground/60 mb-1.5">Use within how many days of opening? Most packs print this.</p>
+                        <div role="group" aria-label="Use within days of opening" className="flex flex-wrap gap-2">
+                          {OPENED_DAYS_OPTIONS.map((d) => (
+                            <button
+                              key={d}
+                              type="button"
+                              aria-pressed={editOpenedDays === d}
+                              onClick={() => setEditOpenedDays(d)}
+                              className={`min-h-11 px-3 rounded-xl text-xs font-semibold transition-all ${editOpenedDays === d ? "bg-foreground text-background" : "neu-raised-sm text-foreground/70"}`}
+                            >
+                              {d}d
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
 
             <div className="mt-5 flex flex-col sm:flex-row gap-2">
@@ -2820,27 +3087,20 @@ if (nutritionFieldsFilled < 2) {
             </div>
 
             <p className="text-sm text-foreground/80 mb-5 leading-relaxed">
-              <span className="font-semibold text-foreground">{dietConflictPrompt.itemName}</span> may not match your diet.
-              Add anyway?
+              <span className="font-semibold text-foreground">{dietConflictPrompt.itemName}</span> doesn&apos;t fit
+              your {DIET_PREFERENCE_LABEL[dietConflictPrompt.userDiet].toLowerCase()} diet, so it won&apos;t be added to your pantry.
+              You can change your diet from the profile menu.
             </p>
 
-            <div className="flex flex-col sm:flex-row gap-2">
-              <button
-                onClick={() => setDietConflictPrompt(null)}
-                className="neu-raised-sm flex-1 rounded-xl h-11 text-sm font-bold text-foreground/80"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  setDietConflictPrompt(null);
-                  void addScannedItemToPantry(true);
-                }}
-                className="flex-1 bg-danger text-white rounded-xl h-11 text-sm font-bold hover:brightness-110 active:scale-[0.99] transition-all"
-              >
-                Yes, add anyway
-              </button>
-            </div>
+            {/* "Yes, add anyway" used to be offered here. Since the diet
+                became a hard scope, that added an item the same account could
+                then never see, edit or remove. */}
+            <button
+              onClick={() => setDietConflictPrompt(null)}
+              className="neu-raised-sm w-full rounded-xl h-11 text-sm font-bold text-foreground/80"
+            >
+              OK
+            </button>
           </div>
         </div>
       )}

@@ -38,7 +38,7 @@ export const calculateCurrentDaysLeft = (initialDaysLeft: number, purchaseDate: 
 /**
  * Days elapsed *beyond* the estimate; 0 while still within it. Nothing
  * displays this — it is the flag that keeps past-estimate food out of the
- * recipe prompt, whose most urgent bucket is headed "MUST USE".
+ * recipe prompt, whose most urgent bucket is headed "USE FIRST".
  */
 export const calculateDaysPastEstimate = (initialDaysLeft: number, purchaseDate: string) =>
   Math.max(0, daysElapsedSince(purchaseDate) - initialDaysLeft);

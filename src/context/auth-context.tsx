@@ -35,6 +35,10 @@ interface AuthContextType {
   // Same pattern again, for pantry_items.health_score. Until this column
   // exists the item card shows "not scanned" rather than inventing a grade.
   healthScoreSchemaReady: boolean | null;
+  // Same pattern, for storage / opened_at / expiry_source
+  // (db/supabase-schema-item-tracking.sql). Until true, the storage and
+  // opened controls stay hidden and nothing writes those columns.
+  trackingSchemaReady: boolean | null;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -48,6 +52,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [householdSchemaReady, setHouseholdSchemaReady] = useState<boolean | null>(null);
   const [ingredientsSchemaReady, setIngredientsSchemaReady] = useState<boolean | null>(null);
   const [healthScoreSchemaReady, setHealthScoreSchemaReady] = useState<boolean | null>(null);
+  const [trackingSchemaReady, setTrackingSchemaReady] = useState<boolean | null>(null);
 
   const refreshHousehold = useCallback(async () => {
     if (!user) {
@@ -116,11 +121,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       supabase.from("pantry_items").select("ingredients_text").limit(1).then(({ error }) => {
         setIngredientsSchemaReady(!error);
       });
+      supabase.from("pantry_items").select("storage, opened_at, expiry_source").limit(1).then(({ error }) => {
+        setTrackingSchemaReady(!error);
+      });
     } else {
       setHousehold(null);
       setHouseholdSchemaReady(null);
       setIngredientsSchemaReady(null);
       setHealthScoreSchemaReady(null);
+      setTrackingSchemaReady(null);
     }
   }, [user, refreshHousehold]);
 
@@ -154,7 +163,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, signIn, signUp, signOut, signInWithGoogle, household, householdLoading, refreshHousehold, householdSchemaReady, ingredientsSchemaReady, healthScoreSchemaReady }}>
+    <AuthContext.Provider value={{ user, session, loading, signIn, signUp, signOut, signInWithGoogle, household, householdLoading, refreshHousehold, householdSchemaReady, ingredientsSchemaReady, healthScoreSchemaReady, trackingSchemaReady }}>
       {children}
     </AuthContext.Provider>
   );

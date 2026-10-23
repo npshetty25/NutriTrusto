@@ -32,8 +32,12 @@ import {
  * Five tiers, in order of how much they can be trusted:
  *
  *   1 scanned   — a real printed date. Used verbatim, never adjusted.
- *   2 database  — a barcode row (Open Food Facts). Hook only for now.
  *   3 known     — a sourced baseline row matched by name.
+ *   2 database  — the same table, reached through the product's Open Food
+ *                 Facts categories when the name matched nothing. Checked
+ *                 after tier 3 (the name is more specific); numbered 2 for
+ *                 history. OFF holds no per-pack date, so this is never a
+ *                 date — only a better guess at what kind of product it is.
  *   4 category  — inferred category baseline.
  *   5 fallback  — nothing matched; conservative, rounded down, flagged.
  *
@@ -221,8 +225,18 @@ const storedElsewhere = (
  * @param name        the item's name as the user will see it
  * @param scannedDays days remaining read from a real printed expiry date,
  *                    when one was scanned. Always wins, never adjusted.
+ * @param options.databaseCategories  the product's category list from Open
+ *                    Food Facts, for a scanned barcode. Used only when the
+ *                    name matches nothing in our table — a product name like
+ *                    "Haldiram's Aloo Bhujia 200 g" says little, but its
+ *                    database categories ("Snacks, Salty snacks, Namkeen")
+ *                    do.
  */
-export function estimateShelfLife(name: string, scannedDays?: number | null): ShelfLifeEstimate {
+export function estimateShelfLife(
+  name: string,
+  scannedDays?: number | null,
+  options: { databaseCategories?: string | null } = {}
+): ShelfLifeEstimate {
   // ── Tier 1: a real printed date ──────────────────────────────────
   if (typeof scannedDays === "number" && Number.isFinite(scannedDays) && scannedDays >= 0) {
     const days = Math.round(scannedDays);
@@ -243,8 +257,7 @@ export function estimateShelfLife(name: string, scannedDays?: number | null): Sh
     };
   }
 
-  // ── Tier 3: sourced baseline row ─────────────────────────────────
-  // (Tier 2, a barcode/database row, is not wired yet — see the roadmap.)
+  // ── Tier 3: sourced baseline row, by name ────────────────────────
   const hit = findShelfLifeRow(name);
   if (hit) {
     const { row, key } = hit;
@@ -274,8 +287,39 @@ export function estimateShelfLife(name: string, scannedDays?: number | null): Sh
     };
   }
 
+  // ── Tier 2: the product database's own categories ────────────────
+  // Checked after the name, not before: the name is what the user sees and
+  // a direct row for it is more specific than a category list. Downgraded
+  // one confidence step because the row was reached through a category, and
+  // it is still a typical figure for that kind of product, not this pack.
+  const dbCategories = (options.databaseCategories || "").trim();
+  const dbHit = dbCategories ? findShelfLifeRow(dbCategories) : null;
+  if (dbHit) {
+    const { row, key } = dbHit;
+    const targetC = ASSUMED_STORAGE_C[row.storage];
+    const adjusted = adjustDays(row.days, row.refTempC, targetC, { eaKJ: row.eaKJ, lookupOnly: row.lookupOnly });
+    const days = Math.max(1, Math.floor(adjusted));
+    return {
+      days,
+      source: "database",
+      explanation: `Typical for ${key}, going by this product's category on Open Food Facts. Change it if your pack says otherwise.`,
+      wantsConfirmation: true,
+      confidence: DOWNGRADE[row.confidence],
+      citation: row.source,
+      sourceCaveat: row.source_caveat,
+      extrapolationWarning: row.extrapolation_warning,
+      tier: row.tier,
+      storage: row.storage,
+      assumedTempC: targetC,
+      ifStoredDifferently: storedElsewhere(row.days, row.refTempC, row),
+      disclaimer: STORAGE_DISCLAIMER,
+    };
+  }
+
   // ── Tier 4: inferred category ────────────────────────────────────
-  const category = inferItemCategory(name);
+  // The database categories help here too: "Namkeen" or "Biscuits" in the
+  // category list names the kind of product even when the brand name does not.
+  const category = inferItemCategory(name) !== "unknown" ? inferItemCategory(name) : inferItemCategory(dbCategories);
   if (category !== "unknown") {
     const base = CATEGORY_SHELF_LIFE[category];
     return {

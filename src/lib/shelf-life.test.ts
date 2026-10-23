@@ -364,3 +364,19 @@ describe("data hygiene", () => {
     expect(e.disclaimer).toBe("");
   });
 });
+
+describe("estimateShelfLife — tier 2, the product database's categories", () => {
+  it("uses Open Food Facts categories when the brand name matches nothing", () => {
+    const byName = estimateShelfLife("Zorbix Fresh Pack 400 g");
+    const withDb = estimateShelfLife("Zorbix Fresh Pack 400 g", null, { databaseCategories: "Indian foods, Paneer" });
+    expect(byName.source).not.toBe("database");
+    expect(withDb.source).toBe("database");
+    expect(withDb.days).toBe(estimateShelfLife("Paneer").days);
+    expect(withDb.wantsConfirmation).toBe(true);
+  });
+
+  it("never outranks a direct name match or a printed date", () => {
+    expect(estimateShelfLife("Paneer", null, { databaseCategories: "Rice" }).source).toBe("known");
+    expect(estimateShelfLife("Paneer", 12, { databaseCategories: "Rice" })).toMatchObject({ source: "scanned", days: 12 });
+  });
+});
