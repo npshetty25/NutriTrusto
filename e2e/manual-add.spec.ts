@@ -1,0 +1,86 @@
+import { expect, openDashboard, test } from "./fixtures";
+
+/** Today + n as YYYY-MM-DD in the browser's own calendar, for a date input. */
+const inDays = (n: number) => {
+  const d = new Date();
+  d.setDate(d.getDate() + n);
+  const pad = (x: number) => String(x).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+};
+
+const lastInsert = (backend: { sent: (m: string, t: string) => { body: unknown }[] }) => {
+  const sent = backend.sent("POST", "pantry_items");
+  return (sent[sent.length - 1]?.body as Record<string, unknown>[] | undefined)?.[0];
+};
+
+test.describe("add an item by hand", () => {
+  test("estimates the days when no date is given, and says so before saving", async ({ backend, page }) => {
+    await openDashboard(page);
+    await page.getByRole("button", { name: "Add an item by hand" }).click();
+
+    const dialog = page.getByRole("dialog", { name: "Add an item" });
+    await dialog.getByLabel("Name").fill("Paneer");
+    await expect(dialog.getByText(/Will show \d+ days? left/)).toBeVisible();
+    await dialog.getByRole("button", { name: "Add to pantry" }).click();
+
+    await expect(page.getByRole("heading", { level: 3, name: "Paneer" })).toBeVisible();
+    expect(lastInsert(backend)).toMatchObject({ name: "Paneer", expiry_source: null, opened_at: null });
+  });
+
+  test("a date typed from the pack beats the estimate and is marked as the person's", async ({ backend, page }) => {
+    await openDashboard(page);
+    await page.getByRole("button", { name: "Add an item by hand" }).click();
+
+    const dialog = page.getByRole("dialog", { name: "Add an item" });
+    await dialog.getByLabel("Name").fill("Amul Taaza Milk");
+    await dialog.locator('input[type="date"]').fill(inDays(10));
+    await expect(dialog.getByText("Will show 10 days left")).toBeVisible();
+    await dialog.getByRole("button", { name: "Add to pantry" }).click();
+
+    await expect(page.getByText("Date set by you")).toBeVisible();
+    expect(lastInsert(backend)).toMatchObject({ name: "Amul Taaza Milk", days_left: 10, expiry_source: "user" });
+  });
+
+  test("an opened pack never keeps longer than its 'use within' days", async ({ backend, page }) => {
+    await openDashboard(page);
+    await page.getByRole("button", { name: "Add an item by hand" }).click();
+
+    const dialog = page.getByRole("dialog", { name: "Add an item" });
+    await dialog.getByLabel("Name").fill("Toor Dal");
+    await dialog.getByRole("button", { name: "Yes, opened" }).click();
+    await dialog.getByRole("button", { name: "2d", exact: true }).click();
+    await expect(dialog.getByText("Will show 2 days left")).toBeVisible();
+    await dialog.getByRole("button", { name: "Add to pantry" }).click();
+
+    await expect.poll(() => lastInsert(backend)?.days_left).toBe(2);
+    expect(lastInsert(backend)?.opened_at).toBeTruthy();
+  });
+
+  test("refuses an item the account's diet would hide, and says why", async ({ backend, page }) => {
+    void backend; // the default account is vegetarian
+    await openDashboard(page);
+    await page.getByRole("button", { name: "Add an item by hand" }).click();
+
+    const dialog = page.getByRole("dialog", { name: "Add an item" });
+    await dialog.getByLabel("Name").fill("Chicken Breast");
+    await expect(dialog.getByRole("alert")).toContainText("doesn't fit your vegetarian diet");
+    await expect(dialog.getByRole("button", { name: "Add to pantry" })).toBeDisabled();
+  });
+});
+
+test.describe("editing what the person knows about an item", () => {
+  test("marking an item opened shortens it to the pack's 'use within' days", async ({ backend, page }) => {
+    backend.seedPantry([{ name: "Curd", days_left: 6 }]);
+    await openDashboard(page);
+
+    await page.getByRole("button", { name: "Edit Curd" }).click();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByRole("button", { name: "Yes, opened" }).click();
+    await dialog.getByRole("button", { name: "3d", exact: true }).click();
+    await dialog.getByRole("button", { name: "Save Changes" }).click();
+
+    await expect.poll(() => backend.tables.pantry_items[0].days_left).toBe(3);
+    expect(backend.tables.pantry_items[0].opened_at).toBeTruthy();
+    await expect(page.getByText(/^Opened /)).toBeVisible();
+  });
+});
