@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import Image from "next/image";
 import {
-  getItemDietType, resolveItemDiet, isDietConflict, normalizeDietPreference, dietChipLabel,
+  getItemDietType, resolveItemDiet, isDietConflict, normalizeDietPreference, dietChipLabel, DIET_PREFERENCE_LABEL,
   type DietPreference, type ItemDietType,
   filterByDiet,
   lockedDietScope,
@@ -3087,27 +3087,20 @@ if (nutritionFieldsFilled < 2) {
             </div>
 
             <p className="text-sm text-foreground/80 mb-5 leading-relaxed">
-              <span className="font-semibold text-foreground">{dietConflictPrompt.itemName}</span> may not match your diet.
-              Add anyway?
+              <span className="font-semibold text-foreground">{dietConflictPrompt.itemName}</span> doesn&apos;t fit
+              your {DIET_PREFERENCE_LABEL[dietConflictPrompt.userDiet].toLowerCase()} diet, so it won&apos;t be added to your pantry.
+              You can change your diet from the profile menu.
             </p>
 
-            <div className="flex flex-col sm:flex-row gap-2">
-              <button
-                onClick={() => setDietConflictPrompt(null)}
-                className="neu-raised-sm flex-1 rounded-xl h-11 text-sm font-bold text-foreground/80"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  setDietConflictPrompt(null);
-                  void addScannedItemToPantry(true);
-                }}
-                className="flex-1 bg-danger text-white rounded-xl h-11 text-sm font-bold hover:brightness-110 active:scale-[0.99] transition-all"
-              >
-                Yes, add anyway
-              </button>
-            </div>
+            {/* "Yes, add anyway" used to be offered here. Since the diet
+                became a hard scope, that added an item the same account could
+                then never see, edit or remove. */}
+            <button
+              onClick={() => setDietConflictPrompt(null)}
+              className="neu-raised-sm w-full rounded-xl h-11 text-sm font-bold text-foreground/80"
+            >
+              OK
+            </button>
           </div>
         </div>
       )}
