@@ -114,7 +114,7 @@ describe("POST /api/find-recipe — what reaches the model", () => {
     const prompt = promptOf();
     expect(prompt).toMatch(/USE FIRST[\s\S]*Paneer \(due today — tell the cook to look at it and smell it first\)/);
     expect(prompt).toContain("- Mushrooms (2 days left, rough estimate)");
-    expect(prompt).toMatch(/SHOULD USE[\s\S]*- Spinach \(4 days left\)/);
+    expect(prompt).toMatch(/USE NEXT[\s\S]*- Spinach \(4 days left\)/);
     expect(prompt).toMatch(/Also available:[\s\S]*- Rice \(200 days left\)/);
   });
 
