@@ -10,6 +10,7 @@ import {
 } from "@/lib/diet";
 
 import { calculateCurrentDaysLeft, calculateDaysPastEstimate } from "@/lib/item-age";
+import { parseGs1, gs1UseByDate } from "@/lib/gs1";
 
 // One definition, in lib/risk-bands.ts. This was a byte-identical copy of
 // the rule in api/extract/route.ts — the same duplication that let the
@@ -146,6 +147,24 @@ interface ScannedResultEntry {
   // never the "None provided..." placeholder used when no product data
   // was found. See PLACEHOLDER_INGREDIENTS_TEXT below.
   ingredients?: string | null;
+  // Open Food Facts' category list for the product, when it has one. Lets the
+  // shelf-life estimate use the product database when the name alone matches
+  // nothing in our table (tier 2 in lib/shelf-life.ts).
+  categories?: string | null;
+}
+
+/** A printed date (from a GS1 barcode) as the scan result's expiry entry. */
+function expiryFromPrintedDate(date: Date | null): ScannedExpiryEntry | null {
+  if (!date) return null;
+  const today = new Date();
+  const todayUtc = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
+  const daysLeft = Math.max(0, Math.round((date.getTime() - todayUtc) / (24 * 60 * 60 * 1000)));
+  return {
+    daysLeft,
+    expiryDate: date.toISOString().slice(0, 10),
+    source: "printed_expiry",
+    confidence: "high",
+  };
 }
 
 interface ScannedExpiryEntry {
@@ -215,6 +234,10 @@ export default function Home() {
     source: "model" | "rules";
   } | null>(null);
   const [showExpiryScanner, setShowExpiryScanner] = useState(false);
+  // The printed date read out of a GS1 barcode, held across the lookup (and
+  // the "type the name" fallback when the product database has no entry), so
+  // it lands on whichever scan result eventually appears.
+  const pendingPrintedDate = useRef<Date | null>(null);
   const [barcodeRetryPrompt, setBarcodeRetryPrompt] = useState<{ code: string } | null>(null);
   const [showBarcodeRetryOptions, setShowBarcodeRetryOptions] = useState(false);
   const [manualRetryBarcode, setManualRetryBarcode] = useState("");
@@ -1227,7 +1250,13 @@ export default function Home() {
   };
 
   // ─── Barcode Processing ─────────────────────────────────────────
-  const handleBarcodeScan = async (decodedText: string) => {
+  const handleBarcodeScan = async (rawScan: string) => {
+    // A GS1 DataMatrix / GS1-128 code carries the product code AND the printed
+    // dates; an ordinary EAN-13 carries only the product code. Either way the
+    // lookup below needs just the product code.
+    const gs1 = parseGs1(rawScan);
+    const decodedText = gs1?.lookupCode ?? rawScan;
+    pendingPrintedDate.current = gs1UseByDate(gs1);
     setInlineError(null);
     setBarcodeRetryPrompt(null);
     setShowBarcodeRetryOptions(false);
@@ -1397,12 +1426,13 @@ if (nutritionFieldsFilled < 2) {
         setInlineError("This barcode appears to be a non-food item, so it wasn't added.");
       } else {
         logScanHistory(productName, "barcode", analysis.health_score);
-        setScannedExpiry(null);
+        setScannedExpiry(expiryFromPrintedDate(pendingPrintedDate.current));
         setScannedResult({
           name: productName,
           analysis,
           itemDiet: detectedItemDiet,
           ingredients: productIngredients !== PLACEHOLDER_INGREDIENTS_TEXT ? productIngredients : null,
+          categories: productCategories !== "Unknown" ? productCategories : null,
         });
       }
     } catch (e) {
@@ -1444,12 +1474,13 @@ if (nutritionFieldsFilled < 2) {
       } else {
         const detectedItemDiet = getItemDietType(`${typedName} ${manualBarcodeEntry.ingredients} ${manualBarcodeEntry.categories}`);
         logScanHistory(typedName, "manual", analysis.health_score);
-        setScannedExpiry(null);
+        setScannedExpiry(expiryFromPrintedDate(pendingPrintedDate.current));
         setScannedResult({
           name: typedName,
           analysis,
           itemDiet: detectedItemDiet,
           ingredients: manualBarcodeEntry.ingredients !== PLACEHOLDER_INGREDIENTS_TEXT ? manualBarcodeEntry.ingredients : null,
+          categories: manualBarcodeEntry.categories !== "Unknown" ? manualBarcodeEntry.categories : null,
         });
 
         if (contributeToOFF) {
