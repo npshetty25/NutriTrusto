@@ -1523,7 +1523,7 @@ if (nutritionFieldsFilled < 2) {
     // Every unscanned item used to get a flat 30 days, which put palak and
     // basmati rice on the same clock. The estimate now depends on what the
     // item is, and carries where the number came from.
-    const shelfLife = estimateShelfLife(scannedResult.name, scannedExpiry?.daysLeft);
+    const shelfLife = estimateShelfLife(scannedResult.name, scannedExpiry?.daysLeft, { databaseCategories: scannedResult.categories });
     const initialDaysLeft = shelfLife.days;
     const newItem = {
       user_id: user.id,
@@ -2544,7 +2544,7 @@ if (nutritionFieldsFilled < 2) {
                     // Shows the estimate it will actually use, and where
                     // that number came from, instead of promising a flat 30.
                     (() => {
-                      const est = estimateShelfLife(scannedResult.name);
+                      const est = estimateShelfLife(scannedResult.name, null, { databaseCategories: scannedResult.categories });
                       const scanRow = findShelfLifeRow(scannedResult.name)?.row;
                       return (
                         <>
