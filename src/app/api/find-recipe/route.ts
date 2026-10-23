@@ -133,7 +133,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: "GEMINI_API_KEY is not configured" }, { status: 500 });
     }
 
-    // Anything at 2 days or less is what this recipe exists to rescue.
+    // Anything at 2 days or less is what the recipe would most like to use —
+    // a preference, not a requirement (rule 2 in the prompt).
     const critical = pantry.filter((i) => (i.daysLeft ?? 999) <= 2);
     const soon = pantry.filter((i) => (i.daysLeft ?? 999) > 2 && (i.daysLeft ?? 999) <= 5);
     const rest = pantry.filter((i) => (i.daysLeft ?? 999) > 5);
@@ -156,8 +157,8 @@ export async function POST(req: Request) {
         .join("\n");
 
     const sections = [
-      critical.length ? `MUST USE — these spoil first:\n${fmt(critical)}` : "",
-      soon.length ? `SHOULD USE if they fit:\n${fmt(soon)}` : "",
+      critical.length ? `USE FIRST, if they fit a real dish — these spoil soonest:\n${fmt(critical)}` : "",
+      soon.length ? `USE NEXT, if they fit:\n${fmt(soon)}` : "",
       rest.length ? `Also available:\n${fmt(rest)}` : "",
     ].filter(Boolean).join("\n\n");
 
@@ -165,25 +166,28 @@ export async function POST(req: Request) {
       ? `\nDo NOT suggest these, they were already shown: ${avoidTitles.slice(0, 6).join(", ")}.\n`
       : "";
 
-    const prompt = `You are an experienced Indian home cook writing everyday ghar ka khana — the kind of food actually cooked in an Indian kitchen on a weeknight, not restaurant or fusion food.
-
-Someone's food is about to spoil. Write ONE dish that rescues it.
+    // Rules 1-3 used to say the opposite: every "MUST USE" item had to go into
+    // one dish. Handed palak, curd, chicken and bread, the model obeyed and
+    // invented a dish nobody cooks — unappetising, and with curd and chicken
+    // thrown together, not obviously safe. A real dish that uses two items
+    // beats an invented one that "uses" five.
+    const prompt = `You are an experienced Indian home cook. Suggest ONE real, everyday Indian dish — ghar ka khana — that uses up some of the food below before it spoils.
 
 ${sections}
 ${avoid}
 Dietary preference: ${dietaryPreference || "none"}.
 
 Rules, in order of importance:
-1. Every item under "MUST USE" has to appear in the dish. That is the entire reason this recipe exists — if you leave one out, the food gets thrown away. Only omit one if it genuinely cannot go in the same dish as the others, and if so say nothing about it.
-2. Pull in as many "SHOULD USE" items as fit naturally. Ignore anything that would make the dish worse.
-3. The dish must be genuinely Indian. Use real formats: sabzi, dal, curry, sukhi bhaji, pulao, khichdi, poha, upma, chilla, paratha, raita, bhurji, kadhi, thoran, poriyal. Never pasta, stir-fry bowls, sandwiches, casseroles or salads.
-4. Cook it the Indian way — tadka where it belongs (jeera, rai, hing, curry leaves), bhuna-ing the masala, everyday spices (haldi, dhania, jeera powder, garam masala, lal mirch, amchur).
-5. Assume the usual Indian kitchen staples are on hand (oil/ghee, salt, onion, tomato, ginger, garlic, green chilli, basic spices, atta, rice, dal). You may use them freely and they do not need to be in the list above.
-6. Respect the dietary preference absolutely. "Veg" means no meat, no fish, no egg. "Eggtarian" allows egg but no meat or fish. Never break this.
+1. The dish must be a REAL, established dish that Indian households actually cook and that people recognise by name — the kind found in any ordinary Indian cookbook (Aloo Gobi, Palak Paneer, Dal Tadka, Vegetable Pulao, Poha, Besan Chilla, Jeera Rice, Kadhi). Never invent a new dish, a fusion, or an unusual combination of ingredients.
+2. Choose the real dish that uses the "USE FIRST" items best. Only include an item if it genuinely belongs in that dish as it is normally cooked. NEVER force an ingredient in just to use it up — leaving an item out is always better than an odd or unsafe combination. Using a single pantry item is fine.
+3. Do not put together ingredients that the real dish does not normally contain.
+4. Respect the dietary preference absolutely. "Veg" means no meat, no fish, no egg. "Eggtarian" allows egg but no meat or fish. Never break this.
+5. Cook it the way that dish is normally cooked — tadka where it belongs (jeera, rai, hing, curry leaves), bhuna-ing the masala, everyday spices (haldi, dhania, jeera powder, garam masala, lal mirch, amchur).
+6. You may assume only these everyday kitchen staples are at home: oil or ghee, salt, sugar, onion, tomato, ginger, garlic, green chilli, the ground spices above, atta, rice and a basic dal. Anything else the dish needs that is not in the lists above goes under "toBuy".
 7. Use Indian measures and names naturally (katori, tsp, tbsp, grams, ml; jeera, haldi, dhania), with the English term in brackets on first use where it isn't obvious.
-8. Name it like a person would, not like a label. Pick the closest real Indian dish and use that name, adding at most ONE distinguishing word. "Palak Paneer Bhurji" is a name; "Dahi-Doodh Paneer-Palak Bread Bhurji" is an ingredient list with hyphens. Never chain more than two ingredients into the title, never use "&", and keep it under five words.
-9. If an item is marked "due today", the FIRST step must tell the cook to look at it and smell it before it goes in, and to leave it out if it does not seem right. Nobody has checked it yet, so the step must not contain the words "spoiled", "spoilage", "gone bad", "rotten" or "expired" ANYWHERE — not even conditionally, so "if it is spoiled, throw it away" is also forbidden. Say what to look for instead: soft or slimy patches, discolouration, a sour or unusual smell. Then say to leave it out if any of that is there.
-10. Where an item is marked "rough estimate", our day count for it is unreliable. Prefer a method that survives being wrong about it — cooked through in a sabzi, dal or curry rather than raw in a raita, salad or chutney. Do not mention the estimate or its reliability in the recipe; just cook it the safer way.
+8. The title is the dish's ordinary, well-known name — exactly what someone would call it at home (e.g. "Aloo Gobi", "Palak Paneer"). Do not list ingredients in the title, do not add made-up words, keep it under five words.
+9. If an item you use is marked "due today", the FIRST step must tell the cook to look at it and smell it before it goes in, and to leave it out if it does not seem right. Nobody has checked it yet, so the step must not contain the words "spoiled", "spoilage", "gone bad", "rotten" or "expired" ANYWHERE — not even conditionally, so "if it is spoiled, throw it away" is also forbidden. Say what to look for instead: soft or slimy patches, discolouration, a sour or unusual smell. Then say to leave it out if any of that is there.
+10. Where an item is marked "rough estimate", our day count for it is unreliable. Prefer a real dish that cooks it through (a sabzi, dal or curry) over one that serves it raw (raita, salad, chutney). Do not mention the estimate or its reliability in the recipe.
 
 Split the ingredients into three groups so the cook knows what they already
 have and what they must go out and buy:
@@ -193,19 +197,19 @@ have and what they must go out and buy:
   staples — things they genuinely have to buy. ALWAYS give the amount
   needed for this dish separately from the name, so it can go straight onto
   a shopping list.
-- "staples": everyday Indian kitchen basics you assumed (oil/ghee, salt,
+- "staples": the everyday kitchen basics from rule 6 that you used (oil/ghee, salt,
   onion, tomato, ginger, garlic, green chilli, ground spices, atta, rice).
 
 Return ONLY this JSON object, no markdown fence, no commentary:
 {
-  "title": "Dish name — at most five words, at most two ingredients named",
-  "baseDish": "the closest well-known Indian dish this is a version of, 2-3 words, exactly as someone would type it into YouTube (e.g. Palak Paneer, Paneer Bhurji, Vegetable Khichdi)",
+  "title": "the dish's ordinary well-known name, e.g. Aloo Gobi",
+  "baseDish": "the same dish name exactly as someone would type it into YouTube (e.g. Palak Paneer, Paneer Bhurji, Vegetable Khichdi)",
   "prepTime": "e.g. 25m",
   "fromPantry": [{"item": "exact name from the lists above", "quantity": "200 g, cubed"}],
   "toBuy": [{"item": "Fresh coriander", "quantity": "1 bunch"}],
   "staples": ["2 tbsp oil", "1 tsp jeera", "..."],
   "steps": ["step 1", "step 2", "..."],
-  "rescueNote": "one short sentence naming which about-to-spoil items this saves"
+  "rescueNote": "one short sentence naming which about-to-spoil items this uses"
 }`;
 
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
