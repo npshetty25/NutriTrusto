@@ -97,6 +97,7 @@ import ExpiryDateScanner from "@/components/expiry-date-scanner";
 import PantryChatModal from "@/components/pantry-chat-modal";
 import { RestockSuggestions } from "@/components/restock-suggestions";
 import { RecipeModal, type GeneratedRecipe } from "@/components/recipe-modal";
+import { AddItemModal, type NewItem } from "@/components/add-item-modal";
 import {
   STORAGE_OPTIONS,
   OPENED_DAYS_OPTIONS,
@@ -110,7 +111,7 @@ import {
 import type { StorageLocation } from "@/lib/temperature";
 import {
   Camera, BrainCircuit, Loader2, TrendingUp, ScanLine,
-  Clock, X, Trash2, Info, Activity, Zap, AlertTriangle, CheckCircle2, Search, CircleAlert, Bell, Carrot, Apple, Milk, Drumstick, Wheat, CupSoda, Croissant, Snowflake, Candy, Package, ChevronLeft, ChevronRight, CalendarClock, Pencil, Sparkles, RefreshCw, SlidersHorizontal, Leaf, UtensilsCrossed, Check, Egg as EggIcon, Images, FileText
+  Clock, X, Trash2, Info, Activity, Zap, AlertTriangle, CheckCircle2, Search, CircleAlert, Bell, Carrot, Apple, Milk, Drumstick, Wheat, CupSoda, Croissant, Snowflake, Candy, Package, ChevronLeft, ChevronRight, CalendarClock, Pencil, Sparkles, Plus, RefreshCw, SlidersHorizontal, Leaf, UtensilsCrossed, Check, Egg as EggIcon, Images, FileText
 } from "lucide-react";
 import ShoppingListModal from "@/components/shopping-list-modal";
 import { CountUp } from "@/components/count-up";
@@ -343,6 +344,7 @@ export default function Home() {
   const [editStorage, setEditStorage] = useState<StorageLocation | null>(null);
   const [editOpened, setEditOpened] = useState(false);
   const [editOpenedDays, setEditOpenedDays] = useState<number | null>(null);
+  const [showAddItem, setShowAddItem] = useState(false);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [showShoppingList, setShowShoppingList] = useState(false);
   const [showPantryChat, setShowPantryChat] = useState(false);
@@ -962,6 +964,29 @@ export default function Home() {
       : i));
     toast("Item updated", note ? { description: note } : undefined);
     closeEditItem();
+  };
+
+  // ─── Add by hand ────────────────────────────────────────────────
+  const addManualItem = async (entry: NewItem): Promise<boolean> => {
+    if (!user) return false;
+    const risk = deriveRisk(entry.daysLeft, entry.daysLeft, entry.name);
+    const { data, error } = await supabase
+      .from("pantry_items")
+      .insert([{
+        user_id: user.id,
+        ...householdIdField(),
+        name: entry.name,
+        days_left: entry.daysLeft,
+        risk,
+        purchase_date: new Date().toISOString(),
+        ...trackingFields(entry),
+      }])
+      .select("*")
+      .single();
+    if (error || !data) return false;
+    setItems((prev) => (prev.some((i) => i.id === data.id) ? prev : [rowToItem(data as PantryRow), ...prev]));
+    toast(`${entry.name} added`, { description: `${days(entry.daysLeft)} left.` });
+    return true;
   };
 
   const addMockInventoryData = async () => {
@@ -2218,6 +2243,14 @@ if (nutritionFieldsFilled < 2) {
             />
           </div>
           <button
+            onClick={() => setShowAddItem(true)}
+            title="Add an item by hand"
+            aria-label="Add an item by hand"
+            className="neu-pressable h-11 w-11 shrink-0 rounded-xl flex items-center justify-center text-foreground/70"
+          >
+            <Plus size={18} />
+          </button>
+          <button
             onClick={() => setShowFilters((v) => !v)}
             aria-expanded={showFilters}
             aria-controls="pantry-filters"
@@ -2341,7 +2374,7 @@ if (nutritionFieldsFilled < 2) {
             <p className="text-sm text-foreground/60 max-w-60 leading-relaxed mb-6">
               {visibleItems.length > 0
                 ? "Try widening the filters to see the rest of your items."
-                : "Snap a grocery receipt and we will add everything on it, or scan one barcode to start. We will tell you what to eat before it goes off."}
+                : "Snap a grocery receipt, scan a barcode, or add something by hand. We will tell you what to eat before it goes off."}
             </p>
             <div className="flex flex-wrap items-center justify-center gap-2">
               <button
@@ -2349,6 +2382,12 @@ if (nutritionFieldsFilled < 2) {
                 className="flex items-center gap-2 bg-foreground text-background text-sm font-semibold px-5 py-2.5 rounded-xl hover:opacity-90 transition-opacity"
               >
                 <Camera size={16} /> Scan Receipt
+              </button>
+              <button
+                onClick={() => setShowAddItem(true)}
+                className="flex items-center gap-2 border border-border bg-card text-foreground text-sm font-semibold px-5 py-2.5 rounded-xl hover:bg-foreground/5 transition-colors"
+              >
+                <Plus size={16} /> Add by hand
               </button>
               {isAdmin && (
                 <button
@@ -2606,6 +2645,15 @@ if (nutritionFieldsFilled < 2) {
       </nav>
 
       {needsDiet && <DietPromptModal />}
+
+      {showAddItem && (
+        <AddItemModal
+          userDiet={userDietPreference}
+          trackingAvailable={!!trackingSchemaReady}
+          onAdd={addManualItem}
+          onClose={() => setShowAddItem(false)}
+        />
+      )}
 
       {showOnboarding && <OnboardingTour onFinish={finishOnboarding} />}
 
