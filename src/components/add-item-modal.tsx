@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { X, Loader2, Plus, ScanLine } from "lucide-react";
 import BarcodeScanner from "@/components/barcode-scanner";
 import { parseGs1 } from "@/lib/gs1";
+import { matchesTerm } from "@/lib/text-match";
 import { estimateShelfLife, formatProvenance } from "@/lib/shelf-life";
 import { isDietConflict, resolveItemDiet, DIET_PREFERENCE_LABEL, type DietPreference } from "@/lib/diet";
 import {
@@ -99,7 +100,7 @@ export function AddItemModal({ userDiet, trackingAvailable, onAdd, onClose }: Ad
         return;
       }
       const brand = product?.brands?.split(",")[0]?.trim();
-      const withBrand = brand && !base.toLowerCase().includes(brand.toLowerCase()) ? `${brand} ${base}` : base;
+      const withBrand = brand && !matchesTerm(base.toLowerCase(), brand.toLowerCase()) ? `${brand} ${base}` : base;
       setName(withBrand.slice(0, 80));
     } catch {
       setError("Couldn't look that barcode up. Check your connection, or type the name.");
