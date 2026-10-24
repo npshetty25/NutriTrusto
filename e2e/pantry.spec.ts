@@ -101,7 +101,7 @@ test.describe("pantry", () => {
     };
     await openDashboard(page);
 
-    await page.getByRole("button", { name: /^Receipt$/ }).click();
+    await page.getByRole("button", { name: /^Add product$/ }).click();
     await page.getByText("Choose from Gallery").click();
     await page.getByTitle("Choose a receipt photo from your gallery").setInputFiles(jpeg());
 
@@ -117,7 +117,7 @@ test.describe("pantry", () => {
   test("a receipt that cannot be read shows an error and adds nothing", async ({ backend, page }) => {
     backend.api["extract"] = { status: 500, body: { success: false, error: "Failed to parse receipt" } };
     await openDashboard(page);
-    await page.getByRole("button", { name: /^Receipt$/ }).click();
+    await page.getByRole("button", { name: /^Add product$/ }).click();
     await page.getByText("Choose from Gallery").click();
     await page.getByTitle("Choose a receipt photo from your gallery").setInputFiles(jpeg());
 
