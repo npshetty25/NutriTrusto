@@ -8,6 +8,7 @@ import { ArrowLeft, Search, Loader2, ExternalLink, ChevronRight, Leaf, Egg, Uten
 import { getItemDietType, lockedDietScope, normalizeDietPreference, type ItemDietType } from "@/lib/diet";
 import { VegMark } from "@/components/veg-mark";
 import { motion } from "framer-motion";
+import { LOCAL_RECIPES, localRecipeId, findLocalRecipe, localRecipeDiet, localRecipeDetail } from "@/lib/global-recipes";
 
 // Every entry here was checked against TheMealDB's filter endpoint on
 // 2026-08-26 and returns a non-empty result. The list is NOT taken from the
@@ -22,46 +23,25 @@ import { motion } from "framer-motion";
 // The count beside each name is what the API returned at the time of
 // checking; it is a comment, not a promise, and the UI reads the real
 // number at runtime.
-const COUNTRIES = [
-  { name: "India", flag: "🇮🇳" },            // 15
-  { name: "Bangladesh", flag: "🇧🇩" },       // 3
-  { name: "Thai", flag: "🇹🇭" },             // 27
-  { name: "Chinese", flag: "🇨🇳" },          // 27
-  { name: "Japanese", flag: "🇯🇵" },         // 9
-  { name: "Malaysian", flag: "🇲🇾" },        // 8
-  { name: "Vietnamese", flag: "🇻🇳" },       // 27
-  { name: "Filipino", flag: "🇵🇭" },         // 8
-  { name: "Turkish", flag: "🇹🇷" },          // 30
-  { name: "Saudi Arabian", flag: "🇸🇦" },    // 12
-  { name: "Syrian", flag: "🇸🇾" },           // 6
-  { name: "Egyptian", flag: "🇪🇬" },         // 8
-  { name: "Moroccan", flag: "🇲🇦" },         // 6
-  { name: "Algerian", flag: "🇩🇿" },         // 12
-  { name: "Tunisian", flag: "🇹🇳" },         // 8
-  { name: "Kenyan", flag: "🇰🇪" },           // 5
-  { name: "Italian", flag: "🇮🇹" },          // 21
-  { name: "Spanish", flag: "🇪🇸" },          // 48
-  { name: "France", flag: "🇫🇷" },           // 28
-  { name: "Greek", flag: "🇬🇷" },            // 8
-  { name: "Portuguese", flag: "🇵🇹" },       // 8
-  { name: "British", flag: "🇬🇧" },          // 60
-  { name: "Ireland", flag: "🇮🇪" },          // 8
-  { name: "Netherlands", flag: "🇳🇱" },      // 18
-  { name: "Poland", flag: "🇵🇱" },           // 27
-  { name: "Croatian", flag: "🇭🇷" },         // 8
-  { name: "Slovakia", flag: "🇸🇰" },         // 4
-  { name: "Ukrainian", flag: "🇺🇦" },        // 7
-  { name: "Russian", flag: "🇷🇺" },          // 7
-  { name: "Norway", flag: "🇳🇴" },           // 18
-  { name: "United States", flag: "🇺🇸" },    // 34
-  { name: "Canadian", flag: "🇨🇦" },         // 22
-  { name: "Mexican", flag: "🇲🇽" },          // 6
-  { name: "Jamaican", flag: "🇯🇲" },         // 27
-  { name: "Brazil", flag: "🇧🇷" },           // 11
-  { name: "Argentina", flag: "🇦🇷" },        // 10
-  { name: "Venezuela", flag: "🇻🇪" },        // 10
-  { name: "Uruguayan", flag: "🇺🇾" },        // 9
-  { name: "Australian", flag: "🇦🇺" },       // 13
+// The 15 best food countries, in rank order. `area` is the name TheMealDB
+// files that cuisine under, when it has one; Peru, Indonesia and Serbia have
+// no TheMealDB entry, so their dishes come only from lib/global-recipes.ts.
+const COUNTRIES: { name: string; flag: string; area?: string }[] = [
+  { name: "Italy", flag: "🇮🇹", area: "Italian" },
+  { name: "Greece", flag: "🇬🇷", area: "Greek" },
+  { name: "Peru", flag: "🇵🇪" },
+  { name: "Portugal", flag: "🇵🇹", area: "Portuguese" },
+  { name: "Spain", flag: "🇪🇸", area: "Spanish" },
+  { name: "Japan", flag: "🇯🇵", area: "Japanese" },
+  { name: "Turkey", flag: "🇹🇷", area: "Turkish" },
+  { name: "China", flag: "🇨🇳", area: "Chinese" },
+  { name: "France", flag: "🇫🇷", area: "France" },
+  { name: "Indonesia", flag: "🇮🇩" },
+  { name: "Mexico", flag: "🇲🇽", area: "Mexican" },
+  { name: "Serbia", flag: "🇷🇸" },
+  { name: "India", flag: "🇮🇳", area: "India" },
+  { name: "Poland", flag: "🇵🇱", area: "Poland" },
+  { name: "United States", flag: "🇺🇸", area: "United States" },
 ];
 
 // TheMealDB's lookup endpoint returns one flat object per meal: named fields
@@ -184,18 +164,31 @@ export default function RecipesPage() {
   const hiddenCount = meals.length - visibleMeals.length;
 
   const fetchMealsByCountry = async (country: string) => {
+    const entry = COUNTRIES.find((c) => c.name === country);
     setSelectedCountry(country);
     setMeals([]);
     setSelectedMeal(null);
     setMealDetail(null);
-    setVerified({});
     setLoading(true);
+
+    // Our own dishes come with their diet already read from the ingredients,
+    // so they are marked verified without a network lookup.
+    const own = LOCAL_RECIPES[country] ?? [];
+    const ownMeals: Meal[] = own.map((r) => ({ idMeal: localRecipeId(r), strMeal: r.name, strMealThumb: "" }));
+    const ownVerified: Record<string, ItemDietType> = {};
+    for (const r of own) ownVerified[localRecipeId(r)] = localRecipeDiet(r);
+    setVerified(ownVerified);
+
     try {
-      const res = await fetch(`https://www.themealdb.com/api/json/v1/1/filter.php?a=${country}`);
-      const data = await res.json();
-      setMeals(data.meals || []);
+      let remote: Meal[] = [];
+      if (entry?.area) {
+        const res = await fetch(`https://www.themealdb.com/api/json/v1/1/filter.php?a=${entry.area}`);
+        const data = await res.json();
+        remote = data.meals || [];
+      }
+      setMeals([...ownMeals, ...remote]);
     } catch {
-      setMeals([]);
+      setMeals(ownMeals);
     } finally {
       setLoading(false);
     }
@@ -204,6 +197,11 @@ export default function RecipesPage() {
   const fetchMealDetail = async (meal: Meal) => {
     setSelectedMeal(meal);
     setMealDetail(null);
+    const own = findLocalRecipe(meal.idMeal);
+    if (own) {
+      setMealDetail(localRecipeDetail(own.country, own.recipe));
+      return;
+    }
     setLoadingDetail(true);
     try {
       const res = await fetch(`https://www.themealdb.com/api/json/v1/1/lookup.php?i=${meal.idMeal}`);
@@ -240,7 +238,7 @@ export default function RecipesPage() {
             </button>
             <div>
               <h1 className="text-lg font-bold tracking-tight">Global Recipes</h1>
-              <p className="text-[11px] text-foreground/50 font-medium">{COUNTRIES.length} cuisines · TheMealDB</p>
+              <p className="text-[11px] text-foreground/50 font-medium">{COUNTRIES.length} cuisines · TheMealDB and our own kitchen</p>
             </div>
           </div>
           <ProfileDropdown />
@@ -258,7 +256,13 @@ export default function RecipesPage() {
           </button>
 
           <div className="relative h-56 w-full bg-foreground/5">
-            <img src={selectedMeal.strMealThumb} alt={selectedMeal.strMeal} className="w-full h-full object-cover" />
+            selectedMeal.strMealThumb ? (
+              <img src={selectedMeal.strMealThumb} alt={selectedMeal.strMeal} className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center bg-foreground/5 text-foreground/30">
+                <UtensilsCrossed size={32} />
+              </div>
+            )
             <div className="absolute inset-0 bg-linear-to-t from-background to-transparent" />
           </div>
 
@@ -288,7 +292,9 @@ export default function RecipesPage() {
                 {/* Instructions */}
                 <h3 className="text-[11px] font-semibold uppercase tracking-widest text-foreground/50 mb-3">Instructions</h3>
                 <p className="text-sm text-foreground/70 leading-relaxed whitespace-pre-line mb-6">
-                  {mealDetail.strInstructions?.slice(0, 600)}{(mealDetail.strInstructions?.length ?? 0) > 600 ? "..." : ""}
+                  {findLocalRecipe(String(mealDetail.idMeal))
+                    ? <span className="whitespace-pre-line">{mealDetail.strInstructions}</span>
+                    : <>{mealDetail.strInstructions?.slice(0, 600)}{(mealDetail.strInstructions?.length ?? 0) > 600 ? "..." : ""}</>}
                 </p>
 
                 {/* Links */}
@@ -299,10 +305,12 @@ export default function RecipesPage() {
                       ▶ Watch on YouTube
                     </a>
                   )}
-                  <a href={`https://www.themealdb.com/meal/${mealDetail.idMeal}`} target="_blank" rel="noopener noreferrer"
-                    className="flex-1 flex items-center justify-center gap-2 bg-foreground text-background text-sm font-semibold py-3 rounded-xl hover:opacity-90 transition-opacity">
-                    Full Recipe <ExternalLink size={14} />
-                  </a>
+                  {!findLocalRecipe(String(mealDetail.idMeal)) && (
+                    <a href={`https://www.themealdb.com/meal/${mealDetail.idMeal}`} target="_blank" rel="noopener noreferrer"
+                      className="flex-1 flex items-center justify-center gap-2 bg-foreground text-background text-sm font-semibold py-3 rounded-xl hover:opacity-90 transition-opacity">
+                      Full Recipe <ExternalLink size={14} />
+                    </a>
+                  )}
                 </div>
               </>
             ) : null}
@@ -425,7 +433,13 @@ export default function RecipesPage() {
                     className="flex flex-col overflow-hidden rounded-xl border border-border bg-card hover:border-foreground/20 transition-all text-left"
                   >
                     <div className="h-28 w-full overflow-hidden bg-foreground/5">
-                      <img src={meal.strMealThumb} alt={meal.strMeal} className="w-full h-full object-cover hover:scale-105 transition-transform duration-300" />
+                      meal.strMealThumb ? (
+                        <img src={meal.strMealThumb} alt={meal.strMeal} className="w-full h-full object-cover hover:scale-105 transition-transform duration-300" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-foreground/5 text-foreground/30">
+                          <UtensilsCrossed size={28} />
+                        </div>
+                      )
                     </div>
                     <div className="p-3 flex items-start gap-1.5">
                       <VegMark
