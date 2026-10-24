@@ -17,11 +17,14 @@ import {
   type ExpirySource,
 } from "@/lib/item-tracking";
 import type { StorageLocation } from "@/lib/temperature";
+import type { DateKind } from "@/lib/date-kind";
 
 export interface NewItem {
   name: string;
   daysLeft: number;
   expirySource: ExpirySource;
+  /** Use-by (safety) or best-before (quality), when a date was typed. */
+  expiryKind: DateKind | null;
   storage: StorageLocation | null;
   openedAt: string | null;
 }
@@ -31,6 +34,8 @@ interface AddItemModalProps {
   /** False until db/supabase-schema-item-tracking.sql has run: storage and
    * opened are then not offered, because there is nowhere to keep them. */
   trackingAvailable: boolean;
+  /** False until db/supabase-schema-accuracy.sql has run. */
+  accuracyAvailable: boolean;
   onAdd: (item: NewItem) => Promise<boolean>;
   onClose: () => void;
 }
@@ -45,9 +50,10 @@ const days = (n: number) => `${n} ${n === 1 ? "day" : "days"}`;
  * pack is used as-is; only when there is none does the shelf-life estimate
  * fill in, and the form shows which one it is going to use before saving.
  */
-export function AddItemModal({ userDiet, trackingAvailable, onAdd, onClose }: AddItemModalProps) {
+export function AddItemModal({ userDiet, trackingAvailable, accuracyAvailable, onAdd, onClose }: AddItemModalProps) {
   const [name, setName] = useState("");
   const [packDate, setPackDate] = useState("");
+  const [dateKind, setDateKind] = useState<DateKind | null>(null);
   const [storage, setStorage] = useState<StorageLocation | null>(null);
   const [opened, setOpened] = useState(false);
   const [openedDays, setOpenedDays] = useState<number | null>(null);
@@ -122,6 +128,7 @@ export function AddItemModal({ userDiet, trackingAvailable, onAdd, onClose }: Ad
       name: trimmed,
       daysLeft: preview.daysLeft,
       expirySource,
+      expiryKind: accuracyAvailable && dateDays !== null ? dateKind : null,
       storage: trackingAvailable ? effectiveStorage : null,
       openedAt: trackingAvailable && opened ? new Date().toISOString() : null,
     });
@@ -192,7 +199,7 @@ export function AddItemModal({ userDiet, trackingAvailable, onAdd, onClose }: Ad
 
           <div className="space-y-1.5">
             <label htmlFor="add-item-date" className="text-[11px] font-semibold uppercase tracking-widest text-foreground/60">
-              Use-by date <span className="normal-case tracking-normal font-normal text-foreground/50">(from the pack, optional)</span>
+              Date on the pack <span className="normal-case tracking-normal font-normal text-foreground/50">(optional)</span>
             </label>
             <input
               id="add-item-date"
@@ -202,6 +209,27 @@ export function AddItemModal({ userDiet, trackingAvailable, onAdd, onClose }: Ad
               className="neu-field w-full rounded-xl px-4 py-3 text-base"
             />
             <p className="text-[11px] text-foreground/55">Type the date printed on the pack. A barcode doesn&apos;t carry it, and a date from the pack beats any estimate.</p>
+            {accuracyAvailable && packDate && (
+              <div className="pt-1">
+                <p className="text-[11px] text-foreground/60 mb-1.5">What does the pack call it?</p>
+                <div role="group" aria-label="Kind of date" className="grid grid-cols-2 gap-2">
+                  {([
+                    { id: "use_by", label: "Use by / Expiry" },
+                    { id: "best_before", label: "Best before" },
+                  ] as const).map((k) => (
+                    <button
+                      key={k.id}
+                      type="button"
+                      aria-pressed={dateKind === k.id}
+                      onClick={() => setDateKind(k.id)}
+                      className={chip(dateKind === k.id)}
+                    >
+                      {k.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {trackingAvailable && (

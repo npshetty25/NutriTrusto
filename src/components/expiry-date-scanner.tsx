@@ -10,6 +10,7 @@ interface ExpiryResult {
   source: "printed_expiry" | "mfd_plus_shelf_life" | "shelf_life_from_today" | "unknown";
   confidence: "high" | "medium" | "low";
   raw_text_found: string | null;
+  date_kind?: "use_by" | "best_before" | null;
 }
 
 interface ExpiryDateScannerProps {

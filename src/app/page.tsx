@@ -10,7 +10,8 @@ import {
 } from "@/lib/diet";
 
 import { calculateCurrentDaysLeft, calculateDaysPastEstimate } from "@/lib/item-age";
-import { parseGs1, gs1UseByDate } from "@/lib/gs1";
+import { parseGs1, gs1PrintedDate } from "@/lib/gs1";
+import { asDateKind, pastDateMessage, type DateKind } from "@/lib/date-kind";
 
 // One definition, in lib/risk-bands.ts. This was a byte-identical copy of
 // the rule in api/extract/route.ts — the same duplication that let the
@@ -145,6 +146,9 @@ interface Item {
   storage?: StorageLocation | null;
   openedAt?: string | null;
   expirySource?: ExpirySource;
+  // db/supabase-schema-accuracy.sql — undefined until it has run.
+  expiryKind?: DateKind | null;
+  quantity?: string | null;
 }
 
 type PantryRow = {
@@ -157,6 +161,8 @@ type PantryRow = {
   storage?: string | null;
   opened_at?: string | null;
   expiry_source?: string | null;
+  expiry_kind?: string | null;
+  quantity?: string | null;
 };
 
 const asStorage = (v: unknown): StorageLocation | null =>
@@ -178,6 +184,8 @@ function rowToItem(row: PantryRow): Item {
     storage: asStorage(row.storage),
     openedAt: row.opened_at ?? null,
     expirySource: asExpirySource(row.expiry_source),
+    expiryKind: asDateKind(row.expiry_kind),
+    quantity: row.quantity ?? null,
   };
 }
 
@@ -186,8 +194,13 @@ const STORAGE_TAG: Record<StorageLocation, string> = { fridge: "In the fridge", 
 /** The small facts on a card that came from the person, not the estimate. */
 function trackingTagsFor(item: Item): string[] {
   const tags: string[] = [];
-  if (item.expirySource === "printed") tags.push("Date from pack");
-  if (item.expirySource === "user") tags.push("Date set by you");
+  if (item.expirySource === "printed") {
+    tags.push(item.expiryKind === "use_by" ? "Use-by from pack" : item.expiryKind === "best_before" ? "Best-before from pack" : "Date from pack");
+  }
+  if (item.expirySource === "user") {
+    tags.push(item.expiryKind === "use_by" ? "Use-by set by you" : item.expiryKind === "best_before" ? "Best-before set by you" : "Date set by you");
+  }
+  if (item.quantity) tags.push(item.quantity);
   if (item.storage) tags.push(STORAGE_TAG[item.storage]);
   if (item.openedAt) {
     const d = new Date(item.openedAt);
@@ -220,8 +233,9 @@ interface ScannedResultEntry {
 }
 
 /** A printed date (from a GS1 barcode) as the scan result's expiry entry. */
-function expiryFromPrintedDate(date: Date | null): ScannedExpiryEntry | null {
-  if (!date) return null;
+function expiryFromPrintedDate(printed: { date: Date; kind: DateKind } | null): ScannedExpiryEntry | null {
+  if (!printed) return null;
+  const { date, kind } = printed;
   const today = new Date();
   const todayUtc = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
   const daysLeft = Math.max(0, Math.round((date.getTime() - todayUtc) / (24 * 60 * 60 * 1000)));
@@ -230,6 +244,7 @@ function expiryFromPrintedDate(date: Date | null): ScannedExpiryEntry | null {
     expiryDate: date.toISOString().slice(0, 10),
     source: "printed_expiry",
     confidence: "high",
+    kind,
   };
 }
 
@@ -238,6 +253,8 @@ interface ScannedExpiryEntry {
   expiryDate: string | null;
   source: "printed_expiry" | "mfd_plus_shelf_life" | "shelf_life_from_today" | "unknown";
   confidence: "high" | "medium" | "low";
+  // Use-by (safety) or best-before (quality), when the pack said which.
+  kind?: DateKind | null;
 }
 
 const PLACEHOLDER_INGREDIENTS_TEXT = "None provided, rely purely on AI general knowledge";
@@ -248,7 +265,7 @@ const INVENTORY_PAGE_SIZE = 6;
 // No fallback items — real users start with an empty pantry.
 
 export default function Home() {
-  const { user, loading: authLoading, household, householdSchemaReady, ingredientsSchemaReady, healthScoreSchemaReady, trackingSchemaReady } = useAuth();
+  const { user, loading: authLoading, household, householdSchemaReady, ingredientsSchemaReady, healthScoreSchemaReady, trackingSchemaReady, accuracySchemaReady } = useAuth();
   // UI-only gate, not a security one — see lib/admin.ts. Hides "Add Demo
   // Data" from everyone but the project owner, so a real user never sees a
   // button that fills their pantry with sample groceries.
@@ -274,6 +291,12 @@ export default function Home() {
   const trackingFields = (t: { storage?: StorageLocation | null; openedAt?: string | null; expirySource?: ExpirySource }) =>
     trackingSchemaReady
       ? { storage: t.storage ?? null, opened_at: t.openedAt ?? null, expiry_source: t.expirySource ?? null }
+      : {};
+
+  // And for quantity / expiry_kind (db/supabase-schema-accuracy.sql).
+  const accuracyFields = (t: { quantity?: string | null; expiryKind?: DateKind | null }) =>
+    accuracySchemaReady
+      ? { quantity: t.quantity?.trim() || null, expiry_kind: t.expiryKind ?? null }
       : {};
   const router = useRouter();
 
@@ -309,7 +332,7 @@ export default function Home() {
   // The printed date read out of a GS1 barcode, held across the lookup (and
   // the "type the name" fallback when the product database has no entry), so
   // it lands on whichever scan result eventually appears.
-  const pendingPrintedDate = useRef<Date | null>(null);
+  const pendingPrintedDate = useRef<{ date: Date; kind: DateKind } | null>(null);
   const [barcodeRetryPrompt, setBarcodeRetryPrompt] = useState<{ code: string } | null>(null);
   const [showBarcodeRetryOptions, setShowBarcodeRetryOptions] = useState(false);
   const [manualRetryBarcode, setManualRetryBarcode] = useState("");
@@ -980,6 +1003,7 @@ export default function Home() {
         risk,
         purchase_date: new Date().toISOString(),
         ...trackingFields(entry),
+        ...accuracyFields(entry),
       }])
       .select("*")
       .single();
@@ -1397,7 +1421,7 @@ export default function Home() {
     // lookup below needs just the product code.
     const gs1 = parseGs1(rawScan);
     const decodedText = gs1?.lookupCode ?? rawScan;
-    pendingPrintedDate.current = gs1UseByDate(gs1);
+    pendingPrintedDate.current = gs1PrintedDate(gs1);
     setInlineError(null);
     setBarcodeRetryPrompt(null);
     setShowBarcodeRetryOptions(false);
@@ -1674,6 +1698,7 @@ if (nutritionFieldsFilled < 2) {
       // A date read off the pack (photo or GS1 barcode) is the pack's own
       // claim; mark it so later storage changes never recompute it.
       ...trackingFields({ expirySource: shelfLife.source === "scanned" ? "printed" : null }),
+      ...accuracyFields({ expiryKind: shelfLife.source === "scanned" ? scannedExpiry?.kind ?? null : null }),
       name: scannedResult.name,
       days_left: initialDaysLeft,
       risk: deriveRisk(initialDaysLeft, initialDaysLeft, scannedResult.name),
@@ -1782,6 +1807,7 @@ if (nutritionFieldsFilled < 2) {
     expiry_date: string | null;
     source: "printed_expiry" | "mfd_plus_shelf_life" | "shelf_life_from_today" | "unknown";
     confidence: "high" | "medium" | "low";
+    date_kind?: string | null;
   }) => {
     setShowExpiryScanner(false);
     if (expiry.days_left === null) return;
@@ -1791,6 +1817,7 @@ if (nutritionFieldsFilled < 2) {
       expiryDate: expiry.expiry_date,
       source: expiry.source,
       confidence: expiry.confidence,
+      kind: asDateKind(expiry.date_kind),
     });
     toast("Expiry date detected", {
       description: expiry.expiry_date
@@ -2457,6 +2484,7 @@ if (nutritionFieldsFilled < 2) {
                   ifStoredDifferently={item.expirySource ? undefined : shelfEstimate.ifStoredDifferently}
                   currentStorage={item.storage ?? shelfRow?.storage}
                   trackingTags={trackingTagsFor(item)}
+                  pastDateNote={item.expirySource ? pastDateMessage(item.expiryKind ?? null) : null}
                   healthierAlternative={healthierAlternative}
                   detectedAllergens={detectedAllergens}
                   actions={
@@ -2672,6 +2700,7 @@ if (nutritionFieldsFilled < 2) {
         <AddItemModal
           userDiet={userDietPreference}
           trackingAvailable={!!trackingSchemaReady}
+          accuracyAvailable={!!accuracySchemaReady}
           onAdd={addManualItem}
           onClose={() => setShowAddItem(false)}
         />
@@ -2724,7 +2753,9 @@ if (nutritionFieldsFilled < 2) {
                     <>
                       <span className="text-lg font-black">{days(scannedExpiry.daysLeft)} left</span>
                       <span className="text-[11px] text-foreground/60 truncate">
-                        {scannedExpiry.expiryDate ? `Expires ${scannedExpiry.expiryDate}` : "From printed shelf-life"}
+                        {scannedExpiry.expiryDate
+                          ? `${scannedExpiry.kind === "best_before" ? "Best before" : scannedExpiry.kind === "use_by" ? "Use by" : "Expires"} ${scannedExpiry.expiryDate}`
+                          : "From printed shelf-life"}
                         {scannedExpiry.confidence !== "high" ? " · double-check label" : ""}
                       </span>
                     </>

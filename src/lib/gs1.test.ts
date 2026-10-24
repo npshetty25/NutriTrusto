@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { gs1UseByDate, parseGs1, parseGs1Date } from "./gs1";
+import { gs1PrintedDate, gs1UseByDate, parseGs1, parseGs1Date } from "./gs1";
 
 const iso = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : null);
 
@@ -42,5 +42,13 @@ describe("parseGs1", () => {
   it("prefers expiry over best-before", () => {
     const g = parseGs1("(01)08901058000290(15)260630(17)260615");
     expect(iso(gs1UseByDate(g))).toBe("2026-06-15");
+  });
+});
+
+describe("gs1PrintedDate", () => {
+  it("names AI 17 as a use-by date and AI 15 as best-before", () => {
+    expect(gs1PrintedDate(parseGs1("(01)08901058000290(17)270131"))?.kind).toBe("use_by");
+    expect(gs1PrintedDate(parseGs1("(01)08901058000290(15)270131"))?.kind).toBe("best_before");
+    expect(gs1PrintedDate(parseGs1("(01)08901058000290"))).toBeNull();
   });
 });

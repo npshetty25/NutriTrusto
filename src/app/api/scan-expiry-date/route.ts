@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { resolveDateKind } from "@/lib/date-kind";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { createRequestContext } from "@/lib/server-logger";
 import { validateUpload } from "@/lib/upload-validation";
@@ -20,6 +21,7 @@ type ParsedExpiryFields = {
   shelf_life_unit?: "days" | "months" | "years" | null;
   raw_text_found?: string | null;
   confidence?: "high" | "medium" | "low";
+  date_kind?: string | null;
 };
 
 const parseIsoDate = (value: unknown): Date | null => {
@@ -71,8 +73,14 @@ Return ONLY this JSON object, nothing else. No markdown formatting, no explanati
   "shelf_life_value": number or null,
   "shelf_life_unit": "days" or "months" or "years" or null,
   "raw_text_found": "short excerpt of the actual printed date/shelf-life text" or null,
-  "confidence": "high" or "medium" or "low"
+  "confidence": "high" or "medium" or "low",
+  "date_kind": "use_by" or "best_before" or null
 }
+
+"date_kind" says which kind of date is printed:
+- "use_by" when the label says "Use by", "Expiry", "Exp", or "Expires"
+- "best_before" when it says "Best before", "Best before end", "BB", or "Best before N months from packing"
+- null when the label does not say which
 
 The "confidence" field is your honest assessment:
 - "high" = date text clearly visible and unambiguous
@@ -169,6 +177,7 @@ export async function POST(req: Request) {
         source,
         confidence,
         raw_text_found: typeof parsed.raw_text_found === "string" ? parsed.raw_text_found : null,
+        date_kind: resolveDateKind(parsed.date_kind, parsed.raw_text_found),
       },
     });
   } catch (error: unknown) {

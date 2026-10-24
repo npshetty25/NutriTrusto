@@ -58,7 +58,16 @@ describe("POST /api/scan-expiry-date — resolving a date", () => {
       source: "printed_expiry",
       confidence: "high",
       raw_text_found: "EXP 20/10/2026",
+      // "EXP" on the pack is a use-by (safety) date, read from the excerpt.
+      date_kind: "use_by",
     });
+  });
+
+  it("says when the printed date is a best-before rather than a use-by", async () => {
+    const { body } = await scan({ expiry_date_iso: "2026-10-20", confidence: "high", raw_text_found: "Best Before 20/10/2026" });
+    expect(body.expiry).toMatchObject({ date_kind: "best_before" });
+    const told = await scan({ expiry_date_iso: "2026-10-20", confidence: "high", raw_text_found: "20/10/2026", date_kind: "use_by" });
+    expect(told.body.expiry).toMatchObject({ date_kind: "use_by" });
   });
 
   it("adds a printed shelf life to the manufacture date when there is no expiry date", async () => {
@@ -104,7 +113,7 @@ describe("POST /api/scan-expiry-date — resolving a date", () => {
 describe("POST /api/scan-expiry-date — refusing to invent a date", () => {
   it("reports unknown when the model found nothing", async () => {
     const { body } = await scan({ expiry_date_iso: null, mfd_date_iso: null, shelf_life_value: null, shelf_life_unit: null, confidence: "low" });
-    expect(body.expiry).toEqual({ days_left: null, expiry_date: null, source: "unknown", confidence: "low", raw_text_found: null });
+    expect(body.expiry).toEqual({ days_left: null, expiry_date: null, source: "unknown", confidence: "low", raw_text_found: null, date_kind: null });
   });
 
   it("ignores a date that is not valid ISO", async () => {
