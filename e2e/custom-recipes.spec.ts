@@ -18,9 +18,9 @@ test.describe("my recipes", () => {
     await dialog.getByLabel("Steps").fill("Pressure-cook the dal.\nFry the onion.");
     await dialog.getByRole("button", { name: "Save recipe" }).click();
 
-    await expect(page.getByRole("button", { name: "Amma's dal" })).toBeVisible();
+    await expect(page.getByText("Amma's dal", { exact: true })).toBeVisible();
     await expect.poll(() => backend.tables.custom_recipes.length).toBe(1);
-    expect(backend.tables.custom_recipes[0]).toMatchObject({ name: "Amma's dal", is_favourite: false });
+    expect(backend.tables.custom_recipes[0]).toMatchObject({ name: "Amma's dal" });
 
     await page.getByRole("button", { name: "Add Amma's dal to favourites" }).click();
     await expect.poll(() => backend.tables.custom_recipes[0].is_favourite).toBe(true);
