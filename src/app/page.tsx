@@ -124,6 +124,7 @@ import { isAdminEmail } from "@/lib/admin";
 import { DEFAULT_NOTIFY_DAYS_BEFORE } from "@/components/notification-preferences-modal";
 import { OnboardingTour, hasSeenOnboarding, markOnboardingSeen } from "@/components/onboarding-tour";
 import { DietPromptModal } from "@/components/diet-prompt-modal";
+import { learnFromOutcomes, adjustEstimate, type Adjustment } from "@/lib/household-learning";
 
 interface Item {
   id: string;
@@ -369,6 +370,23 @@ export default function Home() {
   const [editOpenedDays, setEditOpenedDays] = useState<number | null>(null);
   const [editQuantity, setEditQuantity] = useState("");
   const [showAddItem, setShowAddItem] = useState(false);
+  // Where our estimates have run long for this account, learned from its own
+  // removals (item_outcomes). See lib/household-learning.ts.
+  const [learned, setLearned] = useState<Map<string, Adjustment>>(new Map());
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    supabase
+      .from("item_outcomes")
+      .select("name, outcome, days_left_at_removal")
+      .order("removed_at", { ascending: false })
+      .limit(500)
+      .then(({ data, error }) => {
+        // No table yet, or no history: nothing to learn, nothing changes.
+        if (!cancelled && !error && data) setLearned(learnFromOutcomes(data));
+      });
+    return () => { cancelled = true; };
+  }, [user]);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [showShoppingList, setShowShoppingList] = useState(false);
   const [showPantryChat, setShowPantryChat] = useState(false);
@@ -1323,10 +1341,12 @@ export default function Home() {
         const normalizedItems = (data.items as Array<{ name?: unknown; days_left?: unknown }>)
           .map((apiItem) => {
             const name = String(apiItem?.name || "").trim();
-            const daysLeft = Number.isFinite(Number(apiItem?.days_left))
+            const fromReceipt = Number.isFinite(Number(apiItem?.days_left))
               ? Math.max(1, Math.min(3650, Math.round(Number(apiItem.days_left))))
               : 7;
             if (!name) return null;
+            // Receipt day counts are estimates, so history may shorten them.
+            const daysLeft = adjustEstimate(name, fromReceipt, learned).days;
 
             return {
               name,
@@ -1717,7 +1737,11 @@ if (nutritionFieldsFilled < 2) {
     // basmati rice on the same clock. The estimate now depends on what the
     // item is, and carries where the number came from.
     const shelfLife = estimateShelfLife(scannedResult.name, scannedExpiry?.daysLeft, { databaseCategories: scannedResult.categories });
-    const initialDaysLeft = shelfLife.days;
+    // A printed date is never adjusted; our estimate may be, from history.
+    const learnedAdjustment = shelfLife.source === "scanned"
+      ? { days: shelfLife.days, note: null }
+      : adjustEstimate(scannedResult.name, shelfLife.days, learned);
+    const initialDaysLeft = learnedAdjustment.days;
     const newItem = {
       user_id: user.id,
       ...householdIdField(),
@@ -1758,7 +1782,7 @@ if (nutritionFieldsFilled < 2) {
          }, ...prev];
        });
        toast(`Added — ${days(initialDaysLeft)} left`, {
-         description: shelfLife.explanation,
+         description: learnedAdjustment.note ? `${shelfLife.explanation} ${learnedAdjustment.note}` : shelfLife.explanation,
          // An estimate the app is unsure about gets a way to correct it
          // right there, rather than a note telling the user to go and find
          // the item later.
@@ -2730,6 +2754,7 @@ if (nutritionFieldsFilled < 2) {
           trackingAvailable={!!trackingSchemaReady}
           accuracyAvailable={!!accuracySchemaReady}
           onAdd={addManualItem}
+          adjustEstimate={(name, d) => adjustEstimate(name, d, learned)}
           onClose={() => setShowAddItem(false)}
         />
       )}

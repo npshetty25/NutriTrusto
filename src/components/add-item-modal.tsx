@@ -39,6 +39,9 @@ interface AddItemModalProps {
   /** False until db/supabase-schema-accuracy.sql has run. */
   accuracyAvailable: boolean;
   onAdd: (item: NewItem) => Promise<boolean>;
+  /** Shortens our estimate where this person's history says it runs long
+   * (lib/household-learning.ts). Never applied to a typed date. */
+  adjustEstimate?: (name: string, days: number) => { days: number; note: string | null };
   onClose: () => void;
 }
 
@@ -52,7 +55,7 @@ const days = (n: number) => `${n} ${n === 1 ? "day" : "days"}`;
  * pack is used as-is; only when there is none does the shelf-life estimate
  * fill in, and the form shows which one it is going to use before saving.
  */
-export function AddItemModal({ userDiet, trackingAvailable, accuracyAvailable, onAdd, onClose }: AddItemModalProps) {
+export function AddItemModal({ userDiet, trackingAvailable, accuracyAvailable, onAdd, adjustEstimate, onClose }: AddItemModalProps) {
   const [name, setName] = useState("");
   const [quantity, setQuantity] = useState("");
   const [packDate, setPackDate] = useState("");
@@ -76,6 +79,13 @@ export function AddItemModal({ userDiet, trackingAvailable, accuracyAvailable, o
   if (estimate) {
     let daysLeft = dateDays ?? estimate.days;
     let note = dateDays !== null ? "From the date you entered." : estimate.explanation;
+    if (dateDays === null && adjustEstimate) {
+      const learned = adjustEstimate(trimmed, daysLeft);
+      if (learned.note) {
+        daysLeft = learned.days;
+        note = `${note} ${learned.note}`;
+      }
+    }
     if (trackingAvailable && storage && storage !== estimate.storage) {
       const moved = daysLeftAfterMove(trimmed, daysLeft, estimate.storage, storage, expirySource);
       daysLeft = moved.daysLeft;
