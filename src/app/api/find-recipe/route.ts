@@ -14,6 +14,8 @@ const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null;
 interface PantryItem {
   name: string;
   daysLeft: number;
+  /** How much is left, as the person typed it ("500 g"). Optional. */
+  quantity?: string;
   /**
    * Days elapsed beyond the item's estimated shelf life, 0 when still within
    * it. Sent separately because `daysLeft` is clamped at zero on the client,
@@ -180,9 +182,14 @@ export async function POST(req: Request) {
           // in the prompt exactly like a USDA-sourced one. Saying so lets the
           // model pick a method that survives the estimate being wrong.
           const rough = i.confidence === "low" ? ", rough estimate" : "";
+          // Only a short, plain amount reaches the prompt — never free text
+          // that could carry instructions.
+          const amount = typeof i.quantity === "string" && i.quantity.trim()
+            ? `, about ${i.quantity.trim().slice(0, 40).replace(/[^\p{L}\p{N} .,/-]/gu, "")} left`
+            : "";
           return i.daysLeft === 0
-            ? `- ${i.name} (due today — tell the cook to look at it and smell it first${rough})`
-            : `- ${i.name} (${i.daysLeft} day${i.daysLeft === 1 ? "" : "s"} left${rough})`;
+            ? `- ${i.name} (due today — tell the cook to look at it and smell it first${amount}${rough})`
+            : `- ${i.name} (${i.daysLeft} day${i.daysLeft === 1 ? "" : "s"} left${amount}${rough})`;
         })
         .join("\n");
 
@@ -214,7 +221,7 @@ Rules, in order of importance:
 4. Respect the dietary preference absolutely. "Veg" means no meat, no fish, no egg. "Eggtarian" allows egg but no meat or fish. Never break this.
 5. Cook it the way that dish is normally cooked — tadka where it belongs (jeera, rai, hing, curry leaves), bhuna-ing the masala, everyday spices (haldi, dhania, jeera powder, garam masala, lal mirch, amchur).
 6. You may assume only these everyday kitchen staples are at home: oil or ghee, salt, sugar, onion, tomato, ginger, garlic, green chilli, the ground spices above, atta, rice and a basic dal. Anything else the dish needs that is not in the lists above goes under "toBuy".
-7. Use Indian measures and names naturally (katori, tsp, tbsp, grams, ml; jeera, haldi, dhania), with the English term in brackets on first use where it isn't obvious.
+7. Where an item says how much is left, never use more of it than that, and size the dish to it. Use Indian measures and names naturally (katori, tsp, tbsp, grams, ml; jeera, haldi, dhania), with the English term in brackets on first use where it isn't obvious.
 8. The title is the dish's ordinary, well-known name — exactly what someone would call it at home (e.g. "Aloo Gobi", "Palak Paneer"). Do not list ingredients in the title, do not add made-up words, keep it under five words.
 9. If an item you use is marked "due today", the FIRST step must tell the cook to look at it and smell it before it goes in, and to leave it out if it does not seem right. Nobody has checked it yet, so the step must not contain the words "spoiled", "spoilage", "gone bad", "rotten" or "expired" ANYWHERE — not even conditionally, so "if it is spoiled, throw it away" is also forbidden. Say what to look for instead: soft or slimy patches, discolouration, a sour or unusual smell. Then say to leave it out if any of that is there.
 10. Where an item is marked "rough estimate", our day count for it is unreliable. Prefer a real dish that cooks it through (a sabzi, dal or curry) over one that serves it raw (raita, salad, chutney). Do not mention the estimate or its reliability in the recipe.

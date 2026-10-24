@@ -25,6 +25,8 @@ export interface NewItem {
   expirySource: ExpirySource;
   /** Use-by (safety) or best-before (quality), when a date was typed. */
   expiryKind: DateKind | null;
+  /** How much there is, as typed ("500 g"). */
+  quantity: string | null;
   storage: StorageLocation | null;
   openedAt: string | null;
 }
@@ -52,6 +54,7 @@ const days = (n: number) => `${n} ${n === 1 ? "day" : "days"}`;
  */
 export function AddItemModal({ userDiet, trackingAvailable, accuracyAvailable, onAdd, onClose }: AddItemModalProps) {
   const [name, setName] = useState("");
+  const [quantity, setQuantity] = useState("");
   const [packDate, setPackDate] = useState("");
   const [dateKind, setDateKind] = useState<DateKind | null>(null);
   const [storage, setStorage] = useState<StorageLocation | null>(null);
@@ -129,6 +132,7 @@ export function AddItemModal({ userDiet, trackingAvailable, accuracyAvailable, o
       daysLeft: preview.daysLeft,
       expirySource,
       expiryKind: accuracyAvailable && dateDays !== null ? dateKind : null,
+      quantity: accuracyAvailable && quantity.trim() ? quantity.trim().slice(0, 40) : null,
       storage: trackingAvailable ? effectiveStorage : null,
       openedAt: trackingAvailable && opened ? new Date().toISOString() : null,
     });
@@ -196,6 +200,24 @@ export function AddItemModal({ userDiet, trackingAvailable, accuracyAvailable, o
               className="neu-field w-full rounded-xl px-4 py-3 text-base"
             />
           </div>
+
+          {accuracyAvailable && (
+            <div className="space-y-1.5">
+              <label htmlFor="add-item-quantity" className="text-[11px] font-semibold uppercase tracking-widest text-foreground/60">
+                How much <span className="normal-case tracking-normal font-normal text-foreground/50">(optional)</span>
+              </label>
+              <input
+                id="add-item-quantity"
+                type="text"
+                maxLength={40}
+                placeholder="e.g. 500 g, 1 litre, half a packet"
+                value={quantity}
+                onChange={(e) => setQuantity(e.target.value)}
+                className="neu-field w-full rounded-xl px-4 py-3 text-base"
+              />
+              <p className="text-[11px] text-foreground/55">Recipes use it to size portions to what you actually have.</p>
+            </div>
+          )}
 
           <div className="space-y-1.5">
             <label htmlFor="add-item-date" className="text-[11px] font-semibold uppercase tracking-widest text-foreground/60">

@@ -367,6 +367,7 @@ export default function Home() {
   const [editStorage, setEditStorage] = useState<StorageLocation | null>(null);
   const [editOpened, setEditOpened] = useState(false);
   const [editOpenedDays, setEditOpenedDays] = useState<number | null>(null);
+  const [editQuantity, setEditQuantity] = useState("");
   const [showAddItem, setShowAddItem] = useState(false);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [showShoppingList, setShowShoppingList] = useState(false);
@@ -890,6 +891,7 @@ export default function Home() {
     setEditStorage(item.storage ?? null);
     setEditOpened(!!item.openedAt);
     setEditOpenedDays(null);
+    setEditQuantity(item.quantity ?? "");
   };
 
   const closeEditItem = () => {
@@ -948,6 +950,10 @@ export default function Home() {
     }
     const openedAt = editOpened ? (editingItem.openedAt ?? new Date().toISOString()) : null;
     const storage = editStorage ?? editingItem.storage ?? null;
+    const quantity = editQuantity.trim().slice(0, 40) || null;
+    // A newly typed date's kind is not known from the edit dialog; a date
+    // left alone keeps the kind it had.
+    const expiryKind = source === editingItem.expirySource && !editDate ? editingItem.expiryKind ?? null : null;
 
     // Keep the real purchase date: days_left is stored relative to it. This
     // used to reset purchase_date to today on every edit, which erased when
@@ -965,6 +971,7 @@ export default function Home() {
         days_left: storedDays,
         risk,
         ...trackingFields({ storage, openedAt, expirySource: source }),
+        ...accuracyFields({ quantity, expiryKind }),
       })
       .eq("id", editingItem.id);
 
@@ -983,6 +990,7 @@ export default function Home() {
           daysPastEstimate: calculateDaysPastEstimate(storedDays, editingItem.purchaseDate),
           risk,
           ...(trackingSchemaReady ? { storage, openedAt, expirySource: source } : {}),
+          ...(accuracySchemaReady ? { quantity, expiryKind } : {}),
         }
       : i));
     toast("Item updated", note ? { description: note } : undefined);
@@ -1199,6 +1207,8 @@ export default function Home() {
             // How much the day count beside it is worth. A "rough guess" row
             // and a USDA-sourced one looked identical in the prompt.
             confidence: findShelfLifeRow(i.name)?.row.confidence,
+            // How much is actually there, when the person has said.
+            quantity: i.quantity ?? undefined,
           })),
           dietaryPreference: String(user?.user_metadata?.dietary_preference || "none"),
           avoidTitles,
@@ -2996,6 +3006,22 @@ if (nutritionFieldsFilled < 2) {
                   className="w-full bg-background border border-border rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-1 focus:ring-foreground/20"
                 />
               </div>
+              {accuracySchemaReady && (
+                <div className="space-y-1.5">
+                  <label htmlFor="edit-item-quantity" className="text-[11px] font-semibold uppercase tracking-widest text-foreground/60">
+                    How much is left
+                  </label>
+                  <input
+                    id="edit-item-quantity"
+                    type="text"
+                    maxLength={40}
+                    placeholder="e.g. 500 g, 1 litre, half a packet"
+                    value={editQuantity}
+                    onChange={(e) => setEditQuantity(e.target.value)}
+                    className="w-full bg-background border border-border rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-1 focus:ring-foreground/20"
+                  />
+                </div>
+              )}
               <div className="space-y-1.5">
                 <label htmlFor="edit-item-date" className="text-[11px] font-semibold uppercase tracking-widest text-foreground/60">
                   Or the date on the pack
