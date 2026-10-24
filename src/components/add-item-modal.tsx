@@ -7,6 +7,7 @@ import BarcodeScanner from "@/components/barcode-scanner";
 import { parseGs1 } from "@/lib/gs1";
 import { matchesTerm } from "@/lib/text-match";
 import { estimateShelfLife, formatProvenance } from "@/lib/shelf-life";
+import { openedDaysFor } from "@/lib/foodkeeper";
 import { isDietConflict, resolveItemDiet, DIET_PREFERENCE_LABEL, type DietPreference } from "@/lib/diet";
 import {
   STORAGE_OPTIONS,
@@ -17,11 +18,16 @@ import {
   type ExpirySource,
 } from "@/lib/item-tracking";
 import type { StorageLocation } from "@/lib/temperature";
+import type { DateKind } from "@/lib/date-kind";
 
 export interface NewItem {
   name: string;
   daysLeft: number;
   expirySource: ExpirySource;
+  /** Use-by (safety) or best-before (quality), when a date was typed. */
+  expiryKind: DateKind | null;
+  /** How much there is, as typed ("500 g"). */
+  quantity: string | null;
   storage: StorageLocation | null;
   openedAt: string | null;
 }
@@ -31,7 +37,12 @@ interface AddItemModalProps {
   /** False until db/supabase-schema-item-tracking.sql has run: storage and
    * opened are then not offered, because there is nowhere to keep them. */
   trackingAvailable: boolean;
+  /** False until db/supabase-schema-accuracy.sql has run. */
+  accuracyAvailable: boolean;
   onAdd: (item: NewItem) => Promise<boolean>;
+  /** Shortens our estimate where this person's history says it runs long
+   * (lib/household-learning.ts). Never applied to a typed date. */
+  adjustEstimate?: (name: string, days: number) => { days: number; note: string | null };
   onClose: () => void;
 }
 
@@ -45,9 +56,11 @@ const days = (n: number) => `${n} ${n === 1 ? "day" : "days"}`;
  * pack is used as-is; only when there is none does the shelf-life estimate
  * fill in, and the form shows which one it is going to use before saving.
  */
-export function AddItemModal({ userDiet, trackingAvailable, onAdd, onClose }: AddItemModalProps) {
+export function AddItemModal({ userDiet, trackingAvailable, accuracyAvailable, onAdd, adjustEstimate, onClose }: AddItemModalProps) {
   const [name, setName] = useState("");
+  const [quantity, setQuantity] = useState("");
   const [packDate, setPackDate] = useState("");
+  const [dateKind, setDateKind] = useState<DateKind | null>(null);
   const [storage, setStorage] = useState<StorageLocation | null>(null);
   const [opened, setOpened] = useState(false);
   const [openedDays, setOpenedDays] = useState<number | null>(null);
@@ -61,19 +74,30 @@ export function AddItemModal({ userDiet, trackingAvailable, onAdd, onClose }: Ad
   const dateDays = packDate ? daysUntilDate(packDate) : null;
   const expirySource: ExpirySource = dateDays !== null ? "user" : null;
   const effectiveStorage = storage ?? estimate?.storage ?? null;
+  // USDA's "use within N days of opening", when it has one, until the person picks.
+  const openedSuggestion = trimmed && effectiveStorage ? openedDaysFor(trimmed, effectiveStorage) : null;
+  const effectiveOpenedDays = openedDays ?? openedSuggestion?.days ?? null;
+  const openedChoices = [...new Set([...OPENED_DAYS_OPTIONS, ...(openedSuggestion ? [openedSuggestion.days] : [])])].sort((a, b) => a - b);
 
   // What the item will show, step by step, so the preview and the save agree.
   let preview: { daysLeft: number; note: string } | null = null;
   if (estimate) {
     let daysLeft = dateDays ?? estimate.days;
     let note = dateDays !== null ? "From the date you entered." : estimate.explanation;
+    if (dateDays === null && adjustEstimate) {
+      const learned = adjustEstimate(trimmed, daysLeft);
+      if (learned.note) {
+        daysLeft = learned.days;
+        note = `${note} ${learned.note}`;
+      }
+    }
     if (trackingAvailable && storage && storage !== estimate.storage) {
       const moved = daysLeftAfterMove(trimmed, daysLeft, estimate.storage, storage, expirySource);
       daysLeft = moved.daysLeft;
       if (!moved.changed && moved.reason) note = `${note} ${moved.reason}`;
     }
-    if (trackingAvailable && opened && openedDays) {
-      daysLeft = daysLeftAfterOpening(daysLeft, openedDays);
+    if (trackingAvailable && opened && effectiveOpenedDays) {
+      daysLeft = daysLeftAfterOpening(daysLeft, effectiveOpenedDays);
     }
     preview = { daysLeft, note };
   }
@@ -114,7 +138,7 @@ export function AddItemModal({ userDiet, trackingAvailable, onAdd, onClose }: Ad
     if (!trimmed) return setError("Enter the item's name.");
     if (trimmed.length > 80) return setError("Keep the name under 80 characters.");
     if (packDate && dateDays === null) return setError("That date doesn't look right.");
-    if (trackingAvailable && opened && !openedDays) return setError("Pick how soon it should be used once opened.");
+    if (trackingAvailable && opened && !effectiveOpenedDays) return setError("Pick how soon it should be used once opened.");
     if (dietBlocked || !preview) return;
 
     setSaving(true);
@@ -122,6 +146,8 @@ export function AddItemModal({ userDiet, trackingAvailable, onAdd, onClose }: Ad
       name: trimmed,
       daysLeft: preview.daysLeft,
       expirySource,
+      expiryKind: accuracyAvailable && dateDays !== null ? dateKind : null,
+      quantity: accuracyAvailable && quantity.trim() ? quantity.trim().slice(0, 40) : null,
       storage: trackingAvailable ? effectiveStorage : null,
       openedAt: trackingAvailable && opened ? new Date().toISOString() : null,
     });
@@ -190,9 +216,27 @@ export function AddItemModal({ userDiet, trackingAvailable, onAdd, onClose }: Ad
             />
           </div>
 
+          {accuracyAvailable && (
+            <div className="space-y-1.5">
+              <label htmlFor="add-item-quantity" className="text-[11px] font-semibold uppercase tracking-widest text-foreground/60">
+                How much <span className="normal-case tracking-normal font-normal text-foreground/50">(optional)</span>
+              </label>
+              <input
+                id="add-item-quantity"
+                type="text"
+                maxLength={40}
+                placeholder="e.g. 500 g, 1 litre, half a packet"
+                value={quantity}
+                onChange={(e) => setQuantity(e.target.value)}
+                className="neu-field w-full rounded-xl px-4 py-3 text-base"
+              />
+              <p className="text-[11px] text-foreground/55">Recipes use it to size portions to what you actually have.</p>
+            </div>
+          )}
+
           <div className="space-y-1.5">
             <label htmlFor="add-item-date" className="text-[11px] font-semibold uppercase tracking-widest text-foreground/60">
-              Use-by date <span className="normal-case tracking-normal font-normal text-foreground/50">(from the pack, optional)</span>
+              Date on the pack <span className="normal-case tracking-normal font-normal text-foreground/50">(optional)</span>
             </label>
             <input
               id="add-item-date"
@@ -202,6 +246,27 @@ export function AddItemModal({ userDiet, trackingAvailable, onAdd, onClose }: Ad
               className="neu-field w-full rounded-xl px-4 py-3 text-base"
             />
             <p className="text-[11px] text-foreground/55">Type the date printed on the pack. A barcode doesn&apos;t carry it, and a date from the pack beats any estimate.</p>
+            {accuracyAvailable && packDate && (
+              <div className="pt-1">
+                <p className="text-[11px] text-foreground/60 mb-1.5">What does the pack call it?</p>
+                <div role="group" aria-label="Kind of date" className="grid grid-cols-2 gap-2">
+                  {([
+                    { id: "use_by", label: "Use by / Expiry" },
+                    { id: "best_before", label: "Best before" },
+                  ] as const).map((k) => (
+                    <button
+                      key={k.id}
+                      type="button"
+                      aria-pressed={dateKind === k.id}
+                      onClick={() => setDateKind(k.id)}
+                      className={chip(dateKind === k.id)}
+                    >
+                      {k.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {trackingAvailable && (
@@ -227,12 +292,17 @@ export function AddItemModal({ userDiet, trackingAvailable, onAdd, onClose }: Ad
                   <div className="pt-1">
                     <p className="text-[11px] text-foreground/60 mb-1.5">Use within how many days of opening? Most packs print this.</p>
                     <div role="group" aria-label="Use within days of opening" className="flex flex-wrap gap-2">
-                      {OPENED_DAYS_OPTIONS.map((d) => (
-                        <button key={d} type="button" aria-pressed={openedDays === d} onClick={() => setOpenedDays(d)} className={chip(openedDays === d)}>
+                      {openedChoices.map((d) => (
+                        <button key={d} type="button" aria-pressed={effectiveOpenedDays === d} onClick={() => setOpenedDays(d)} className={chip(effectiveOpenedDays === d)}>
                           {d}d
                         </button>
                       ))}
                     </div>
+                    {openedSuggestion && (
+                      <p className="text-[10px] text-foreground/45 mt-1.5">
+                        {openedSuggestion.days}d suggested from {openedSuggestion.citation}. The pack&apos;s own figure wins.
+                      </p>
+                    )}
                   </div>
                 )}
               </div>

@@ -1,4 +1,6 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { estimateShelfLife } from "@/lib/shelf-life";
+import { deriveRiskFromDaysOnly } from "@/lib/risk-bands";
 import { fileWithHeader, geminiText, JPEG_HEADER, multipartRequest, silenceLogs, TEST_USER } from "@/test/route-helpers";
 
 // The route parses a receipt's printed date in *server-local* time and returns
@@ -99,7 +101,7 @@ describe("POST /api/extract — upload validation (nothing is paid for before it
 });
 
 describe("POST /api/extract — turning Gemini output into pantry items", () => {
-  it("normalises names, day counts and risk, and drops nameless lines", async () => {
+  it("prefers our sourced figure, then the model's guess, then the category, and drops nameless lines", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-10-10T12:00:00Z"));
     generateContent.mockResolvedValue(
@@ -109,9 +111,10 @@ describe("POST /api/extract — turning Gemini output into pantry items", () => 
           items: [
             { name: "  Full Cream Milk  ", days_left: 5, risk: "HIGH" },
             { name: "Basmati Rice", days_left: "365", risk: "low" },
-            { name: "Mystery", days_left: "not a number", risk: "weird" },
-            { name: "Frozen peas", days_left: 99999, risk: "Critical" },
-            { name: "Zero day", days_left: 0, risk: "medium" },
+            { name: "Zorbix Party Mix", days_left: 45, risk: "low" },
+            { name: "Zorbix Mystery", days_left: "not a number", risk: "weird" },
+            { name: "Zorbix Overflow", days_left: 99999, risk: "Critical" },
+            { name: "Zorbix Zero", days_left: 0, risk: "medium" },
             { name: "   ", days_left: 3, risk: "low" },
             { days_left: 3, risk: "low" },
           ],
@@ -124,13 +127,28 @@ describe("POST /api/extract — turning Gemini output into pantry items", () => 
 
     expect(res.status).toBe(200);
     expect(body.success).toBe(true);
+    const known = (name: string) => {
+      const days = estimateShelfLife(name).days;
+      return { name, days_left: days, risk: deriveRiskFromDaysOnly(days), days_source: "table" };
+    };
+    const guessFromCategory = (name: string) => {
+      const days = estimateShelfLife(name).days;
+      return { name, days_left: days, risk: deriveRiskFromDaysOnly(days), days_source: "category" };
+    };
     expect(body.items).toEqual([
-      { name: "Full Cream Milk", days_left: 5, risk: "high" },
-      { name: "Basmati Rice", days_left: 365, risk: "low" },
-      { name: "Mystery", days_left: 7, risk: "low" }, // unparseable -> 7; unknown risk -> low
-      { name: "Frozen peas", days_left: 3650, risk: "high" }, // clamped; "critical" -> high
-      { name: "Zero day", days_left: 1, risk: "medium" }, // floor of 1
+      // In our table: our sourced figure, not the model's 5 or 365.
+      known("Full Cream Milk"),
+      known("Basmati Rice"),
+      // Not in our table: the model's guess, labelled as such.
+      { name: "Zorbix Party Mix", days_left: 45, risk: deriveRiskFromDaysOnly(45), days_source: "ai" },
+      // Model gave nothing usable: the category / fallback figure.
+      guessFromCategory("Zorbix Mystery"),
+      // An absurd model number is still clamped.
+      { name: "Zorbix Overflow", days_left: 3650, risk: deriveRiskFromDaysOnly(3650), days_source: "ai" },
+      // Zero is not a usable guess.
+      guessFromCategory("Zorbix Zero"),
     ]);
+    expect(body.estimate_sources).toEqual({ table: 2, ai: 2, category: 2 });
     expect(body.purchase_date).toBe("2026-10-08T00:00:00.000Z");
   });
 
@@ -139,7 +157,9 @@ describe("POST /api/extract — turning Gemini output into pantry items", () => 
       geminiText('```json\n{"purchase_date_iso":null,"items":[{"name":"Paneer","days_left":4,"risk":"high"}]}\n```')
     );
     const body = await json(await POST(receipt()));
-    expect(body.items).toEqual([{ name: "Paneer", days_left: 4, risk: "high" }]);
+    expect(body.items).toEqual([
+      { name: "Paneer", days_left: estimateShelfLife("Paneer").days, risk: deriveRiskFromDaysOnly(estimateShelfLife("Paneer").days), days_source: "table" },
+    ]);
   });
 
   it("falls back to today when the receipt date is in the future", async () => {

@@ -120,3 +120,13 @@ export function parseGs1(raw: string): Gs1Data | null {
 export function gs1UseByDate(data: Gs1Data | null): Date | null {
   return data?.expiry ?? data?.bestBefore ?? null;
 }
+
+/**
+ * The printed date and which kind it is. GS1 AI 17 is the expiration date
+ * (a use-by), AI 15 is best-before — the barcode says which, so no guessing.
+ */
+export function gs1PrintedDate(data: Gs1Data | null): { date: Date; kind: "use_by" | "best_before" } | null {
+  if (data?.expiry) return { date: data.expiry, kind: "use_by" };
+  if (data?.bestBefore) return { date: data.bestBefore, kind: "best_before" };
+  return null;
+}

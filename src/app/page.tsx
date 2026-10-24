@@ -10,7 +10,8 @@ import {
 } from "@/lib/diet";
 
 import { calculateCurrentDaysLeft, calculateDaysPastEstimate } from "@/lib/item-age";
-import { parseGs1, gs1UseByDate } from "@/lib/gs1";
+import { parseGs1, gs1PrintedDate } from "@/lib/gs1";
+import { asDateKind, pastDateMessage, type DateKind } from "@/lib/date-kind";
 
 // One definition, in lib/risk-bands.ts. This was a byte-identical copy of
 // the rule in api/extract/route.ts — the same duplication that let the
@@ -85,6 +86,7 @@ import { useAuth } from "@/context/auth-context";
 import { supabase } from "@/lib/supabase";
 import { inferItemCategory, type ItemCategory } from "@/lib/item-category";
 import { estimateShelfLife, findShelfLifeRow, formatProvenance } from "@/lib/shelf-life";
+import { openedDaysFor } from "@/lib/foodkeeper";
 import { positiveFindingClasses } from "@/lib/colour-semantics";
 import { deriveRiskLevel, riskLabelForDays } from "@/lib/risk-bands";
 import { detectAllergens } from "@/lib/allergens";
@@ -96,7 +98,7 @@ import NutritionLabelScanner from "@/components/nutrition-label-scanner";
 import ExpiryDateScanner from "@/components/expiry-date-scanner";
 import PantryChatModal from "@/components/pantry-chat-modal";
 import { RestockSuggestions } from "@/components/restock-suggestions";
-import { RecipeModal, type GeneratedRecipe } from "@/components/recipe-modal";
+import { RecipeModal, type GeneratedRecipe, type RecipeRating } from "@/components/recipe-modal";
 import { AddItemModal, type NewItem } from "@/components/add-item-modal";
 import {
   STORAGE_OPTIONS,
@@ -123,6 +125,7 @@ import { isAdminEmail } from "@/lib/admin";
 import { DEFAULT_NOTIFY_DAYS_BEFORE } from "@/components/notification-preferences-modal";
 import { OnboardingTour, hasSeenOnboarding, markOnboardingSeen } from "@/components/onboarding-tour";
 import { DietPromptModal } from "@/components/diet-prompt-modal";
+import { learnFromOutcomes, adjustEstimate, type Adjustment } from "@/lib/household-learning";
 
 interface Item {
   id: string;
@@ -145,6 +148,9 @@ interface Item {
   storage?: StorageLocation | null;
   openedAt?: string | null;
   expirySource?: ExpirySource;
+  // db/supabase-schema-accuracy.sql — undefined until it has run.
+  expiryKind?: DateKind | null;
+  quantity?: string | null;
 }
 
 type PantryRow = {
@@ -157,6 +163,8 @@ type PantryRow = {
   storage?: string | null;
   opened_at?: string | null;
   expiry_source?: string | null;
+  expiry_kind?: string | null;
+  quantity?: string | null;
 };
 
 const asStorage = (v: unknown): StorageLocation | null =>
@@ -178,6 +186,8 @@ function rowToItem(row: PantryRow): Item {
     storage: asStorage(row.storage),
     openedAt: row.opened_at ?? null,
     expirySource: asExpirySource(row.expiry_source),
+    expiryKind: asDateKind(row.expiry_kind),
+    quantity: row.quantity ?? null,
   };
 }
 
@@ -186,8 +196,13 @@ const STORAGE_TAG: Record<StorageLocation, string> = { fridge: "In the fridge", 
 /** The small facts on a card that came from the person, not the estimate. */
 function trackingTagsFor(item: Item): string[] {
   const tags: string[] = [];
-  if (item.expirySource === "printed") tags.push("Date from pack");
-  if (item.expirySource === "user") tags.push("Date set by you");
+  if (item.expirySource === "printed") {
+    tags.push(item.expiryKind === "use_by" ? "Use-by from pack" : item.expiryKind === "best_before" ? "Best-before from pack" : "Date from pack");
+  }
+  if (item.expirySource === "user") {
+    tags.push(item.expiryKind === "use_by" ? "Use-by set by you" : item.expiryKind === "best_before" ? "Best-before set by you" : "Date set by you");
+  }
+  if (item.quantity) tags.push(item.quantity);
   if (item.storage) tags.push(STORAGE_TAG[item.storage]);
   if (item.openedAt) {
     const d = new Date(item.openedAt);
@@ -220,8 +235,9 @@ interface ScannedResultEntry {
 }
 
 /** A printed date (from a GS1 barcode) as the scan result's expiry entry. */
-function expiryFromPrintedDate(date: Date | null): ScannedExpiryEntry | null {
-  if (!date) return null;
+function expiryFromPrintedDate(printed: { date: Date; kind: DateKind } | null): ScannedExpiryEntry | null {
+  if (!printed) return null;
+  const { date, kind } = printed;
   const today = new Date();
   const todayUtc = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
   const daysLeft = Math.max(0, Math.round((date.getTime() - todayUtc) / (24 * 60 * 60 * 1000)));
@@ -230,6 +246,7 @@ function expiryFromPrintedDate(date: Date | null): ScannedExpiryEntry | null {
     expiryDate: date.toISOString().slice(0, 10),
     source: "printed_expiry",
     confidence: "high",
+    kind,
   };
 }
 
@@ -238,6 +255,8 @@ interface ScannedExpiryEntry {
   expiryDate: string | null;
   source: "printed_expiry" | "mfd_plus_shelf_life" | "shelf_life_from_today" | "unknown";
   confidence: "high" | "medium" | "low";
+  // Use-by (safety) or best-before (quality), when the pack said which.
+  kind?: DateKind | null;
 }
 
 const PLACEHOLDER_INGREDIENTS_TEXT = "None provided, rely purely on AI general knowledge";
@@ -248,7 +267,7 @@ const INVENTORY_PAGE_SIZE = 6;
 // No fallback items — real users start with an empty pantry.
 
 export default function Home() {
-  const { user, loading: authLoading, household, householdSchemaReady, ingredientsSchemaReady, healthScoreSchemaReady, trackingSchemaReady } = useAuth();
+  const { user, loading: authLoading, household, householdSchemaReady, ingredientsSchemaReady, healthScoreSchemaReady, trackingSchemaReady, accuracySchemaReady } = useAuth();
   // UI-only gate, not a security one — see lib/admin.ts. Hides "Add Demo
   // Data" from everyone but the project owner, so a real user never sees a
   // button that fills their pantry with sample groceries.
@@ -274,6 +293,12 @@ export default function Home() {
   const trackingFields = (t: { storage?: StorageLocation | null; openedAt?: string | null; expirySource?: ExpirySource }) =>
     trackingSchemaReady
       ? { storage: t.storage ?? null, opened_at: t.openedAt ?? null, expiry_source: t.expirySource ?? null }
+      : {};
+
+  // And for quantity / expiry_kind (db/supabase-schema-accuracy.sql).
+  const accuracyFields = (t: { quantity?: string | null; expiryKind?: DateKind | null }) =>
+    accuracySchemaReady
+      ? { quantity: t.quantity?.trim() || null, expiry_kind: t.expiryKind ?? null }
       : {};
   const router = useRouter();
 
@@ -309,7 +334,7 @@ export default function Home() {
   // The printed date read out of a GS1 barcode, held across the lookup (and
   // the "type the name" fallback when the product database has no entry), so
   // it lands on whichever scan result eventually appears.
-  const pendingPrintedDate = useRef<Date | null>(null);
+  const pendingPrintedDate = useRef<{ date: Date; kind: DateKind } | null>(null);
   const [barcodeRetryPrompt, setBarcodeRetryPrompt] = useState<{ code: string } | null>(null);
   const [showBarcodeRetryOptions, setShowBarcodeRetryOptions] = useState(false);
   const [manualRetryBarcode, setManualRetryBarcode] = useState("");
@@ -344,7 +369,25 @@ export default function Home() {
   const [editStorage, setEditStorage] = useState<StorageLocation | null>(null);
   const [editOpened, setEditOpened] = useState(false);
   const [editOpenedDays, setEditOpenedDays] = useState<number | null>(null);
+  const [editQuantity, setEditQuantity] = useState("");
   const [showAddItem, setShowAddItem] = useState(false);
+  // Where our estimates have run long for this account, learned from its own
+  // removals (item_outcomes). See lib/household-learning.ts.
+  const [learned, setLearned] = useState<Map<string, Adjustment>>(new Map());
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    supabase
+      .from("item_outcomes")
+      .select("name, outcome, days_left_at_removal")
+      .order("removed_at", { ascending: false })
+      .limit(500)
+      .then(({ data, error }) => {
+        // No table yet, or no history: nothing to learn, nothing changes.
+        if (!cancelled && !error && data) setLearned(learnFromOutcomes(data));
+      });
+    return () => { cancelled = true; };
+  }, [user]);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [showShoppingList, setShowShoppingList] = useState(false);
   const [showPantryChat, setShowPantryChat] = useState(false);
@@ -867,6 +910,7 @@ export default function Home() {
     setEditStorage(item.storage ?? null);
     setEditOpened(!!item.openedAt);
     setEditOpenedDays(null);
+    setEditQuantity(item.quantity ?? "");
   };
 
   const closeEditItem = () => {
@@ -917,14 +961,19 @@ export default function Home() {
 
     const newlyOpened = !!trackingSchemaReady && editOpened && !editingItem.openedAt;
     if (newlyOpened) {
-      if (!editOpenedDays) {
+      const useWithin = editOpenedDays ?? openedDaysFor(trimmedName, editStorage ?? fromStorage)?.days ?? null;
+      if (!useWithin) {
         setInlineError("Pick how soon it should be used once opened.");
         return;
       }
-      remaining = daysLeftAfterOpening(remaining, editOpenedDays);
+      remaining = daysLeftAfterOpening(remaining, useWithin);
     }
     const openedAt = editOpened ? (editingItem.openedAt ?? new Date().toISOString()) : null;
     const storage = editStorage ?? editingItem.storage ?? null;
+    const quantity = editQuantity.trim().slice(0, 40) || null;
+    // A newly typed date's kind is not known from the edit dialog; a date
+    // left alone keeps the kind it had.
+    const expiryKind = source === editingItem.expirySource && !editDate ? editingItem.expiryKind ?? null : null;
 
     // Keep the real purchase date: days_left is stored relative to it. This
     // used to reset purchase_date to today on every edit, which erased when
@@ -942,6 +991,7 @@ export default function Home() {
         days_left: storedDays,
         risk,
         ...trackingFields({ storage, openedAt, expirySource: source }),
+        ...accuracyFields({ quantity, expiryKind }),
       })
       .eq("id", editingItem.id);
 
@@ -960,6 +1010,7 @@ export default function Home() {
           daysPastEstimate: calculateDaysPastEstimate(storedDays, editingItem.purchaseDate),
           risk,
           ...(trackingSchemaReady ? { storage, openedAt, expirySource: source } : {}),
+          ...(accuracySchemaReady ? { quantity, expiryKind } : {}),
         }
       : i));
     toast("Item updated", note ? { description: note } : undefined);
@@ -980,6 +1031,7 @@ export default function Home() {
         risk,
         purchase_date: new Date().toISOString(),
         ...trackingFields(entry),
+        ...accuracyFields(entry),
       }])
       .select("*")
       .single();
@@ -1175,6 +1227,8 @@ export default function Home() {
             // How much the day count beside it is worth. A "rough guess" row
             // and a USDA-sourced one looked identical in the prompt.
             confidence: findShelfLifeRow(i.name)?.row.confidence,
+            // How much is actually there, when the person has said.
+            quantity: i.quantity ?? undefined,
           })),
           dietaryPreference: String(user?.user_metadata?.dietary_preference || "none"),
           avoidTitles,
@@ -1203,6 +1257,24 @@ export default function Home() {
     } finally {
       setIsGeneratingRecipe(false);
     }
+  };
+
+  // Whether a generated recipe was any good — the only way to judge prompt
+  // changes against real use. Stored per account (recipe_feedback, RLS).
+  const sendRecipeFeedback = async (rating: RecipeRating): Promise<boolean> => {
+    if (!user || !generatedRecipe) return false;
+    const { error } = await supabase.from("recipe_feedback").insert([{
+      user_id: user.id,
+      title: generatedRecipe.title.slice(0, 120),
+      base_dish: (generatedRecipe.baseDish || "").slice(0, 120) || null,
+      diet: String(user.user_metadata?.dietary_preference || "none").slice(0, 20),
+      rating,
+    }]);
+    if (error) {
+      toast("Couldn't save that", { description: "Please try again." });
+      return false;
+    }
+    return true;
   };
 
   const tryAnotherRecipe = async () => {
@@ -1271,10 +1343,12 @@ export default function Home() {
         const normalizedItems = (data.items as Array<{ name?: unknown; days_left?: unknown }>)
           .map((apiItem) => {
             const name = String(apiItem?.name || "").trim();
-            const daysLeft = Number.isFinite(Number(apiItem?.days_left))
+            const fromReceipt = Number.isFinite(Number(apiItem?.days_left))
               ? Math.max(1, Math.min(3650, Math.round(Number(apiItem.days_left))))
               : 7;
             if (!name) return null;
+            // Receipt day counts are estimates, so history may shorten them.
+            const daysLeft = adjustEstimate(name, fromReceipt, learned).days;
 
             return {
               name,
@@ -1348,10 +1422,19 @@ export default function Home() {
           setItems(prev => [...failedLocalItems, ...prev]);
         }
 
+        // Say how many day counts are guesses, so a person knows which cards
+        // are worth a glance. Absent on an older server response.
+        const sources = data.estimate_sources as { table?: number; ai?: number; category?: number } | undefined;
+        const guessed = (sources?.ai ?? 0) + (sources?.category ?? 0);
+        const sourceNote = sources
+          ? guessed === 0
+            ? " Every day count is from our shelf-life sources."
+            : ` ${guessed} of the day counts are estimates — tap Edit on a card to set the real date.`
+          : "";
         toast("Receipt Parsed", {
-          description: insertedCount === rows.length
+          description: (insertedCount === rows.length
             ? `Added all ${rows.length} items to your inventory.`
-            : `Added ${insertedCount}/${rows.length} items to cloud inventory. Remaining items were added locally.`,
+            : `Added ${insertedCount}/${rows.length} items to cloud inventory. Remaining items were added locally.`) + sourceNote,
         });
       } else {
         setInlineError(data.error || "We couldn't parse this receipt. Try a clearer image in good lighting.");
@@ -1388,7 +1471,7 @@ export default function Home() {
     // lookup below needs just the product code.
     const gs1 = parseGs1(rawScan);
     const decodedText = gs1?.lookupCode ?? rawScan;
-    pendingPrintedDate.current = gs1UseByDate(gs1);
+    pendingPrintedDate.current = gs1PrintedDate(gs1);
     setInlineError(null);
     setBarcodeRetryPrompt(null);
     setShowBarcodeRetryOptions(false);
@@ -1656,7 +1739,11 @@ if (nutritionFieldsFilled < 2) {
     // basmati rice on the same clock. The estimate now depends on what the
     // item is, and carries where the number came from.
     const shelfLife = estimateShelfLife(scannedResult.name, scannedExpiry?.daysLeft, { databaseCategories: scannedResult.categories });
-    const initialDaysLeft = shelfLife.days;
+    // A printed date is never adjusted; our estimate may be, from history.
+    const learnedAdjustment = shelfLife.source === "scanned"
+      ? { days: shelfLife.days, note: null }
+      : adjustEstimate(scannedResult.name, shelfLife.days, learned);
+    const initialDaysLeft = learnedAdjustment.days;
     const newItem = {
       user_id: user.id,
       ...householdIdField(),
@@ -1665,6 +1752,7 @@ if (nutritionFieldsFilled < 2) {
       // A date read off the pack (photo or GS1 barcode) is the pack's own
       // claim; mark it so later storage changes never recompute it.
       ...trackingFields({ expirySource: shelfLife.source === "scanned" ? "printed" : null }),
+      ...accuracyFields({ expiryKind: shelfLife.source === "scanned" ? scannedExpiry?.kind ?? null : null }),
       name: scannedResult.name,
       days_left: initialDaysLeft,
       risk: deriveRisk(initialDaysLeft, initialDaysLeft, scannedResult.name),
@@ -1696,7 +1784,7 @@ if (nutritionFieldsFilled < 2) {
          }, ...prev];
        });
        toast(`Added — ${days(initialDaysLeft)} left`, {
-         description: shelfLife.explanation,
+         description: learnedAdjustment.note ? `${shelfLife.explanation} ${learnedAdjustment.note}` : shelfLife.explanation,
          // An estimate the app is unsure about gets a way to correct it
          // right there, rather than a note telling the user to go and find
          // the item later.
@@ -1773,6 +1861,7 @@ if (nutritionFieldsFilled < 2) {
     expiry_date: string | null;
     source: "printed_expiry" | "mfd_plus_shelf_life" | "shelf_life_from_today" | "unknown";
     confidence: "high" | "medium" | "low";
+    date_kind?: string | null;
   }) => {
     setShowExpiryScanner(false);
     if (expiry.days_left === null) return;
@@ -1782,6 +1871,7 @@ if (nutritionFieldsFilled < 2) {
       expiryDate: expiry.expiry_date,
       source: expiry.source,
       confidence: expiry.confidence,
+      kind: asDateKind(expiry.date_kind),
     });
     toast("Expiry date detected", {
       description: expiry.expiry_date
@@ -2448,6 +2538,7 @@ if (nutritionFieldsFilled < 2) {
                   ifStoredDifferently={item.expirySource ? undefined : shelfEstimate.ifStoredDifferently}
                   currentStorage={item.storage ?? shelfRow?.storage}
                   trackingTags={trackingTagsFor(item)}
+                  pastDateNote={item.expirySource ? pastDateMessage(item.expiryKind ?? null) : null}
                   healthierAlternative={healthierAlternative}
                   detectedAllergens={detectedAllergens}
                   actions={
@@ -2663,7 +2754,9 @@ if (nutritionFieldsFilled < 2) {
         <AddItemModal
           userDiet={userDietPreference}
           trackingAvailable={!!trackingSchemaReady}
+          accuracyAvailable={!!accuracySchemaReady}
           onAdd={addManualItem}
+          adjustEstimate={(name, d) => adjustEstimate(name, d, learned)}
           onClose={() => setShowAddItem(false)}
         />
       )}
@@ -2715,7 +2808,9 @@ if (nutritionFieldsFilled < 2) {
                     <>
                       <span className="text-lg font-black">{days(scannedExpiry.daysLeft)} left</span>
                       <span className="text-[11px] text-foreground/60 truncate">
-                        {scannedExpiry.expiryDate ? `Expires ${scannedExpiry.expiryDate}` : "From printed shelf-life"}
+                        {scannedExpiry.expiryDate
+                          ? `${scannedExpiry.kind === "best_before" ? "Best before" : scannedExpiry.kind === "use_by" ? "Use by" : "Expires"} ${scannedExpiry.expiryDate}`
+                          : "From printed shelf-life"}
                         {scannedExpiry.confidence !== "high" ? " · double-check label" : ""}
                       </span>
                     </>
@@ -2746,13 +2841,34 @@ if (nutritionFieldsFilled < 2) {
                     })()
                   )}
                 </div>
+                {scannedExpiry && (
+                  <button
+                    onClick={() => setShowExpiryScanner(true)}
+                    className="flex min-h-11 items-center gap-1.5 border border-border bg-card text-foreground text-xs font-semibold px-3 py-2 rounded-lg hover:bg-foreground/5 transition-colors shrink-0 whitespace-nowrap"
+                  >
+                    <CalendarClock size={13} /> Rescan
+                  </button>
+                )}
+              </div>
+
+              {/* The most accurate number for a packaged product is the one
+                  printed on it — FSSAI requires a best-before or use-by date
+                  on pre-packed food. So when a scan has no date yet, asking
+                  for it is the main action here, not a small side button
+                  next to our estimate. */}
+              {!scannedExpiry && (
                 <button
                   onClick={() => setShowExpiryScanner(true)}
-                  className="flex min-h-11 items-center gap-1.5 border border-border bg-card text-foreground text-xs font-semibold px-3 py-2 rounded-lg hover:bg-foreground/5 transition-colors shrink-0 whitespace-nowrap"
+                  className="w-full min-h-12 flex items-center justify-center gap-2 rounded-2xl bg-brand text-white text-sm font-bold hover:opacity-90 transition-opacity"
                 >
-                  <CalendarClock size={13} /> {scannedExpiry ? "Rescan" : "Scan date"}
+                  <CalendarClock size={16} /> Scan the date on the pack
                 </button>
-              </div>
+              )}
+              {!scannedExpiry && (
+                <p className="-mt-2 text-[11px] text-foreground/55 text-center leading-relaxed">
+                  Packed food in India must print a date. Scanning it gives an exact count instead of our estimate.
+                </p>
+              )}
 
               {/* TruthIn Style Rating Card */}
               <div className="bg-foreground/5 rounded-2xl p-4 flex items-center justify-between border border-border/50 sleek-shadow">
@@ -2935,6 +3051,22 @@ if (nutritionFieldsFilled < 2) {
                   className="w-full bg-background border border-border rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-1 focus:ring-foreground/20"
                 />
               </div>
+              {accuracySchemaReady && (
+                <div className="space-y-1.5">
+                  <label htmlFor="edit-item-quantity" className="text-[11px] font-semibold uppercase tracking-widest text-foreground/60">
+                    How much is left
+                  </label>
+                  <input
+                    id="edit-item-quantity"
+                    type="text"
+                    maxLength={40}
+                    placeholder="e.g. 500 g, 1 litre, half a packet"
+                    value={editQuantity}
+                    onChange={(e) => setEditQuantity(e.target.value)}
+                    className="w-full bg-background border border-border rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-1 focus:ring-foreground/20"
+                  />
+                </div>
+              )}
               <div className="space-y-1.5">
                 <label htmlFor="edit-item-date" className="text-[11px] font-semibold uppercase tracking-widest text-foreground/60">
                   Or the date on the pack
@@ -2985,24 +3117,38 @@ if (nutritionFieldsFilled < 2) {
                         </button>
                       ))}
                     </div>
-                    {editOpened && !editingItem.openedAt && (
-                      <div className="pt-1">
-                        <p className="text-[11px] text-foreground/60 mb-1.5">Use within how many days of opening? Most packs print this.</p>
-                        <div role="group" aria-label="Use within days of opening" className="flex flex-wrap gap-2">
-                          {OPENED_DAYS_OPTIONS.map((d) => (
-                            <button
-                              key={d}
-                              type="button"
-                              aria-pressed={editOpenedDays === d}
-                              onClick={() => setEditOpenedDays(d)}
-                              className={`min-h-11 px-3 rounded-xl text-xs font-semibold transition-all ${editOpenedDays === d ? "bg-foreground text-background" : "neu-raised-sm text-foreground/70"}`}
-                            >
-                              {d}d
-                            </button>
-                          ))}
+                    {editOpened && !editingItem.openedAt && (() => {
+                      // USDA's "use within N days of opening", until the person picks.
+                      const suggestion = openedDaysFor(
+                        editName.trim() || editingItem.name,
+                        editStorage ?? editingItem.storage ?? defaultStorageFor(editingItem.name)
+                      );
+                      const selected = editOpenedDays ?? suggestion?.days ?? null;
+                      const choices = [...new Set([...OPENED_DAYS_OPTIONS, ...(suggestion ? [suggestion.days] : [])])].sort((a, b) => a - b);
+                      return (
+                        <div className="pt-1">
+                          <p className="text-[11px] text-foreground/60 mb-1.5">Use within how many days of opening? Most packs print this.</p>
+                          <div role="group" aria-label="Use within days of opening" className="flex flex-wrap gap-2">
+                            {choices.map((d) => (
+                              <button
+                                key={d}
+                                type="button"
+                                aria-pressed={selected === d}
+                                onClick={() => setEditOpenedDays(d)}
+                                className={`min-h-11 px-3 rounded-xl text-xs font-semibold transition-all ${selected === d ? "bg-foreground text-background" : "neu-raised-sm text-foreground/70"}`}
+                              >
+                                {d}d
+                              </button>
+                            ))}
+                          </div>
+                          {suggestion && (
+                            <p className="text-[10px] text-foreground/45 mt-1.5">
+                              {suggestion.days}d suggested from {suggestion.citation}. The pack&apos;s own figure wins.
+                            </p>
+                          )}
                         </div>
-                      </div>
-                    )}
+                      );
+                    })()}
                   </div>
                 </>
               )}
@@ -3232,6 +3378,7 @@ if (nutritionFieldsFilled < 2) {
           excludedCount={recipeExcludedCount}
           onAddMissing={() => { void addMissingIngredientsToShoppingList(); }}
           isAddingToShoppingList={isAddingToShoppingList}
+          onFeedback={accuracySchemaReady ? sendRecipeFeedback : undefined}
         />
       )}
 

@@ -210,7 +210,7 @@ describe("chilling injury — colder must never look longer", () => {
       const e = estimateShelfLife(row.keys[0]);
       const { fridge, counter } = e.ifStoredDifferently;
       if (fridge === null) return; // declined to advise — acceptable
-      expect(fridge).toBeLessThanOrEqual(counter);
+      expect(fridge).toBeLessThanOrEqual(counter!);
     }
   );
 
@@ -228,7 +228,7 @@ describe("chilling injury — colder must never look longer", () => {
       const e = estimateShelfLife(row.keys[0]);
       const { fridge, counter, suppressedReason } = e.ifStoredDifferently;
       // Either we decline, or we cap at ambient — never an extension.
-      if (fridge === null || fridge <= counter) {
+      if (fridge === null || fridge <= counter!) {
         expect(suppressedReason).toBeTruthy();
       }
     }
@@ -241,7 +241,7 @@ describe("chilling injury — colder must never look longer", () => {
     const e = estimateShelfLife("Banana");
     const { fridge, counter, suppressedReason } = e.ifStoredDifferently;
     expect(fridge).not.toBeNull();
-    expect(fridge!).toBeLessThanOrEqual(counter);
+    expect(fridge!).toBeLessThanOrEqual(counter!);
     expect(suppressedReason).toMatch(/dull colour/i);
   });
 
@@ -378,5 +378,29 @@ describe("estimateShelfLife — tier 2, the product database's categories", () =
   it("never outranks a direct name match or a printed date", () => {
     expect(estimateShelfLife("Paneer", null, { databaseCategories: "Rice" }).source).toBe("known");
     expect(estimateShelfLife("Paneer", 12, { databaseCategories: "Rice" })).toMatchObject({ source: "scanned", days: 12 });
+  });
+});
+
+describe("estimateShelfLife — FSSAI's list of Indian sweets", () => {
+  it("uses FSSAI's figure for a listed sweet, with FSSAI as the citation", () => {
+    expect(estimateShelfLife("Rasgulla")).toMatchObject({ days: 2, storage: "fridge" });
+    expect(estimateShelfLife("Haldiram Kaju Katli 250 g")).toMatchObject({ days: 7 });
+    expect(estimateShelfLife("Soan Papdi").citation).not.toMatch(/FSSAI/); // not on the list
+    expect(estimateShelfLife("Besan Laddoo").days).toBe(30);
+    expect(estimateShelfLife("Kalakand").days).toBe(0);
+    expect(estimateShelfLife("Rasgulla").citation).toMatch(/FSSAI/);
+  });
+
+  it("wins over the generic milk row for a sweet named after milk", () => {
+    expect(estimateShelfLife("Milk Cake").days).toBe(4);
+    expect(estimateShelfLife("Badam milk").days).toBe(2);
+  });
+
+  it("is always flagged for checking, because FSSAI counts from the day it was made", () => {
+    expect(estimateShelfLife("Peda").wantsConfirmation).toBe(true);
+  });
+
+  it("never shows a shelf figure for a sweet FSSAI says to refrigerate", () => {
+    expect(estimateShelfLife("Rasgulla").ifStoredDifferently).toMatchObject({ fridge: 2, counter: null });
   });
 });

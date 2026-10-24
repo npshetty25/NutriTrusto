@@ -61,6 +61,9 @@ interface PantryCardProps {
   currentStorage?: "fridge" | "counter" | "freezer";
   /** Short facts the person told us: "In the fridge", "Opened 3 Oct", "Date from pack". */
   trackingTags?: string[];
+  /** Shown instead of "our estimate ran out" when the date came from the
+   * pack or the person and we know whether it was a use-by or best-before. */
+  pastDateNote?: string | null;
   // Rendered in the card's own footer. These used to be free-floating
   // buttons absolutely positioned over the card by the dashboard, which
   // meant they overlapped whatever the card happened to render last.
@@ -90,7 +93,7 @@ const formatDayMonth = (iso: string) => {
   return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short" });
 };
 
-export function PantryCard({ name, daysLeft, risk, purchaseDate, healthScore, dietMatch = true, dietLabel, itemDiet = "veg", dietUnverified = false, riskLabel, shelfLifeCitation, shelfLifeConfidence, storageDisclaimer, ifStoredDifferently, currentStorage, trackingTags, detectedAllergens, healthierAlternative, actions }: PantryCardProps) {
+export function PantryCard({ name, daysLeft, risk, purchaseDate, healthScore, dietMatch = true, dietLabel, itemDiet = "veg", dietUnverified = false, riskLabel, shelfLifeCitation, shelfLifeConfidence, storageDisclaimer, ifStoredDifferently, currentStorage, trackingTags, pastDateNote, detectedAllergens, healthierAlternative, actions }: PantryCardProps) {
   const score = healthScore != null ? Number.parseFloat(healthScore) : NaN;
   const hasScore = Number.isFinite(score);
   // Same thresholds the nutrition trend chart uses, so one score reads the
@@ -251,7 +254,7 @@ export function PantryCard({ name, daysLeft, risk, purchaseDate, healthScore, di
           // whether the food is actually off. Only the person holding it can
           // tell, and telling them it has spoiled bins food that is still good.
           <p className="mt-2 text-[11px] leading-relaxed font-semibold text-danger">
-            Our estimate for {name} has run out. Look at it and smell it before you use it.
+            {pastDateNote ?? `Our estimate for ${name} has run out. Look at it and smell it before you use it.`}
           </p>
         )}
       </div>

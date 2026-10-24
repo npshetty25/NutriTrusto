@@ -1,5 +1,7 @@
 import { inferItemCategory, type ItemCategory } from "@/lib/item-category";
 import { matchesTerm, isExcluded } from "@/lib/text-match";
+import { findFssaiSweet, FSSAI_SWEETS_CITATION } from "@/lib/fssai-sweets";
+import { findFoodKeeperEntry, foodKeeperLabel, FOODKEEPER_CITATION } from "@/lib/foodkeeper";
 import {
   ROWS_BY_KEY_LENGTH,
   type Confidence,
@@ -32,7 +34,8 @@ import {
  * Five tiers, in order of how much they can be trusted:
  *
  *   1 scanned   — a real printed date. Used verbatim, never adjusted.
- *   3 known     — a sourced baseline row matched by name.
+ *   3 known     — a sourced baseline row matched by name (FSSAI sweets, our
+ *                 own table, then USDA FoodKeeper).
  *   2 database  — the same table, reached through the product's Open Food
  *                 Facts categories when the name matched nothing. Checked
  *                 after tier 3 (the name is more specific); numbered 2 for
@@ -71,7 +74,7 @@ export interface ShelfLifeEstimate {
    * injury and we have no sourced threshold, or its failure mode is not
    * temperature-modelled. The UI shows "storage guidance unavailable".
    */
-  ifStoredDifferently: { fridge: number | null; counter: number; freezer: number | null; suppressedReason?: string };
+  ifStoredDifferently: { fridge: number | null; counter: number | null; freezer: number | null; suppressedReason?: string };
   /** Shown wherever an adjusted number appears. */
   disclaimer: string;
   /**
@@ -257,6 +260,36 @@ export function estimateShelfLife(
     };
   }
 
+  // ── Tier 3a: Indian sweets, from FSSAI's own list ────────────────
+  // Before our table, not after: "Milk Cake" or "Badam milk" would otherwise
+  // match the "milk" row and get a dairy figure instead of FSSAI's.
+  const sweet = findFssaiSweet(name);
+  if (sweet) {
+    const { group } = sweet;
+    const tier: PerishTier = group.days <= 2 ? "highly-perishable" : group.days <= 7 ? "perishable" : "semi-perishable";
+    return {
+      days: group.days,
+      source: "known",
+      explanation:
+        group.days === 0
+          ? `FSSAI says ${sweet.name} is to be eaten the day it is made. The date on the shop's tray wins.`
+          : `FSSAI gives ${sweet.name} ${group.days} days from the day it was made${group.storage === "fridge" ? ", kept in the fridge" : ""}. Counted from today, so check the date on the shop's tray.`,
+      // Counted from purchase, not manufacture, and the list is illustrative.
+      wantsConfirmation: true,
+      confidence: "medium",
+      citation: FSSAI_SWEETS_CITATION,
+      tier,
+      storage: group.storage,
+      assumedTempC: ASSUMED_STORAGE_C[group.storage],
+      // FSSAI gives one storage condition per group, and nothing else to
+      // extrapolate from — so no "if stored differently" figures.
+      ifStoredDifferently: group.storage === "fridge"
+        ? { fridge: group.days, counter: null, freezer: null, suppressedReason: "FSSAI says to keep it refrigerated" }
+        : { fridge: null, counter: group.days, freezer: null, suppressedReason: "FSSAI gives room temperature only" },
+      disclaimer: "",
+    };
+  }
+
   // ── Tier 3: sourced baseline row, by name ────────────────────────
   const hit = findShelfLifeRow(name);
   if (hit) {
@@ -283,6 +316,37 @@ export function estimateShelfLife(
       storage: row.storage,
       assumedTempC: targetC,
       ifStoredDifferently: storedElsewhere(row.days, row.refTempC, row),
+      disclaimer: STORAGE_DISCLAIMER,
+    };
+  }
+
+  // ── Tier 3b: USDA FoodKeeper, by name ────────────────────────────
+  // After our table, which is written for Indian items and storage; before
+  // the category guesses, because a USDA figure for the item itself beats a
+  // figure for the kind of item it is.
+  const fk = findFoodKeeperEntry(name);
+  if (fk) {
+    const label = foodKeeperLabel(fk.entry);
+    const { counter, fridge, freezer } = fk.byStorage;
+    return {
+      days: fk.days,
+      source: "known",
+      explanation: fk.adjusted
+        ? `USDA's figure for ${label}, adjusted for ${STORAGE_LABEL[fk.storage]} at ${ASSUMED_STORAGE_C[fk.storage]}°C. Change it if your pack says otherwise.`
+        : `USDA's figure for ${label}, kept ${STORAGE_LABEL[fk.storage]}. Change it if your pack says otherwise.`,
+      wantsConfirmation: false,
+      confidence: fk.adjusted ? "medium" : "high",
+      citation: `${FOODKEEPER_CITATION}: ${label}`,
+      tier: fk.days <= 2 ? "highly-perishable" : fk.days <= 14 ? "perishable" : fk.days <= 90 ? "semi-perishable" : "shelf-stable",
+      storage: fk.storage,
+      assumedTempC: ASSUMED_STORAGE_C[fk.storage],
+      // USDA's own figure for each storage, not an extrapolation from one.
+      ifStoredDifferently: {
+        fridge,
+        counter,
+        freezer,
+        ...(fridge === null || counter === null ? { suppressedReason: "USDA gives no figure for that" } : {}),
+      },
       disclaimer: STORAGE_DISCLAIMER,
     };
   }
