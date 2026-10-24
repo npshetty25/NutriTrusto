@@ -96,6 +96,22 @@ interface Indexed {
 
 const words = (s: string) => s.toLowerCase().match(/[a-z]+/g) ?? [];
 
+/** Item word `iw` is term word `tw` or its plural, as matchesTerm allows. */
+const sameWord = (iw: string, tw: string) => iw === tw || iw === tw + "s" || iw === tw + "es";
+
+/**
+ * The item's words that come AFTER the matched term. In "Almond Milkshake"
+ * the match is "almond" and "milkshake" follows: the item is a milkshake,
+ * and "almond" only describes it. English puts the head noun last.
+ */
+function wordsAfter(itemWords: string[], term: string): string[] {
+  const t = words(term);
+  for (let i = itemWords.length - t.length; i >= 0; i--) {
+    if (t.every((tw, k) => sameWord(itemWords[i + k], tw))) return itemWords.slice(i + t.length);
+  }
+  return [];
+}
+
 function termsFor(entry: FoodKeeperEntry): string[] {
   const name = entry.name.toLowerCase().replace(/"/g, "");
   const parts = name
@@ -180,7 +196,8 @@ export function foodKeeperFigures(entry: FoodKeeperEntry): FoodKeeperFigures | n
 export function findFoodKeeperEntry(name: string): FoodKeeperFigures | null {
   const text = (name || "").toLowerCase().trim();
   if (!text) return null;
-  const itemWords = new Set(words(text));
+  const itemWordList = words(text);
+  const itemWords = new Set(itemWordList);
   const wantsFrozen = itemWords.has("frozen");
   const prepared = PREPARED_DISH_WORDS.some((w) => matchesTerm(text, w));
 
@@ -197,6 +214,10 @@ export function findFoodKeeperEntry(name: string): FoodKeeperFigures | null {
   for (const { entry, terms, detail } of INDEX) {
     const term = terms.filter((t) => matchesTerm(text, t)).sort((a, b) => b.length - a.length)[0];
     if (!term) continue;
+    // Anything after the match must be part of this entry's own description
+    // ("Cheese Slices" → "processed slices"); otherwise the match is only a
+    // modifier of some other food. Short tokens ("g" in "200g") are units.
+    if (wordsAfter(itemWordList, term).some((w) => w.length >= 3 && !detail.has(w))) continue;
     // Frozen by category ("Food Purchased Frozen") or by qualifier ("Bagel, commercially frozen").
     const isFrozenEntry = entry.category === FROZEN_CATEGORY || words(entry.subtitle ?? "").some((w) => w === "frozen");
     // A frozen product's figure is a freezer figure; "Pizza" is not "Pizza, frozen".

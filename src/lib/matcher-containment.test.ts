@@ -55,6 +55,9 @@ const ALLOWED: Allow[] = [
   // ── The shared primitive itself ──────────────────────────────────────
   { file: "lib/text-match.ts", match: "text.indexOf(term, from)", reason: "matchesTerm's own implementation — this IS the primitive" },
   { file: "lib/text-match.ts", match: 'head.endsWith("s")', reason: "isPluralNoun asks a grammatical question about one string — it takes no term list and compares against nothing, so there is no food term being matched" },
+  { file: "lib/foodkeeper.ts", match: 'last.endsWith("ies")', reason: "singular() inflects one USDA product name into a second term; the matching itself is done by matchesTerm" },
+  { file: "lib/foodkeeper.ts", match: 'last.endsWith("oes")', reason: "singular() — same" },
+  { file: "lib/foodkeeper.ts", match: 'last.endsWith("s")', reason: "singular() — same" },
 
   // ── Free-from claims: substring is correct, the claim must win ───────
   { file: "lib/diet.ts", match: "text.includes(c)", reason: "EGG_FREE_CLAIMS — a claim like 'eggless' must match as a fragment so it beats the egg terms" },

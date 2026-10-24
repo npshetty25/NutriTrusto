@@ -45,6 +45,15 @@ describe("FoodKeeper matching", () => {
     expect(findFoodKeeperEntry("Fried Rice")).toBeNull();
   });
 
+  it("does not match a word that only describes another food", () => {
+    // "almond" modifies "milkshake"; the item is not almonds.
+    expect(findFoodKeeperEntry("Almond Milkshake")).toBeNull();
+    // Garlic bread is bread, not garlic.
+    expect(label("Garlic Bread")).not.toMatch(/^garlic/);
+    // A trailing word from the entry's own description is fine.
+    expect(label("Cheese Slices")).toBe("cheese (processed slices)");
+  });
+
   it("converts perishable figures to Indian storage, rounding down", () => {
     // USDA: strawberries 2 days in a 4 °C fridge. At 7 °C that is less.
     const hit = findFoodKeeperEntry("Strawberries");
