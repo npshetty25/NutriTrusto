@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { X, Clock, Play, RefreshCw, ShoppingCart, Loader2, Check, ChevronDown } from "lucide-react";
+import { X, Clock, Play, RefreshCw, ShoppingCart, Loader2, Check, ChevronDown, ThumbsUp, ThumbsDown, ChefHat } from "lucide-react";
 import { ALLERGEN_LABELS, type AllergenTag } from "@/lib/allergens";
 
 export interface GeneratedRecipe {
@@ -40,7 +40,14 @@ interface RecipeModalProps {
   excludedCount?: number;
   onAddMissing?: () => void;
   isAddingToShoppingList?: boolean;
+  /**
+   * Records whether this recipe was any good. Absent until the
+   * recipe_feedback table exists, in which case no buttons are shown.
+   */
+  onFeedback?: (rating: RecipeRating) => Promise<boolean>;
 }
+
+export type RecipeRating = "up" | "down" | "cooked";
 
 export function RecipeModal({
   recipe,
@@ -50,7 +57,19 @@ export function RecipeModal({
   excludedCount = 0,
   onAddMissing,
   isAddingToShoppingList,
+  onFeedback,
 }: RecipeModalProps) {
+  // Keyed to the recipe's title so "Another idea" starts with fresh buttons.
+  const [rated, setRated] = useState<{ title: string; rating: RecipeRating } | null>(null);
+  const [rating, setRating] = useState<RecipeRating | null>(null);
+  const currentRating = rated && rated.title === recipe.title ? rated.rating : null;
+  const sendFeedback = async (r: RecipeRating) => {
+    if (!onFeedback || rating) return;
+    setRating(r);
+    const ok = await onFeedback(r);
+    setRating(null);
+    if (ok) setRated({ title: recipe.title, rating: r });
+  };
   // Collapsed by default: the decision — "does this save my food and what
   // must I buy?" — is answerable without reading a single step.
   const [showSteps, setShowSteps] = useState(false);
@@ -255,11 +274,50 @@ export function RecipeModal({
             </p>
 
             <p className="text-[11px] leading-relaxed text-foreground/40">
-              Written for the items you have, so it won&apos;t match any single published recipe. The video
-              button searches for {recipe.baseDish || "the dish"}, the closest standard dish.
+              A home version of {recipe.baseDish || "the dish"}, written for the items you have. The video
+              button searches for the standard dish.
             </p>
           </div>
         </div>
+
+        {onFeedback && (
+          <div className="shrink-0 border-t border-border px-3 pt-3">
+            {currentRating ? (
+              <p className="text-xs text-foreground/60 text-center py-2">
+                {currentRating === "cooked" ? "Glad it got cooked — noted." : "Thanks — noted. It helps make the next ones better."}
+              </p>
+            ) : (
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs font-semibold text-foreground/70">Was this any good?</p>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => { void sendFeedback("cooked"); }}
+                    disabled={rating !== null}
+                    className="min-h-11 flex items-center gap-1.5 px-3 rounded-xl border border-border text-xs font-semibold hover:bg-foreground/5 disabled:opacity-60"
+                  >
+                    {rating === "cooked" ? <Loader2 size={13} className="animate-spin" /> : <ChefHat size={13} />} I cooked it
+                  </button>
+                  <button
+                    onClick={() => { void sendFeedback("up"); }}
+                    disabled={rating !== null}
+                    aria-label="Good recipe"
+                    className="w-11 h-11 flex items-center justify-center rounded-xl border border-border hover:bg-foreground/5 disabled:opacity-60"
+                  >
+                    {rating === "up" ? <Loader2 size={14} className="animate-spin" /> : <ThumbsUp size={14} />}
+                  </button>
+                  <button
+                    onClick={() => { void sendFeedback("down"); }}
+                    disabled={rating !== null}
+                    aria-label="Not a good recipe"
+                    className="w-11 h-11 flex items-center justify-center rounded-xl border border-border hover:bg-foreground/5 disabled:opacity-60"
+                  >
+                    {rating === "down" ? <Loader2 size={14} className="animate-spin" /> : <ThumbsDown size={14} />}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="shrink-0 border-t border-border p-3 grid grid-cols-2 gap-2">
           <a

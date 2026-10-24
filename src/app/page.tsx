@@ -97,7 +97,7 @@ import NutritionLabelScanner from "@/components/nutrition-label-scanner";
 import ExpiryDateScanner from "@/components/expiry-date-scanner";
 import PantryChatModal from "@/components/pantry-chat-modal";
 import { RestockSuggestions } from "@/components/restock-suggestions";
-import { RecipeModal, type GeneratedRecipe } from "@/components/recipe-modal";
+import { RecipeModal, type GeneratedRecipe, type RecipeRating } from "@/components/recipe-modal";
 import { AddItemModal, type NewItem } from "@/components/add-item-modal";
 import {
   STORAGE_OPTIONS,
@@ -1237,6 +1237,24 @@ export default function Home() {
     } finally {
       setIsGeneratingRecipe(false);
     }
+  };
+
+  // Whether a generated recipe was any good — the only way to judge prompt
+  // changes against real use. Stored per account (recipe_feedback, RLS).
+  const sendRecipeFeedback = async (rating: RecipeRating): Promise<boolean> => {
+    if (!user || !generatedRecipe) return false;
+    const { error } = await supabase.from("recipe_feedback").insert([{
+      user_id: user.id,
+      title: generatedRecipe.title.slice(0, 120),
+      base_dish: (generatedRecipe.baseDish || "").slice(0, 120) || null,
+      diet: String(user.user_metadata?.dietary_preference || "none").slice(0, 20),
+      rating,
+    }]);
+    if (error) {
+      toast("Couldn't save that", { description: "Please try again." });
+      return false;
+    }
+    return true;
   };
 
   const tryAnotherRecipe = async () => {
@@ -3319,6 +3337,7 @@ if (nutritionFieldsFilled < 2) {
           excludedCount={recipeExcludedCount}
           onAddMissing={() => { void addMissingIngredientsToShoppingList(); }}
           isAddingToShoppingList={isAddingToShoppingList}
+          onFeedback={accuracySchemaReady ? sendRecipeFeedback : undefined}
         />
       )}
 
