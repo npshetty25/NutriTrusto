@@ -86,6 +86,7 @@ import { useAuth } from "@/context/auth-context";
 import { supabase } from "@/lib/supabase";
 import { inferItemCategory, type ItemCategory } from "@/lib/item-category";
 import { estimateShelfLife, findShelfLifeRow, formatProvenance } from "@/lib/shelf-life";
+import { openedDaysFor } from "@/lib/foodkeeper";
 import { positiveFindingClasses } from "@/lib/colour-semantics";
 import { deriveRiskLevel, riskLabelForDays } from "@/lib/risk-bands";
 import { detectAllergens } from "@/lib/allergens";
@@ -960,11 +961,12 @@ export default function Home() {
 
     const newlyOpened = !!trackingSchemaReady && editOpened && !editingItem.openedAt;
     if (newlyOpened) {
-      if (!editOpenedDays) {
+      const useWithin = editOpenedDays ?? openedDaysFor(trimmedName, editStorage ?? fromStorage)?.days ?? null;
+      if (!useWithin) {
         setInlineError("Pick how soon it should be used once opened.");
         return;
       }
-      remaining = daysLeftAfterOpening(remaining, editOpenedDays);
+      remaining = daysLeftAfterOpening(remaining, useWithin);
     }
     const openedAt = editOpened ? (editingItem.openedAt ?? new Date().toISOString()) : null;
     const storage = editStorage ?? editingItem.storage ?? null;
@@ -3115,24 +3117,38 @@ if (nutritionFieldsFilled < 2) {
                         </button>
                       ))}
                     </div>
-                    {editOpened && !editingItem.openedAt && (
-                      <div className="pt-1">
-                        <p className="text-[11px] text-foreground/60 mb-1.5">Use within how many days of opening? Most packs print this.</p>
-                        <div role="group" aria-label="Use within days of opening" className="flex flex-wrap gap-2">
-                          {OPENED_DAYS_OPTIONS.map((d) => (
-                            <button
-                              key={d}
-                              type="button"
-                              aria-pressed={editOpenedDays === d}
-                              onClick={() => setEditOpenedDays(d)}
-                              className={`min-h-11 px-3 rounded-xl text-xs font-semibold transition-all ${editOpenedDays === d ? "bg-foreground text-background" : "neu-raised-sm text-foreground/70"}`}
-                            >
-                              {d}d
-                            </button>
-                          ))}
+                    {editOpened && !editingItem.openedAt && (() => {
+                      // USDA's "use within N days of opening", until the person picks.
+                      const suggestion = openedDaysFor(
+                        editName.trim() || editingItem.name,
+                        editStorage ?? editingItem.storage ?? defaultStorageFor(editingItem.name)
+                      );
+                      const selected = editOpenedDays ?? suggestion?.days ?? null;
+                      const choices = [...new Set([...OPENED_DAYS_OPTIONS, ...(suggestion ? [suggestion.days] : [])])].sort((a, b) => a - b);
+                      return (
+                        <div className="pt-1">
+                          <p className="text-[11px] text-foreground/60 mb-1.5">Use within how many days of opening? Most packs print this.</p>
+                          <div role="group" aria-label="Use within days of opening" className="flex flex-wrap gap-2">
+                            {choices.map((d) => (
+                              <button
+                                key={d}
+                                type="button"
+                                aria-pressed={selected === d}
+                                onClick={() => setEditOpenedDays(d)}
+                                className={`min-h-11 px-3 rounded-xl text-xs font-semibold transition-all ${selected === d ? "bg-foreground text-background" : "neu-raised-sm text-foreground/70"}`}
+                              >
+                                {d}d
+                              </button>
+                            ))}
+                          </div>
+                          {suggestion && (
+                            <p className="text-[10px] text-foreground/45 mt-1.5">
+                              {suggestion.days}d suggested from {suggestion.citation}. The pack&apos;s own figure wins.
+                            </p>
+                          )}
                         </div>
-                      </div>
-                    )}
+                      );
+                    })()}
                   </div>
                 </>
               )}

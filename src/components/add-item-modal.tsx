@@ -7,6 +7,7 @@ import BarcodeScanner from "@/components/barcode-scanner";
 import { parseGs1 } from "@/lib/gs1";
 import { matchesTerm } from "@/lib/text-match";
 import { estimateShelfLife, formatProvenance } from "@/lib/shelf-life";
+import { openedDaysFor } from "@/lib/foodkeeper";
 import { isDietConflict, resolveItemDiet, DIET_PREFERENCE_LABEL, type DietPreference } from "@/lib/diet";
 import {
   STORAGE_OPTIONS,
@@ -73,6 +74,10 @@ export function AddItemModal({ userDiet, trackingAvailable, accuracyAvailable, o
   const dateDays = packDate ? daysUntilDate(packDate) : null;
   const expirySource: ExpirySource = dateDays !== null ? "user" : null;
   const effectiveStorage = storage ?? estimate?.storage ?? null;
+  // USDA's "use within N days of opening", when it has one, until the person picks.
+  const openedSuggestion = trimmed && effectiveStorage ? openedDaysFor(trimmed, effectiveStorage) : null;
+  const effectiveOpenedDays = openedDays ?? openedSuggestion?.days ?? null;
+  const openedChoices = [...new Set([...OPENED_DAYS_OPTIONS, ...(openedSuggestion ? [openedSuggestion.days] : [])])].sort((a, b) => a - b);
 
   // What the item will show, step by step, so the preview and the save agree.
   let preview: { daysLeft: number; note: string } | null = null;
@@ -91,8 +96,8 @@ export function AddItemModal({ userDiet, trackingAvailable, accuracyAvailable, o
       daysLeft = moved.daysLeft;
       if (!moved.changed && moved.reason) note = `${note} ${moved.reason}`;
     }
-    if (trackingAvailable && opened && openedDays) {
-      daysLeft = daysLeftAfterOpening(daysLeft, openedDays);
+    if (trackingAvailable && opened && effectiveOpenedDays) {
+      daysLeft = daysLeftAfterOpening(daysLeft, effectiveOpenedDays);
     }
     preview = { daysLeft, note };
   }
@@ -133,7 +138,7 @@ export function AddItemModal({ userDiet, trackingAvailable, accuracyAvailable, o
     if (!trimmed) return setError("Enter the item's name.");
     if (trimmed.length > 80) return setError("Keep the name under 80 characters.");
     if (packDate && dateDays === null) return setError("That date doesn't look right.");
-    if (trackingAvailable && opened && !openedDays) return setError("Pick how soon it should be used once opened.");
+    if (trackingAvailable && opened && !effectiveOpenedDays) return setError("Pick how soon it should be used once opened.");
     if (dietBlocked || !preview) return;
 
     setSaving(true);
@@ -287,12 +292,17 @@ export function AddItemModal({ userDiet, trackingAvailable, accuracyAvailable, o
                   <div className="pt-1">
                     <p className="text-[11px] text-foreground/60 mb-1.5">Use within how many days of opening? Most packs print this.</p>
                     <div role="group" aria-label="Use within days of opening" className="flex flex-wrap gap-2">
-                      {OPENED_DAYS_OPTIONS.map((d) => (
-                        <button key={d} type="button" aria-pressed={openedDays === d} onClick={() => setOpenedDays(d)} className={chip(openedDays === d)}>
+                      {openedChoices.map((d) => (
+                        <button key={d} type="button" aria-pressed={effectiveOpenedDays === d} onClick={() => setOpenedDays(d)} className={chip(effectiveOpenedDays === d)}>
                           {d}d
                         </button>
                       ))}
                     </div>
+                    {openedSuggestion && (
+                      <p className="text-[10px] text-foreground/45 mt-1.5">
+                        {openedSuggestion.days}d suggested from {openedSuggestion.citation}. The pack&apos;s own figure wins.
+                      </p>
+                    )}
                   </div>
                 )}
               </div>
