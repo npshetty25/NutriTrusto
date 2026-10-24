@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenerativeAI, SchemaType, type ResponseSchema } from "@google/generative-ai";
 import { createRequestContext } from "@/lib/server-logger";
 import { findDietViolations, normalizeDiet } from "@/lib/diet-check";
 import { ANIMAL_TERMS } from "@/lib/diet";
@@ -47,6 +47,36 @@ const RAW_PROTEIN_TERMS = [
   ...ANIMAL_TERMS.filter((t) => !NOT_COOKED_THROUGH.has(t)),
   "egg", "eggs", "anda",
 ];
+
+/**
+ * The shape Gemini must answer in. With a response schema the model is
+ * constrained to valid JSON of this shape, instead of being asked nicely and
+ * then having its code fences stripped by regex — which failed outright on
+ * any stray sentence before or after the JSON.
+ */
+const ingredientRow: ResponseSchema = {
+  type: SchemaType.OBJECT,
+  properties: {
+    item: { type: SchemaType.STRING },
+    quantity: { type: SchemaType.STRING },
+  },
+  required: ["item", "quantity"],
+};
+
+const RECIPE_RESPONSE_SCHEMA: ResponseSchema = {
+  type: SchemaType.OBJECT,
+  properties: {
+    title: { type: SchemaType.STRING },
+    baseDish: { type: SchemaType.STRING },
+    prepTime: { type: SchemaType.STRING },
+    fromPantry: { type: SchemaType.ARRAY, items: ingredientRow },
+    toBuy: { type: SchemaType.ARRAY, items: ingredientRow },
+    staples: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
+    steps: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
+    rescueNote: { type: SchemaType.STRING },
+  },
+  required: ["title", "baseDish", "prepTime", "fromPantry", "toBuy", "staples", "steps", "rescueNote"],
+};
 
 const isOverloaded = (error: unknown) => {
   const status = (error as { status?: number })?.status;
@@ -200,7 +230,7 @@ have and what they must go out and buy:
 - "staples": the everyday kitchen basics from rule 6 that you used (oil/ghee, salt,
   onion, tomato, ginger, garlic, green chilli, ground spices, atta, rice).
 
-Return ONLY this JSON object, no markdown fence, no commentary:
+Answer with this JSON object:
 {
   "title": "the dish's ordinary well-known name, e.g. Aloo Gobi",
   "baseDish": "the same dish name exactly as someone would type it into YouTube (e.g. Palak Paneer, Paneer Bhurji, Vegetable Khichdi)",
@@ -212,7 +242,17 @@ Return ONLY this JSON object, no markdown fence, no commentary:
   "rescueNote": "one short sentence naming which about-to-spoil items this uses"
 }`;
 
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const model = genAI.getGenerativeModel({
+      model: "gemini-2.5-flash",
+      generationConfig: {
+        responseMimeType: "application/json",
+        responseSchema: RECIPE_RESPONSE_SCHEMA,
+        // Lower than the default: the same pantry should get a similar, real
+        // dish each time, not a creative one. "Try another" still varies it
+        // through avoidTitles.
+        temperature: 0.4,
+      },
+    });
     const diet = normalizeDiet(dietaryPreference);
     const knownNames = new Set(pantry.map((i) => i.name.toLowerCase()));
 

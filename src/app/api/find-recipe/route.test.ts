@@ -4,9 +4,15 @@ import { geminiText, silenceLogs, TEST_USER } from "@/test/route-helpers";
 const generateContent = vi.hoisted(() => vi.fn());
 const getRequestUser = vi.hoisted(() => vi.fn());
 
-vi.mock("@google/generative-ai", () => ({
+// Keeps the library's real exports (SchemaType, used for the response schema)
+// and swaps only the client. The generation config is captured so a test can
+// check the schema and temperature are actually sent.
+const modelConfig = vi.hoisted(() => ({ last: undefined as unknown }));
+vi.mock("@google/generative-ai", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@google/generative-ai")>()),
   GoogleGenerativeAI: class {
-    getGenerativeModel() {
+    getGenerativeModel(config: unknown) {
+      modelConfig.last = config;
       return { generateContent };
     }
   },
@@ -129,6 +135,17 @@ describe("POST /api/find-recipe — what reaches the model", () => {
 });
 
 describe("POST /api/find-recipe — shaping the response", () => {
+  it("asks Gemini for JSON in a fixed schema, at a low temperature", async () => {
+    generateContent.mockResolvedValue(geminiText(recipeJson()));
+    await call({ items: PANTRY });
+    const config = modelConfig.last as { generationConfig?: { responseMimeType?: string; responseSchema?: { required?: string[] }; temperature?: number } };
+    expect(config.generationConfig?.responseMimeType).toBe("application/json");
+    expect(config.generationConfig?.responseSchema?.required).toEqual(
+      expect.arrayContaining(["title", "baseDish", "fromPantry", "toBuy", "steps"])
+    );
+    expect(config.generationConfig?.temperature).toBeLessThanOrEqual(0.5);
+  });
+
   it("returns a normalised recipe", async () => {
     generateContent.mockResolvedValue(geminiText(recipeJson()));
     const { res, body } = await call({ items: PANTRY, dietaryPreference: "Veg" });
