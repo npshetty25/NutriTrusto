@@ -9,6 +9,7 @@ import { getItemDietType, lockedDietScope, normalizeDietPreference, type ItemDie
 import { VegMark } from "@/components/veg-mark";
 import { motion } from "framer-motion";
 import { LOCAL_RECIPES, localRecipeId, findLocalRecipe, localRecipeDiet, localRecipeDetail } from "@/lib/global-recipes";
+import { MyRecipes } from "@/components/my-recipes";
 
 // Every entry here was checked against TheMealDB's filter endpoint on
 // 2026-08-26 and returns a non-empty result. The list is NOT taken from the
@@ -73,6 +74,8 @@ export default function RecipesPage() {
   // India-first product met beef first. Beef in particular is not a mild
   // mismatch here: it is restricted by law in much of the country.
   const userDiet = normalizeDietPreference(String(user?.user_metadata?.dietary_preference || "none"));
+  // Cuisines (the global list) or the account's own recipes.
+  const [view, setView] = useState<"cuisines" | "mine">("cuisines");
   // A veg or eggtarian account is locked to its diet: no chip can widen it
   // back to "All". Everyone else picks. Derived rather than set in an effect,
   // which also removes the first-render window where `user` was still null and
@@ -319,6 +322,30 @@ export default function RecipesPage() {
       )}
 
       <main className="px-4 sm:px-6 py-5 flex-1">
+        <div role="tablist" aria-label="Recipes" className="grid grid-cols-2 gap-2 mb-5">
+          {([
+            { id: "cuisines", label: "Cuisines" },
+            { id: "mine", label: "My recipes" },
+          ] as const).map((t) => (
+            <button
+              key={t.id}
+              role="tab"
+              aria-selected={view === t.id}
+              onClick={() => {
+                setView(t.id);
+                if (t.id === "cuisines") { setSelectedCountry(null); setMeals([]); }
+              }}
+              className={`min-h-11 rounded-xl text-sm font-bold transition-all ${view === t.id ? "bg-foreground text-background" : "neu-raised-sm text-foreground/70 hover:text-foreground"}`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {view === "mine" ? (
+          <MyRecipes userDiet={userDiet} />
+        ) : (
+          <>
         {/* Country list */}
         {!selectedCountry ? (
           <>
@@ -454,6 +481,8 @@ export default function RecipesPage() {
                 ))}
               </div>
             )}
+          </>
+        )}
           </>
         )}
       </main>
