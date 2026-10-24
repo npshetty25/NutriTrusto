@@ -59,7 +59,10 @@ export function ProfileDropdown({ onOpenShoppingList, onReplayTour }: ProfileDro
     }
     // Fixed positioning is resolved once at open time, so anything that moves
     // the trigger would leave the menu stranded.
-    function handleReflow() {
+    // The scroll listener is in the capture phase, so it also hears a scroll
+    // inside the menu itself. A long menu scrolls, and that must not close it.
+    function handleReflow(e: Event) {
+      if (e.type === "scroll" && menuRef.current?.contains(e.target as Node)) return;
       setOpen(false);
     }
 
