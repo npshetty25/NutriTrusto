@@ -7,6 +7,7 @@ import { matchesTerm, isPluralNoun } from "@/lib/text-match";
 import { detectAllergens } from "@/lib/allergens";
 import { getRequestUser, unauthorized } from "@/lib/api-auth";
 import { checkRateLimit, rateLimited } from "@/lib/rate-limit";
+import { selectDishCandidates, findDish, missingCoreIngredients } from "@/lib/dish-catalog";
 
 const apiKey = process.env.GEMINI_API_KEY;
 const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null;
@@ -203,6 +204,23 @@ export async function POST(req: Request) {
       ? `\nDo NOT suggest these, they were already shown: ${avoidTitles.slice(0, 6).join(", ")}.\n`
       : "";
 
+    // The dishes this pantry can actually make, from a known list. The model
+    // chooses among these; it does not invent one.
+    const candidates = selectDishCandidates(pantry, dietaryPreference, Array.isArray(avoidTitles) ? avoidTitles : []);
+    if (candidates.length === 0) {
+      log.info("No known dish fits this pantry", { itemCount: pantry.length });
+      return NextResponse.json(
+        {
+          success: false,
+          error: "None of the everyday dishes we know use these items. Add a vegetable, paneer, dal or eggs and try again.",
+        },
+        { status: 422 }
+      );
+    }
+    const dishList = candidates
+      .map((c) => `- ${c.name} (would use: ${c.uses.join(", ")})`)
+      .join("\n");
+
     // Rules 1-3 used to say the opposite: every "MUST USE" item had to go into
     // one dish. Handed palak, curd, chicken and bread, the model obeyed and
     // invented a dish nobody cooks — unappetising, and with curd and chicken
@@ -214,15 +232,18 @@ ${sections}
 ${avoid}
 Dietary preference: ${dietaryPreference || "none"}.
 
+Choose ONE dish from this list. These are real dishes that the pantry can make:
+${dishList}
+
 Rules, in order of importance:
-1. The dish must be a REAL, established dish that Indian households actually cook and that people recognise by name — the kind found in any ordinary Indian cookbook (Aloo Gobi, Palak Paneer, Dal Tadka, Vegetable Pulao, Poha, Besan Chilla, Jeera Rice, Kadhi). Never invent a new dish, a fusion, or an unusual combination of ingredients.
+1. The dish MUST be one of the dishes listed above. Put its name, exactly as listed, in both "title" and "baseDish". Never invent a new dish, a fusion, or an unusual combination of ingredients.
 2. Choose the real dish that uses the "USE FIRST" items best. Only include an item if it genuinely belongs in that dish as it is normally cooked. NEVER force an ingredient in just to use it up — leaving an item out is always better than an odd or unsafe combination. Using a single pantry item is fine.
 3. Do not put together ingredients that the real dish does not normally contain.
 4. Respect the dietary preference absolutely. "Veg" means no meat, no fish, no egg. "Eggtarian" allows egg but no meat or fish. Never break this.
 5. Cook it the way that dish is normally cooked — tadka where it belongs (jeera, rai, hing, curry leaves), bhuna-ing the masala, everyday spices (haldi, dhania, jeera powder, garam masala, lal mirch, amchur).
 6. You may assume only these everyday kitchen staples are at home: oil or ghee, salt, sugar, onion, tomato, ginger, garlic, green chilli, the ground spices above, atta, rice and a basic dal. Anything else the dish needs that is not in the lists above goes under "toBuy".
 7. Where an item says how much is left, never use more of it than that, and size the dish to it. Use Indian measures and names naturally (katori, tsp, tbsp, grams, ml; jeera, haldi, dhania), with the English term in brackets on first use where it isn't obvious.
-8. The title is the dish's ordinary, well-known name — exactly what someone would call it at home (e.g. "Aloo Gobi", "Palak Paneer"). Do not list ingredients in the title, do not add made-up words, keep it under five words.
+8. The title is the listed name, unchanged. Do not add words to it.
 9. If an item you use is marked "due today", the FIRST step must tell the cook to look at it and smell it before it goes in, and to leave it out if it does not seem right. Nobody has checked it yet, so the step must not contain the words "spoiled", "spoilage", "gone bad", "rotten" or "expired" ANYWHERE — not even conditionally, so "if it is spoiled, throw it away" is also forbidden. Say what to look for instead: soft or slimy patches, discolouration, a sour or unusual smell. Then say to leave it out if any of that is there.
 10. Where an item is marked "rough estimate", our day count for it is unreliable. Prefer a real dish that cooks it through (a sabzi, dal or curry) over one that serves it raw (raita, salad, chutney). Do not mention the estimate or its reliability in the recipe.
 
@@ -239,8 +260,8 @@ have and what they must go out and buy:
 
 Answer with this JSON object:
 {
-  "title": "the dish's ordinary well-known name, e.g. Aloo Gobi",
-  "baseDish": "the same dish name exactly as someone would type it into YouTube (e.g. Palak Paneer, Paneer Bhurji, Vegetable Khichdi)",
+  "title": "the chosen dish's name, exactly as listed",
+  "baseDish": "the same name, exactly as listed",
   "prepTime": "e.g. 25m",
   "fromPantry": [{"item": "exact name from the lists above", "quantity": "200 g, cubed"}],
   "toBuy": [{"item": "Fresh coriander", "quantity": "1 bunch"}],
@@ -265,15 +286,23 @@ Answer with this JSON object:
 
     let recipe: Record<string, unknown> | null = null;
     let lastViolations: string[] = [];
+    let lastGroundingProblem: string | null = null;
+    let chosenDish: string | null = null;
 
     // A prompt is a request, not a guarantee. Check the result and try again
     // once before giving up — never serve the violation.
     for (let attempt = 0; attempt < 2; attempt++) {
-      const attemptPrompt = attempt === 0
+      const corrections = [
+        lastViolations.length
+          ? `Your previous attempt included ${lastViolations.join(", ")}, which breaks the "${dietaryPreference}" requirement. Write a completely different dish containing no meat, no fish${diet === "veg" ? ", and no egg" : ""} whatsoever.`
+          : "",
+        lastGroundingProblem ? `Your previous attempt was not usable: ${lastGroundingProblem}. Choose a dish from the list and keep its defining ingredients.` : "",
+      ].filter(Boolean);
+      const attemptPrompt = attempt === 0 || corrections.length === 0
         ? prompt
         : `${prompt}
 
-Your previous attempt included ${lastViolations.join(", ")}, which breaks the "${dietaryPreference}" requirement. Write a completely different dish containing no meat, no fish${diet === "veg" ? ", and no egg" : ""} whatsoever.`;
+${corrections.join("\n")}`;
 
       const result = await generateWithRetry(model, attemptPrompt);
       const text = result.response.text().trim();
@@ -286,25 +315,50 @@ Your previous attempt included ${lastViolations.join(", ")}, which breaks the "$
       const parsed = JSON.parse(jsonStr);
       const violations = findDietViolations(JSON.stringify(parsed), diet);
 
-      if (violations.length === 0) {
+      // Grounding: the dish must be one we offered, and must keep the
+      // ingredients that make it that dish.
+      const named = String(parsed?.baseDish || parsed?.title || "").trim();
+      const offered = candidates.find((c) => c.name.toLowerCase() === named.toLowerCase());
+      const dish = offered ? findDish(offered.name) : null;
+      const ingredientLines = [
+        ...(Array.isArray(parsed?.fromPantry) ? parsed.fromPantry : []).map((r: unknown) => String((r as { item?: unknown })?.item ?? r ?? "")),
+        ...(Array.isArray(parsed?.toBuy) ? parsed.toBuy : []).map((r: unknown) => (typeof r === "string" ? r : String((r as { item?: unknown })?.item ?? ""))),
+        ...(Array.isArray(parsed?.staples) ? parsed.staples : []).map(String),
+      ];
+      const missing = dish ? missingCoreIngredients(dish, ingredientLines) : [];
+      const groundingProblem = !dish
+        ? `"${named || "(no name)"}" is not one of the listed dishes`
+        : missing.length
+          ? `${dish.name} needs ${missing.join(" and ")}, which the ingredients left out`
+          : null;
+
+      if (violations.length === 0 && !groundingProblem) {
         recipe = parsed;
+        chosenDish = dish!.name;
         break;
       }
       lastViolations = violations;
-      log.warn("Generated recipe violated dietary preference", { diet, violations, attempt });
+      lastGroundingProblem = groundingProblem;
+      if (violations.length) log.warn("Generated recipe violated dietary preference", { diet, violations, attempt });
+      if (groundingProblem) log.warn("Generated recipe was not a listed dish", { problem: groundingProblem, attempt });
     }
 
-    if (!recipe) {
-      log.error("Could not produce a diet-safe recipe", { diet, lastViolations });
+    if (!recipe || !chosenDish) {
+      log.error("Could not produce a usable recipe", { diet, lastViolations, lastGroundingProblem });
       return NextResponse.json(
-        { success: false, error: `Couldn't put together a ${dietaryPreference} recipe from these items. Please try again.` },
+        {
+          success: false,
+          error: lastViolations.length
+            ? `Couldn't put together a ${dietaryPreference} recipe from these items. Please try again.`
+            : "Couldn't match these items to a dish we know. Please try again.",
+        },
         { status: 502 }
       );
     }
 
-    const title = String(recipe.title || "Pantry Special").trim();
-    // Fall back to the title only if the model skipped the field entirely.
-    const baseDish = String(recipe.baseDish || "").trim() || title;
+    // The listed name, not whatever wording the model added around it.
+    const title = chosenDish;
+    const baseDish = chosenDish;
 
     const fromPantry = (Array.isArray(recipe.fromPantry) ? recipe.fromPantry : [])
       .map((row: unknown) => {
