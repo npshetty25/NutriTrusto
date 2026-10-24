@@ -2,7 +2,7 @@ import { STORAGE_DISCLAIMER } from "@/lib/temperature";
 
 export interface IfStoredDifferently {
   fridge: number | null;
-  counter: number;
+  counter: number | null;
   freezer: number | null;
   suppressedReason?: string;
 }

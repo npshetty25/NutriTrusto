@@ -1,5 +1,6 @@
 import { inferItemCategory, type ItemCategory } from "@/lib/item-category";
 import { matchesTerm, isExcluded } from "@/lib/text-match";
+import { findFssaiSweet, FSSAI_SWEETS_CITATION } from "@/lib/fssai-sweets";
 import {
   ROWS_BY_KEY_LENGTH,
   type Confidence,
@@ -71,7 +72,7 @@ export interface ShelfLifeEstimate {
    * injury and we have no sourced threshold, or its failure mode is not
    * temperature-modelled. The UI shows "storage guidance unavailable".
    */
-  ifStoredDifferently: { fridge: number | null; counter: number; freezer: number | null; suppressedReason?: string };
+  ifStoredDifferently: { fridge: number | null; counter: number | null; freezer: number | null; suppressedReason?: string };
   /** Shown wherever an adjusted number appears. */
   disclaimer: string;
   /**
@@ -253,6 +254,36 @@ export function estimateShelfLife(
       ifStoredDifferently: { fridge: days, counter: days, freezer: null },
       // A printed date is a manufacturer's statement, not our estimate, so
       // the storage disclaimer would be a false qualifier here.
+      disclaimer: "",
+    };
+  }
+
+  // ── Tier 3a: Indian sweets, from FSSAI's own list ────────────────
+  // Before our table, not after: "Milk Cake" or "Badam milk" would otherwise
+  // match the "milk" row and get a dairy figure instead of FSSAI's.
+  const sweet = findFssaiSweet(name);
+  if (sweet) {
+    const { group } = sweet;
+    const tier: PerishTier = group.days <= 2 ? "highly-perishable" : group.days <= 7 ? "perishable" : "semi-perishable";
+    return {
+      days: group.days,
+      source: "known",
+      explanation:
+        group.days === 0
+          ? `FSSAI says ${sweet.name} is to be eaten the day it is made. The date on the shop's tray wins.`
+          : `FSSAI gives ${sweet.name} ${group.days} days from the day it was made${group.storage === "fridge" ? ", kept in the fridge" : ""}. Counted from today, so check the date on the shop's tray.`,
+      // Counted from purchase, not manufacture, and the list is illustrative.
+      wantsConfirmation: true,
+      confidence: "medium",
+      citation: FSSAI_SWEETS_CITATION,
+      tier,
+      storage: group.storage,
+      assumedTempC: ASSUMED_STORAGE_C[group.storage],
+      // FSSAI gives one storage condition per group, and nothing else to
+      // extrapolate from — so no "if stored differently" figures.
+      ifStoredDifferently: group.storage === "fridge"
+        ? { fridge: group.days, counter: null, freezer: null, suppressedReason: "FSSAI says to keep it refrigerated" }
+        : { fridge: null, counter: group.days, freezer: null, suppressedReason: "FSSAI gives room temperature only" },
       disclaimer: "",
     };
   }
