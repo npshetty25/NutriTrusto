@@ -18,8 +18,8 @@ export const TOUR_STEPS: TourStep[] = [
     body: "This is your pantry — everything you've got, and how long it's good for. Three quick things, then it's yours.",
   },
   {
-    title: "Scan a receipt",
-    body: "Just got back from a grocery run? Scan the receipt and every item on it gets added at once.",
+    title: "Add products",
+    body: "Just got back from a grocery run? Add a receipt and every item on it gets added at once. Or add one product by barcode or by hand.",
     target: "receipt",
   },
   {

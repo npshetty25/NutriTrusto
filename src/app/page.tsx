@@ -2606,6 +2606,19 @@ if (nutritionFieldsFilled < 2) {
                 <p className="text-[11px] text-foreground/50 leading-tight mt-0.5">Reads a photo of a bill or a PDF file</p>
               </div>
             </button>
+            <div className="h-px w-full bg-border" />
+            <button
+              onClick={() => { setShowReceiptMenu(false); setShowAddItem(true); }}
+              className="flex items-center gap-3 p-3 rounded-xl hover:bg-foreground/5 text-foreground text-left transition-colors"
+            >
+              <div className="w-9 h-9 rounded-xl neu-raised-sm text-foreground/70 flex items-center justify-center shrink-0">
+                <Plus size={16} />
+              </div>
+              <div>
+                <p className="font-semibold text-sm leading-tight">Add product</p>
+                <p className="text-[11px] text-foreground/50 leading-tight mt-0.5">Scan a barcode, or type it in with its use-by date</p>
+              </div>
+            </button>
           </div>
         )}
 
@@ -2632,8 +2645,8 @@ if (nutritionFieldsFilled < 2) {
             disabled={isUploading}
             className={`flex-1 min-w-0 flex flex-col items-center justify-center gap-1 hover:bg-foreground/5 h-16 px-2 rounded-xl transition-all disabled:opacity-50 ${showReceiptMenu ? 'bg-foreground/10 text-foreground' : 'text-foreground/80 hover:text-foreground'}`}
           >
-            {isUploading ? <Loader2 size={18} className="animate-spin" /> : <Camera size={18} />}
-            <span className="text-[10px] tracking-wide">{isUploading ? "Reading" : "Receipt"}</span>
+            {isUploading ? <Loader2 size={18} className="animate-spin" /> : <Plus size={18} />}
+            <span className="text-[10px] tracking-wide">{isUploading ? "Reading" : "Add product"}</span>
           </button>
 
           <div className="w-px h-8 bg-border" />

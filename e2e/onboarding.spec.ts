@@ -37,7 +37,7 @@ test.describe("first-time walkthrough", () => {
     await page.getByRole("heading", { name: "Welcome to Nutri-Trust" }).waitFor();
 
     await page.getByRole("button", { name: /Next/ }).click();
-    await expect(page.getByRole("heading", { name: "Scan a receipt" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Add products" })).toBeVisible();
 
     await page.getByRole("button", { name: /Next/ }).click();
     await expect(page.getByRole("heading", { name: "Scan a barcode" })).toBeVisible();
