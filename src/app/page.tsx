@@ -2755,13 +2755,34 @@ if (nutritionFieldsFilled < 2) {
                     })()
                   )}
                 </div>
+                {scannedExpiry && (
+                  <button
+                    onClick={() => setShowExpiryScanner(true)}
+                    className="flex min-h-11 items-center gap-1.5 border border-border bg-card text-foreground text-xs font-semibold px-3 py-2 rounded-lg hover:bg-foreground/5 transition-colors shrink-0 whitespace-nowrap"
+                  >
+                    <CalendarClock size={13} /> Rescan
+                  </button>
+                )}
+              </div>
+
+              {/* The most accurate number for a packaged product is the one
+                  printed on it — FSSAI requires a best-before or use-by date
+                  on pre-packed food. So when a scan has no date yet, asking
+                  for it is the main action here, not a small side button
+                  next to our estimate. */}
+              {!scannedExpiry && (
                 <button
                   onClick={() => setShowExpiryScanner(true)}
-                  className="flex min-h-11 items-center gap-1.5 border border-border bg-card text-foreground text-xs font-semibold px-3 py-2 rounded-lg hover:bg-foreground/5 transition-colors shrink-0 whitespace-nowrap"
+                  className="w-full min-h-12 flex items-center justify-center gap-2 rounded-2xl bg-brand text-white text-sm font-bold hover:opacity-90 transition-opacity"
                 >
-                  <CalendarClock size={13} /> {scannedExpiry ? "Rescan" : "Scan date"}
+                  <CalendarClock size={16} /> Scan the date on the pack
                 </button>
-              </div>
+              )}
+              {!scannedExpiry && (
+                <p className="-mt-2 text-[11px] text-foreground/55 text-center leading-relaxed">
+                  Packed food in India must print a date. Scanning it gives an exact count instead of our estimate.
+                </p>
+              )}
 
               {/* TruthIn Style Rating Card */}
               <div className="bg-foreground/5 rounded-2xl p-4 flex items-center justify-between border border-border/50 sleek-shadow">
