@@ -5,6 +5,7 @@ import { deriveRiskFromDaysOnly } from "@/lib/risk-bands";
 import { validateUpload } from "@/lib/upload-validation";
 import { getRequestUser, unauthorized } from "@/lib/api-auth";
 import { checkRateLimit, rateLimited } from "@/lib/rate-limit";
+import { estimateShelfLife } from "@/lib/shelf-life";
 
 const apiKey = process.env.GEMINI_API_KEY;
 const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null;
@@ -34,13 +35,6 @@ const resolveReceiptDate = (isoDate: unknown): Date => {
     }
   }
   return today;
-};
-
-const normalizeRisk = (risk?: string): "high" | "medium" | "low" => {
-  const value = (risk || "").toLowerCase().trim();
-  if (["high", "critical", "urgent"].includes(value)) return "high";
-  if (["medium", "med", "soon"].includes(value)) return "medium";
-  return "low";
 };
 
 const normalizeDaysLeft = (value: number | string | undefined): number => {
@@ -155,15 +149,37 @@ Return ONLY the raw JSON string, with no markdown formatting.`;
     const items = rawItems
       .map((item) => {
         const name = String(item?.name || "").trim();
-        const days_left = normalizeDaysLeft(item?.days_left);
         if (!name) return null;
 
-        const modelRisk = normalizeRisk(item?.risk);
-        const risk = modelRisk || deriveRiskFromDays(days_left);
+        // Same order of trust as every other way an item gets in: a sourced
+        // figure (our table, or FSSAI for sweets) first; the model's general-
+        // knowledge guess only when nothing sourced matches; the category
+        // average only when the model gave nothing usable either. This used
+        // to be the model's guess for every line, which made receipts — the
+        // way most items are added — the least accurate path in the app.
+        const estimate = estimateShelfLife(name);
+        const rawModelDays = typeof item?.days_left === "number" ? item.days_left : Number.parseInt(String(item?.days_left ?? ""), 10);
+        const modelGaveDays = Number.isFinite(rawModelDays) && rawModelDays > 0;
 
-        return { name, days_left, risk };
+        let days_left: number;
+        let days_source: "table" | "ai" | "category";
+        if (estimate.source === "known") {
+          days_left = estimate.days;
+          days_source = "table";
+        } else if (modelGaveDays) {
+          days_left = normalizeDaysLeft(rawModelDays);
+          days_source = "ai";
+        } else {
+          days_left = estimate.days;
+          days_source = "category";
+        }
+
+        // Risk follows the number actually used, not the model's own label,
+        // which was judged against its own guess.
+        const risk = deriveRiskFromDays(days_left);
+        return { name, days_left, risk, days_source };
       })
-      .filter((item): item is { name: string; days_left: number; risk: "high" | "medium" | "low" } => Boolean(item));
+      .filter((item): item is { name: string; days_left: number; risk: "high" | "medium" | "low"; days_source: "table" | "ai" | "category" } => Boolean(item));
 
     const receiptDate = resolveReceiptDate(parsedData?.purchase_date_iso);
     // Returned to the client, which writes it straight into pantry_items.
@@ -180,6 +196,12 @@ Return ONLY the raw JSON string, with no markdown formatting.`;
       success: true,
       items,
       purchase_date,
+      // How many day counts came from where, so the app can say so.
+      estimate_sources: {
+        table: items.filter((i) => i.days_source === "table").length,
+        ai: items.filter((i) => i.days_source === "ai").length,
+        category: items.filter((i) => i.days_source === "category").length,
+      },
     });
   } catch (error: unknown) {
     const err = error as { message?: string; stack?: string } | null;

@@ -1348,10 +1348,19 @@ export default function Home() {
           setItems(prev => [...failedLocalItems, ...prev]);
         }
 
+        // Say how many day counts are guesses, so a person knows which cards
+        // are worth a glance. Absent on an older server response.
+        const sources = data.estimate_sources as { table?: number; ai?: number; category?: number } | undefined;
+        const guessed = (sources?.ai ?? 0) + (sources?.category ?? 0);
+        const sourceNote = sources
+          ? guessed === 0
+            ? " Every day count is from our shelf-life sources."
+            : ` ${guessed} of the day counts are estimates — tap Edit on a card to set the real date.`
+          : "";
         toast("Receipt Parsed", {
-          description: insertedCount === rows.length
+          description: (insertedCount === rows.length
             ? `Added all ${rows.length} items to your inventory.`
-            : `Added ${insertedCount}/${rows.length} items to cloud inventory. Remaining items were added locally.`,
+            : `Added ${insertedCount}/${rows.length} items to cloud inventory. Remaining items were added locally.`) + sourceNote,
         });
       } else {
         setInlineError(data.error || "We couldn't parse this receipt. Try a clearer image in good lighting.");

@@ -68,8 +68,6 @@ const ALLOWED: Allow[] = [
   // ── Not food terms at all ────────────────────────────────────────────
   { file: "app/page.tsx", match: "cleanBase.toLowerCase().includes(cleanBrand", reason: "brand-name de-duplication in a display label, not a term match" },
   { file: "app/api/analyze-food/route.ts", match: "/\\be1\\d\\d\\b/gi", reason: "E-number colour additives are a regulatory code, not a food name — no term list exists to match against; boundaries added" },
-  { file: "app/api/extract/route.ts", match: '["high", "critical", "urgent"].includes(value)', reason: "enum membership on a risk level" },
-  { file: "app/api/extract/route.ts", match: '["medium", "med", "soon"].includes(value)', reason: "enum membership on a risk level" },
   { file: "lib/upload-validation.ts", match: "[0x68, 0x6d].includes(b[8])", reason: "magic-byte check on a file header" },
   { file: "lib/admin.ts", match: ".includes(target)", reason: "exact-match membership check of a signed-in email against a fixed admin allow-list — never a food term" },
   { file: "lib/colour-semantics.ts", match: "className.includes(token)", reason: "CSS class-name token check" },
