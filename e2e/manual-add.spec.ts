@@ -87,7 +87,7 @@ test.describe("reaching add-by-hand from the bottom bar", () => {
     await page.getByRole("button", { name: "Use", exact: true }).click();
 
     const dialog = page.getByRole("dialog", { name: "Add an item" });
-    await expect(dialog.getByLabel("Name")).toHaveValue("Amul Salted Butter 100 g");
+    await expect(dialog.getByLabel("Name")).toHaveValue("Amul Salted Butter");
     await dialog.locator('input[type="date"]').fill(inDays(20));
     await expect(dialog.getByText("Will show 20 days left")).toBeVisible();
     await dialog.getByRole("button", { name: "Add to pantry" }).click();
