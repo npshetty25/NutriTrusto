@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import { createPortal } from "react-dom";
-import { X, Loader2, Plus } from "lucide-react";
+import { X, Loader2, Plus, ScanLine } from "lucide-react";
+import BarcodeScanner from "@/components/barcode-scanner";
+import { parseGs1 } from "@/lib/gs1";
 import { estimateShelfLife, formatProvenance } from "@/lib/shelf-life";
 import { isDietConflict, resolveItemDiet, DIET_PREFERENCE_LABEL, type DietPreference } from "@/lib/diet";
 import {
@@ -50,6 +52,8 @@ export function AddItemModal({ userDiet, trackingAvailable, onAdd, onClose }: Ad
   const [openedDays, setOpenedDays] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [scanning, setScanning] = useState(false);
+  const [looking, setLooking] = useState(false);
 
   const trimmed = name.trim();
   const estimate = trimmed ? estimateShelfLife(trimmed) : null;
@@ -75,6 +79,34 @@ export function AddItemModal({ userDiet, trackingAvailable, onAdd, onClose }: Ad
 
   const itemDiet = trimmed ? resolveItemDiet(trimmed) : "veg";
   const dietBlocked = !!trimmed && isDietConflict(userDiet, itemDiet);
+
+  // The barcode identifies the product, not this pack's date, so a scan only
+  // fills in the name. The use-by date is still typed by hand, as it is on
+  // the pack. Not found in the database is a normal outcome: say so and let
+  // the name be typed.
+  const handleScanned = async (decoded: string) => {
+    setScanning(false);
+    setError(null);
+    const code = parseGs1(decoded)?.lookupCode ?? decoded;
+    setLooking(true);
+    try {
+      const res = await fetch(`https://world.openfoodfacts.org/api/v2/product/${code}.json?fields=product_name,brands,quantity`);
+      const data = await res.json();
+      const product = data?.status === 1 ? (data.product as { product_name?: string; brands?: string; quantity?: string } | undefined) : undefined;
+      const base = product?.product_name?.trim();
+      if (!base) {
+        setError("That barcode isn't in the product database. Type the name instead.");
+        return;
+      }
+      const brand = product?.brands?.split(",")[0]?.trim();
+      const withBrand = brand && !base.toLowerCase().includes(brand.toLowerCase()) ? `${brand} ${base}` : base;
+      setName(withBrand.slice(0, 80));
+    } catch {
+      setError("Couldn't look that barcode up. Check your connection, or type the name.");
+    } finally {
+      setLooking(false);
+    }
+  };
 
   const submit = async () => {
     setError(null);
@@ -102,6 +134,17 @@ export function AddItemModal({ userDiet, trackingAvailable, onAdd, onClose }: Ad
       active ? "bg-foreground text-background" : "neu-raised-sm text-foreground/70 hover:text-foreground"
     }`;
 
+  // The scanner is a full-screen layer of its own, so it replaces the form
+  // while open instead of sitting underneath this dialog.
+  if (scanning) {
+    return (
+      <BarcodeScanner
+        onScan={(decoded) => { void handleScanned(decoded); }}
+        onClose={() => setScanning(false)}
+      />
+    );
+  }
+
   return createPortal(
     <div className="fixed inset-0 z-70 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200">
       <div
@@ -122,7 +165,18 @@ export function AddItemModal({ userDiet, trackingAvailable, onAdd, onClose }: Ad
           onSubmit={(e) => { e.preventDefault(); void submit(); }}
         >
           <div className="space-y-1.5">
-            <label htmlFor="add-item-name" className="text-[11px] font-semibold uppercase tracking-widest text-foreground/60">Name</label>
+            <div className="flex items-center justify-between">
+              <label htmlFor="add-item-name" className="text-[11px] font-semibold uppercase tracking-widest text-foreground/60">Name</label>
+              <button
+                type="button"
+                onClick={() => { setError(null); setScanning(true); }}
+                disabled={looking}
+                className="min-h-11 flex items-center gap-1.5 text-xs font-semibold text-foreground/70 hover:text-foreground disabled:opacity-60"
+              >
+                {looking ? <Loader2 size={14} className="animate-spin" /> : <ScanLine size={14} />}
+                {looking ? "Looking it up…" : "Scan barcode"}
+              </button>
+            </div>
             <input
               id="add-item-name"
               type="text"
@@ -137,7 +191,7 @@ export function AddItemModal({ userDiet, trackingAvailable, onAdd, onClose }: Ad
 
           <div className="space-y-1.5">
             <label htmlFor="add-item-date" className="text-[11px] font-semibold uppercase tracking-widest text-foreground/60">
-              Expiry / best-before date <span className="normal-case tracking-normal font-normal text-foreground/50">(optional)</span>
+              Use-by date <span className="normal-case tracking-normal font-normal text-foreground/50">(from the pack, optional)</span>
             </label>
             <input
               id="add-item-date"
@@ -146,7 +200,7 @@ export function AddItemModal({ userDiet, trackingAvailable, onAdd, onClose }: Ad
               onChange={(e) => setPackDate(e.target.value)}
               className="neu-field w-full rounded-xl px-4 py-3 text-base"
             />
-            <p className="text-[11px] text-foreground/55">If it&apos;s printed on the pack, enter it — that beats any estimate.</p>
+            <p className="text-[11px] text-foreground/55">Type the date printed on the pack. A barcode doesn&apos;t carry it, and a date from the pack beats any estimate.</p>
           </div>
 
           {trackingAvailable && (

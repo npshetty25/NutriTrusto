@@ -68,6 +68,34 @@ test.describe("add an item by hand", () => {
   });
 });
 
+test.describe("reaching add-by-hand from the bottom bar", () => {
+  test("the bottom button is 'Add product' and its menu offers the form", async ({ backend, page }) => {
+    void backend;
+    await openDashboard(page);
+    await page.getByRole("button", { name: /^Add product$/ }).click();
+    await page.getByRole("button", { name: /^Add product Scan a barcode/ }).click();
+    await expect(page.getByRole("dialog", { name: "Add an item" })).toBeVisible();
+  });
+
+  test("scanning a barcode fills in the product's name, and the date is still typed by hand", async ({ backend, page }) => {
+    await openDashboard(page);
+    await page.getByRole("button", { name: "Add an item by hand" }).click();
+    await page.getByRole("dialog", { name: "Add an item" }).getByRole("button", { name: "Scan barcode" }).click();
+
+    // The scanner's own manual-code box stands in for the camera in tests.
+    await page.getByPlaceholder("e.g., 8901234567890").fill("8901262010023");
+    await page.getByRole("button", { name: "Use", exact: true }).click();
+
+    const dialog = page.getByRole("dialog", { name: "Add an item" });
+    await expect(dialog.getByLabel("Name")).toHaveValue("Amul Salted Butter 100 g");
+    await dialog.locator('input[type="date"]').fill(inDays(20));
+    await expect(dialog.getByText("Will show 20 days left")).toBeVisible();
+    await dialog.getByRole("button", { name: "Add to pantry" }).click();
+
+    await expect.poll(() => lastInsert(backend)).toMatchObject({ days_left: 20, expiry_source: "user" });
+  });
+});
+
 test.describe("editing what the person knows about an item", () => {
   test("marking an item opened shortens it to the pack's 'use within' days", async ({ backend, page }) => {
     backend.seedPantry([{ name: "Curd", days_left: 6 }]);
