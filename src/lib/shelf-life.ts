@@ -1,6 +1,7 @@
 import { inferItemCategory, type ItemCategory } from "@/lib/item-category";
 import { matchesTerm, isExcluded } from "@/lib/text-match";
 import { findFssaiSweet, FSSAI_SWEETS_CITATION } from "@/lib/fssai-sweets";
+import { findFoodKeeperEntry, foodKeeperLabel, FOODKEEPER_CITATION } from "@/lib/foodkeeper";
 import {
   ROWS_BY_KEY_LENGTH,
   type Confidence,
@@ -33,7 +34,8 @@ import {
  * Five tiers, in order of how much they can be trusted:
  *
  *   1 scanned   — a real printed date. Used verbatim, never adjusted.
- *   3 known     — a sourced baseline row matched by name.
+ *   3 known     — a sourced baseline row matched by name (FSSAI sweets, our
+ *                 own table, then USDA FoodKeeper).
  *   2 database  — the same table, reached through the product's Open Food
  *                 Facts categories when the name matched nothing. Checked
  *                 after tier 3 (the name is more specific); numbered 2 for
@@ -314,6 +316,37 @@ export function estimateShelfLife(
       storage: row.storage,
       assumedTempC: targetC,
       ifStoredDifferently: storedElsewhere(row.days, row.refTempC, row),
+      disclaimer: STORAGE_DISCLAIMER,
+    };
+  }
+
+  // ── Tier 3b: USDA FoodKeeper, by name ────────────────────────────
+  // After our table, which is written for Indian items and storage; before
+  // the category guesses, because a USDA figure for the item itself beats a
+  // figure for the kind of item it is.
+  const fk = findFoodKeeperEntry(name);
+  if (fk) {
+    const label = foodKeeperLabel(fk.entry);
+    const { counter, fridge, freezer } = fk.byStorage;
+    return {
+      days: fk.days,
+      source: "known",
+      explanation: fk.adjusted
+        ? `USDA's figure for ${label}, adjusted for ${STORAGE_LABEL[fk.storage]} at ${ASSUMED_STORAGE_C[fk.storage]}°C. Change it if your pack says otherwise.`
+        : `USDA's figure for ${label}, kept ${STORAGE_LABEL[fk.storage]}. Change it if your pack says otherwise.`,
+      wantsConfirmation: false,
+      confidence: fk.adjusted ? "medium" : "high",
+      citation: `${FOODKEEPER_CITATION}: ${label}`,
+      tier: fk.days <= 2 ? "highly-perishable" : fk.days <= 14 ? "perishable" : fk.days <= 90 ? "semi-perishable" : "shelf-stable",
+      storage: fk.storage,
+      assumedTempC: ASSUMED_STORAGE_C[fk.storage],
+      // USDA's own figure for each storage, not an extrapolation from one.
+      ifStoredDifferently: {
+        fridge,
+        counter,
+        freezer,
+        ...(fridge === null || counter === null ? { suppressedReason: "USDA gives no figure for that" } : {}),
+      },
       disclaimer: STORAGE_DISCLAIMER,
     };
   }
