@@ -274,6 +274,9 @@ const PLACEHOLDER_INGREDIENTS_TEXT = "None provided, rely purely on AI general k
 const NOTIFICATIONS_PAGE_SIZE = 8;
 const INVENTORY_PAGE_SIZE = 6;
 
+// A fresh topic per subscription: supabase-js hands back a same-named channel even while it is still leaving.
+let realtimeSeq = 0;
+
 // No fallback items — real users start with an empty pantry.
 
 export default function Home() {
@@ -845,7 +848,7 @@ export default function Home() {
     // still gated by the same RLS policy as the initial SELECT, so this
     // does not broadcast rows this user can't already read.
     const channel = supabase
-      .channel("pantry-realtime")
+      .channel(`pantry-realtime-${++realtimeSeq}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "pantry_items" },
         () => fetchItems() // Re-fetch on any change (INSERT, UPDATE, DELETE)
       )
