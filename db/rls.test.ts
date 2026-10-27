@@ -418,6 +418,91 @@ describe("households v2", () => {
 });
 
 /**
+ * supabase-schema-household-v3.sql, applied on top of v2: one pantry per
+ * household, with nothing to share by hand.
+ */
+describe("households v3 — one shared pantry", () => {
+  let db: PGlite;
+  const names = async (user: string, table = "pantry_items") =>
+    (await as(db, user, () => db.query<{ name: string }>(`select name from public.${table} order by name`))).rows.map((r) => r.name);
+
+  beforeAll(async () => {
+    db = await freshDatabase(["supabase-schema-household-v2.sql", "supabase-schema-household-v3.sql"]);
+  }, 60_000);
+  afterAll(async () => db.close());
+
+  it("creating a household brings your existing pantry and shopping list in", async () => {
+    await as(db, ALICE, () =>
+      db.query(`insert into public.pantry_items (user_id, name, days_left) values ('${ALICE}', 'Alice paneer', 3)`)
+    );
+    await as(db, ALICE, () => db.query(`insert into public.shopping_list_items (user_id, name) values ('${ALICE}', 'Alice onions')`));
+    await as(db, ALICE, () => db.query(`select * from public.create_household('Rao family')`));
+    const { rows } = await db.query<{ household_id: string | null }>(`select household_id from public.pantry_items where name = 'Alice paneer'`);
+    expect(rows[0].household_id).not.toBeNull();
+    const list = await db.query<{ household_id: string | null }>(`select household_id from public.shopping_list_items where name = 'Alice onions'`);
+    expect(list.rows[0].household_id).not.toBeNull();
+  });
+
+  it("joining brings your items in, and both people then see one pantry", async () => {
+    const code = (await db.query<{ invite_code: string }>(`select invite_code from public.households`)).rows[0].invite_code;
+    await as(db, BOB, () =>
+      db.query(`insert into public.pantry_items (user_id, name, days_left) values ('${BOB}', 'Bob atta', 90), ('${BOB}', 'Bob milk', 2)`)
+    );
+    expect(await names(ALICE)).toEqual(["Alice paneer"]);
+    await as(db, BOB, () => db.query(`select public.join_household_by_code('${code}')`));
+    expect(await names(ALICE)).toEqual(["Alice paneer", "Bob atta", "Bob milk"]);
+    expect(await names(BOB)).toEqual(["Alice paneer", "Bob atta", "Bob milk"]);
+    expect(await names(BOB, "shopping_list_items")).toEqual(["Alice onions"]);
+  });
+
+  it("an item added without a household still lands in the household", async () => {
+    await as(db, BOB, () =>
+      db.query(`insert into public.pantry_items (user_id, name, days_left) values ('${BOB}', 'Bob curd', 4)`)
+    );
+    await as(db, BOB, () => db.query(`insert into public.shopping_list_items (user_id, name) values ('${BOB}', 'Bob rice')`));
+    expect(await names(ALICE)).toContain("Bob curd");
+    expect(await names(ALICE, "shopping_list_items")).toContain("Bob rice");
+  });
+
+  it("someone in no household keeps a private pantry", async () => {
+    await as(db, CAROL, () =>
+      db.query(`insert into public.pantry_items (user_id, name, days_left) values ('${CAROL}', 'Carol ragi', 30)`)
+    );
+    expect(await names(CAROL)).toEqual(["Carol ragi"]);
+    expect(await names(ALICE)).not.toContain("Carol ragi");
+  });
+
+  it("the by-hand share function is gone", async () => {
+    await as(db, BOB, async () => {
+      await expect(db.query(`select public.share_my_items_with_household()`)).rejects.toThrow(/does not exist/);
+    });
+  });
+
+  it("leaving still takes your own items, including ones added after joining", async () => {
+    await as(db, BOB, () => db.query(`select public.leave_household()`));
+    expect(await names(BOB)).toEqual(["Bob atta", "Bob curd", "Bob milk"]);
+    expect(await names(ALICE)).toEqual(["Alice paneer"]);
+    // And a new item added after leaving is private again.
+    await as(db, BOB, () =>
+      db.query(`insert into public.pantry_items (user_id, name, days_left) values ('${BOB}', 'Bob dal', 60)`)
+    );
+    expect(await names(ALICE)).not.toContain("Bob dal");
+  });
+
+  it("the backfill moves a current member's older private items in", async () => {
+    // A member whose items predate sharing: put the migration's state back by hand.
+    await db.query(`update public.pantry_items set household_id = null where name = 'Alice paneer'`);
+    const sql = readFileSync(resolve(DB_DIR, "supabase-schema-household-v3.sql"), "utf8");
+    await db.exec(sql);
+    const { rows } = await db.query<{ household_id: string | null }>(`select household_id from public.pantry_items where name = 'Alice paneer'`);
+    expect(rows[0].household_id).not.toBeNull();
+    // Carol is in no household, so her items stay hers alone.
+    const carol = await db.query<{ household_id: string | null }>(`select household_id from public.pantry_items where name = 'Carol ragi'`);
+    expect(carol.rows[0].household_id).toBeNull();
+  });
+});
+
+/**
  * The pantry_items policy accepts `auth.uid() = user_id` in WITH CHECK without
  * looking at household_id, so on its own it would let a non-member write into
  * someone else's household. supabase-schema-household-guard.sql closes that
