@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { createPortal } from "react-dom";
-import { X, Users, Copy, LogOut, Loader2, Check, Share2, Pencil, RefreshCw, UserMinus, Lock, Crown } from "lucide-react";
+import { X, Users, Copy, LogOut, Loader2, Check, Share2, Pencil, RefreshCw, UserMinus, Crown } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/auth-context";
 import {
-  countPrivateItems,
+  bringMyItemsIn,
   inviteLink,
   isAlreadyInHousehold,
   isMissingFunction,
@@ -15,7 +15,6 @@ import {
   newInviteCode,
   removeMember,
   renameHousehold,
-  shareMyItems,
 } from "@/lib/household";
 
 interface HouseholdModalProps {
@@ -27,60 +26,40 @@ interface HouseholdModalProps {
 const MIGRATION_MISSING = "Household tables aren't set up yet — the required database migration hasn't been run.";
 const ALREADY_IN_ONE = "You're already in a household. Leave it first to join or start another.";
 
-const items = (n: number) => `${n} ${n === 1 ? "item" : "items"}`;
-
 /**
  * Share a pantry with the people you live with.
  *
- * Everything in a household is visible to every member, and anyone can edit
- * or use it up. Items added before joining stay private until their owner
- * shares them — which used to be silent, so a new member saw an empty
- * pantry and concluded the feature was broken. Leaving takes your own items
- * back with you.
+ * A household has one pantry. Everything in it is visible to every member,
+ * and anyone can edit or use it up. Joining or creating one moves what you
+ * already own into it, and anything you add afterwards goes in on its own.
+ * Leaving takes your own items back with you.
  */
 export function HouseholdModal({ onClose, initialJoinCode = "" }: HouseholdModalProps) {
   const { user, household, householdLoading, refreshHousehold, householdMembers, householdV2Ready } = useAuth();
   const [joinCode, setJoinCode] = useState(initialJoinCode);
   const [newName, setNewName] = useState("");
-  // "create" | "join" | "leave" | "share" | "rename" | "code", or a member's id while removing them.
+  // "create" | "join" | "leave" | "rename" | "code", or a member's id while removing them.
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<null | "code" | "link">(null);
-  const [privateCount, setPrivateCount] = useState(0);
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
-  // Shown once, right after creating or joining, when there is something to share.
-  const [offerShare, setOfferShare] = useState(false);
 
   const defaultName = user?.user_metadata?.full_name ? `${user.user_metadata.full_name}'s Household` : "My Household";
   const me = householdMembers.find((m) => m.userId === user?.id);
   const iCreatedIt = !!me?.isCreator;
 
-  useEffect(() => {
-    if (!user || !household) return;
-    let cancelled = false;
-    countPrivateItems(user.id).then((n) => {
-      if (!cancelled) setPrivateCount(n);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [user, household]);
-
-  const afterEntering = async () => {
+  const afterEntering = async (householdId: string | null) => {
+    if (user && householdId) await bringMyItemsIn(user.id, householdId);
     await refreshHousehold();
-    if (!user) return;
-    const n = await countPrivateItems(user.id);
-    setPrivateCount(n);
-    if (n > 0) setOfferShare(true);
   };
 
   const handleCreate = async () => {
     if (!user) return;
     setBusy("create");
     setError(null);
-    const { error: createError } = await supabase.rpc("create_household", {
+    const { data: created, error: createError } = await supabase.rpc("create_household", {
       // "My's Household" is what a nameless profile used to get.
       new_name: newName.trim() || defaultName,
     });
@@ -96,8 +75,9 @@ export function HouseholdModal({ onClose, initialJoinCode = "" }: HouseholdModal
       );
       return;
     }
-    toast("Household created", { description: "Share your invite link with the people you live with." });
-    await afterEntering();
+    toast("Household created", { description: "Your pantry is now the household's. Share the invite link with the people you live with." });
+    const row = Array.isArray(created) ? (created[0] as { id?: string } | undefined) : undefined;
+    await afterEntering(row?.id ?? null);
   };
 
   const handleJoin = async () => {
@@ -108,7 +88,7 @@ export function HouseholdModal({ onClose, initialJoinCode = "" }: HouseholdModal
     }
     setBusy("join");
     setError(null);
-    const { error: rpcError } = await supabase.rpc("join_household_by_code", { code });
+    const { data: joinedId, error: rpcError } = await supabase.rpc("join_household_by_code", { code });
     setBusy(null);
 
     if (rpcError) {
@@ -123,23 +103,8 @@ export function HouseholdModal({ onClose, initialJoinCode = "" }: HouseholdModal
     }
 
     setJoinCode("");
-    toast("Joined household", { description: "You'll now see this household's shared pantry." });
-    await afterEntering();
-  };
-
-  const handleShare = async () => {
-    if (!user || !household) return;
-    setBusy("share");
-    setError(null);
-    const moved = await shareMyItems(user.id, household.id);
-    setBusy(null);
-    setOfferShare(false);
-    if (moved === null) {
-      setError("Couldn't share your items. Please try again.");
-      return;
-    }
-    setPrivateCount(0);
-    toast("Shared with the household", { description: `${items(moved)} can now be seen by everyone in ${household.name}.` });
+    toast("Joined household", { description: "You and your housemates now share one pantry. Your own items moved in with you." });
+    await afterEntering(typeof joinedId === "string" ? joinedId : null);
   };
 
   const handleLeave = async () => {
@@ -311,30 +276,6 @@ export function HouseholdModal({ onClose, initialJoinCode = "" }: HouseholdModal
                 )}
               </div>
 
-              {/* Share-your-items prompt, after creating or joining */}
-              {(offerShare || privateCount > 0) && (
-                <div className="rounded-2xl border border-warning/30 bg-warning/10 p-4 space-y-3">
-                  <div className="flex items-start gap-2.5">
-                    <Lock size={15} className="text-warning mt-0.5 shrink-0" />
-                    <div>
-                      <p className="text-sm font-semibold">{items(privateCount)} of yours {privateCount === 1 ? "is" : "are"} private</p>
-                      <p className="text-xs text-foreground/65 mt-0.5 leading-relaxed">
-                        You added {privateCount === 1 ? "it" : "them"} before joining, so nobody else in {household.name} can see {privateCount === 1 ? "it" : "them"}. New items you add are shared automatically.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <button onClick={handleShare} disabled={busy === "share"} className="flex-1 min-h-11 rounded-xl bg-foreground text-background text-xs font-semibold disabled:opacity-60 inline-flex items-center justify-center gap-1.5">
-                      {busy === "share" ? <Loader2 size={14} className="animate-spin" /> : <Share2 size={14} />}
-                      Share {privateCount === 1 ? "it" : "them"} with the household
-                    </button>
-                    {offerShare && (
-                      <button onClick={() => setOfferShare(false)} className={quiet}>Keep private</button>
-                    )}
-                  </div>
-                </div>
-              )}
-
               {/* Invite */}
               <div className="rounded-2xl bg-foreground/5 border border-border/50 p-4 space-y-3">
                 <div className="flex items-center justify-between">
@@ -434,7 +375,7 @@ export function HouseholdModal({ onClose, initialJoinCode = "" }: HouseholdModal
               <ul className="space-y-2 text-xs text-foreground/70">
                 <li className="flex gap-2"><Check size={14} className="text-safe shrink-0 mt-0.5" /> Everyone sees the same pantry and the same expiry alerts.</li>
                 <li className="flex gap-2"><Check size={14} className="text-safe shrink-0 mt-0.5" /> Anyone can add, edit or use up an item.</li>
-                <li className="flex gap-2"><Check size={14} className="text-safe shrink-0 mt-0.5" /> You choose whether to share the items you already have.</li>
+                <li className="flex gap-2"><Check size={14} className="text-safe shrink-0 mt-0.5" /> The items you already have move in with you. Leave, and they come back.</li>
               </ul>
 
               <div className="space-y-2">

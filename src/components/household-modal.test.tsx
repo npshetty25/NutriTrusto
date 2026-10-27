@@ -8,8 +8,7 @@ const toast = vi.hoisted(() => vi.fn());
 const refreshHousehold = vi.hoisted(() => vi.fn());
 const auth = vi.hoisted(() => ({ current: {} as Record<string, unknown> }));
 const lib = vi.hoisted(() => ({
-  countPrivateItems: vi.fn(),
-  shareMyItems: vi.fn(),
+  bringMyItemsIn: vi.fn(),
   leaveHousehold: vi.fn(),
   renameHousehold: vi.fn(),
   removeMember: vi.fn(),
@@ -49,8 +48,7 @@ beforeEach(() => {
   rpc.mockReset();
   toast.mockReset();
   refreshHousehold.mockReset().mockResolvedValue(undefined);
-  lib.countPrivateItems.mockReset().mockResolvedValue(0);
-  lib.shareMyItems.mockReset().mockResolvedValue(3);
+  lib.bringMyItemsIn.mockReset().mockResolvedValue(3);
   lib.leaveHousehold.mockReset().mockResolvedValue(true);
   lib.renameHousehold.mockReset().mockResolvedValue(true);
   lib.removeMember.mockReset().mockResolvedValue(true);
@@ -68,13 +66,14 @@ describe("HouseholdModal — joining", () => {
     expect(rpc).not.toHaveBeenCalled();
   });
 
-  it("joins by the trimmed code, refreshes the household and confirms", async () => {
-    rpc.mockResolvedValue({ error: null });
+  it("joins by the trimmed code, brings the user's own items in, refreshes and confirms", async () => {
+    rpc.mockResolvedValue({ data: "h-1", error: null });
     open();
     await userEvent.type(screen.getByPlaceholderText("Enter invite code"), "  a1b2c3d4e5f6  ");
     await userEvent.click(screen.getByRole("button", { name: "Join" }));
 
     await waitFor(() => expect(rpc).toHaveBeenCalledWith("join_household_by_code", { code: "a1b2c3d4e5f6" }));
+    await waitFor(() => expect(lib.bringMyItemsIn).toHaveBeenCalledWith("u-1", "h-1"));
     await waitFor(() => expect(refreshHousehold).toHaveBeenCalledOnce());
     expect(toast).toHaveBeenCalledWith("Joined household", expect.anything());
     expect(screen.getByPlaceholderText("Enter invite code")).toHaveValue("");
@@ -93,6 +92,7 @@ describe("HouseholdModal — joining", () => {
 
     expect(await screen.findByText("Invalid invite code. Double-check and try again.")).toBeInTheDocument();
     expect(refreshHousehold).not.toHaveBeenCalled();
+    expect(lib.bringMyItemsIn).not.toHaveBeenCalled();
   });
 
   it("says plainly when the person is already in a household", async () => {
@@ -113,12 +113,13 @@ describe("HouseholdModal — joining", () => {
 });
 
 describe("HouseholdModal — creating", () => {
-  it("creates a household named after the user via the atomic RPC", async () => {
-    rpc.mockResolvedValue({ error: null });
+  it("creates a household named after the user via the atomic RPC, bringing their items in", async () => {
+    rpc.mockResolvedValue({ data: [{ id: "h-9", name: "Asha Rao's Household", invite_code: "a1b2c3d4e5f6" }], error: null });
     open();
     await userEvent.click(screen.getByRole("button", { name: /Create a Household/ }));
 
     await waitFor(() => expect(rpc).toHaveBeenCalledWith("create_household", { new_name: "Asha Rao's Household" }));
+    await waitFor(() => expect(lib.bringMyItemsIn).toHaveBeenCalledWith("u-1", "h-9"));
     await waitFor(() => expect(refreshHousehold).toHaveBeenCalledOnce());
     expect(toast).toHaveBeenCalledWith("Household created", expect.anything());
   });
@@ -180,13 +181,10 @@ describe("HouseholdModal — an existing household", () => {
     expect(refreshHousehold).not.toHaveBeenCalled();
   });
 
-  it("says how many of the user's items are still private, and shares them", async () => {
-    lib.countPrivateItems.mockResolvedValue(3);
+  it("has no share-by-hand step: a household is one pantry", () => {
     open();
-    expect(await screen.findByText("3 items of yours are private")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: /Share them with the household/ }));
-    await waitFor(() => expect(lib.shareMyItems).toHaveBeenCalledWith("u-1", "h-1"));
-    await waitFor(() => expect(screen.queryByText(/of yours are private/)).not.toBeInTheDocument());
+    expect(screen.queryByText(/of yours (is|are) private/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Share (it|them) with the household/ })).not.toBeInTheDocument();
   });
 
   it("renames the household", async () => {

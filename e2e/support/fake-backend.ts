@@ -281,6 +281,10 @@ export class FakeBackend {
 
   private handleRpc(route: Route, fn: string, body: unknown) {
     const args = (body ?? {}) as Record<string, string>;
+    // db/supabase-schema-household-v3.sql: creating or joining brings your items in.
+    const bringItemsIn = (hid: unknown) => {
+      for (const r of this.tables.pantry_items) if (r.user_id === this.user.id && r.household_id == null) r.household_id = hid;
+    };
     if (fn === "create_household") {
       const household = {
         id: uuid(),
@@ -295,6 +299,7 @@ export class FakeBackend {
         user_id: this.user.id,
         joined_at: new Date().toISOString(),
       });
+      bringItemsIn(household.id);
       return this.json(route, [{ id: household.id, name: household.name, invite_code: household.invite_code }]);
     }
     if (fn === "join_household_by_code") {
@@ -303,6 +308,7 @@ export class FakeBackend {
         return this.json(route, { code: "P0001", message: "Invalid invite code", details: null, hint: null }, 400);
       }
       this.tables.household_members.push({ household_id: target.id, user_id: this.user.id, joined_at: new Date().toISOString() });
+      bringItemsIn(target.id);
       return this.json(route, target.id);
     }
     if (fn === "household_impact_leaderboard") return this.json(route, []);
@@ -323,12 +329,6 @@ export class FakeBackend {
             is_creator: household?.created_by === m.user_id,
           }))
       );
-    }
-    if (fn === "share_my_items_with_household") {
-      const hid = myHousehold();
-      const mine = this.tables.pantry_items.filter((r) => r.user_id === this.user.id && r.household_id == null);
-      for (const r of mine) r.household_id = hid;
-      return this.json(route, mine.length);
     }
     if (fn === "leave_household") {
       const hid = myHousehold();

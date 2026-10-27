@@ -3,7 +3,7 @@ import { supabase } from "@/lib/supabase";
 
 /**
  * Household actions, each working with or without
- * db/supabase-schema-household-v2.sql.
+ * db/supabase-schema-household-v2.sql and -v3.sql.
  *
  * With it, each action is one SECURITY DEFINER function that does the whole
  * job atomically (leave AND take your items back). Without it, the actions
@@ -39,27 +39,23 @@ export async function fetchMembers(): Promise<HouseholdMember[] | "unavailable" 
   }));
 }
 
-/** How many of my items are not in any household. */
-export async function countPrivateItems(userId: string): Promise<number> {
-  const { data, error } = await supabase.from("pantry_items").select("id").eq("user_id", userId).is("household_id", null);
-  return error || !data ? 0 : data.length;
-}
-
-/** Puts my private items into my household. Returns how many moved, or null on failure. */
-export async function shareMyItems(userId: string, householdId: string): Promise<number | null> {
-  const { data, error } = await supabase.rpc("share_my_items_with_household");
-  if (!error && typeof data === "number") return data;
-  if (!isMissingFunction(error)) return null;
-
-  // Before v2: the pantry policy and the guard trigger already allow a
-  // member to move their own rows into their own household.
-  const moved = await supabase
+/**
+ * Moves everything I own that is not in a household into mine, and returns
+ * how many pantry items moved. A household has one pantry, so this runs right
+ * after creating or joining one. With v3 the database has already done it
+ * (the count is then 0); before v3 this does it from here, which the pantry
+ * policy and guard trigger already allow for a member's own rows.
+ */
+export async function bringMyItemsIn(userId: string, householdId: string): Promise<number> {
+  const pantry = await supabase
     .from("pantry_items")
     .update({ household_id: householdId })
     .eq("user_id", userId)
     .is("household_id", null)
     .select("id");
-  return moved.error ? null : moved.data?.length ?? 0;
+  // Shopping-list sharing needs v2; before it the column does not exist and this fails harmlessly.
+  await supabase.from("shopping_list_items").update({ household_id: householdId }).eq("user_id", userId).is("household_id", null);
+  return pantry.error ? 0 : pantry.data?.length ?? 0;
 }
 
 /**

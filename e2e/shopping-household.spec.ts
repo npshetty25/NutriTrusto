@@ -73,7 +73,7 @@ test.describe("household", () => {
     await expect(page.getByRole("dialog").getByText("Rao family")).toBeVisible();
   });
 
-  test("after joining, offers to share the items you already had, and shares them", async ({ backend, page }) => {
+  test("joining moves the items you already had into the shared pantry, with nothing to click", async ({ backend, page }) => {
     backend.seedPantry([{ name: "Paneer", days_left: 3 }]);
     backend.tables.households.push({ id: "h-rao", name: "Rao family", invite_code: "abc123def456", created_by: "u-ravi" });
     backend.tables.household_members.push({ household_id: "h-rao", user_id: "u-ravi", display_name: "Ravi", joined_at: "2026-10-01T00:00:00Z" });
@@ -82,12 +82,11 @@ test.describe("household", () => {
 
     await page.getByPlaceholder("Enter invite code").fill("abc123def456");
     await page.getByRole("button", { name: "Join" }).click();
-    await expect(page.getByText("1 item of yours is private")).toBeVisible();
     await expect(page.getByText("Ravi", { exact: true })).toBeVisible();
 
-    await page.getByRole("button", { name: /Share it with the household/ }).click();
     await expect.poll(() => backend.tables.pantry_items[0].household_id).toBe("h-rao");
     await expect(page.getByText(/of yours (is|are) private/)).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /Share (it|them) with the household/ })).toHaveCount(0);
   });
 
   test("an invite link opens the join dialog with the code filled in", async ({ backend, page }) => {
