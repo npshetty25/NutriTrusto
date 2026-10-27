@@ -503,6 +503,41 @@ describe("households v3 — one shared pantry", () => {
   });
 });
 
+/** supabase-schema-printed-date.sql: the pack's own date, kept as a date. Not yet applied to production. */
+describe("printed date", () => {
+  let db: PGlite;
+  beforeAll(async () => {
+    db = await freshDatabase(["supabase-schema-printed-date.sql"]);
+  }, 60_000);
+  afterAll(async () => db.close());
+
+  it("keeps a printed date that has already passed, which days_left (0..3650) cannot", async () => {
+    await as(db, ALICE, () =>
+      db.query(`insert into public.pantry_items (user_id, name, days_left, expiry_date) values ('${ALICE}', 'Old jam', 0, date '2026-09-30')`)
+    );
+    const { rows } = await as(db, ALICE, () =>
+      db.query<{ expiry_date: string }>(`select expiry_date::text as expiry_date from public.pantry_items where name = 'Old jam'`)
+    );
+    expect(rows[0].expiry_date).toBe("2026-09-30");
+  });
+
+  it("refuses a date no pack carries", async () => {
+    await as(db, ALICE, async () => {
+      await expect(
+        db.query(`insert into public.pantry_items (user_id, name, days_left, expiry_date) values ('${ALICE}', 'Typo', 0, date '1970-01-01')`)
+      ).rejects.toThrow(/pantry_items_expiry_date_range/);
+    });
+  });
+
+  it("is safe to run a second time", async () => {
+    await db.exec(readFileSync(resolve(DB_DIR, "supabase-schema-printed-date.sql"), "utf8"));
+    const { rows } = await db.query<{ n: number }>(
+      `select count(*)::int as n from pg_constraint where conname = 'pantry_items_expiry_date_range'`
+    );
+    expect(rows[0].n).toBe(1);
+  });
+});
+
 /**
  * The pantry_items policy accepts `auth.uid() = user_id` in WITH CHECK without
  * looking at household_id, so on its own it would let a non-member write into
