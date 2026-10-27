@@ -23,6 +23,12 @@ describe("learnFromOutcomes", () => {
     expect(learned.size).toBe(0);
   });
 
+  it("ignores throw-aways with more days left than our estimate ever gives", () => {
+    // Coriander keeps days, not months, by our estimate: 60 left was a date from the pack or the person.
+    const learned = learnFromOutcomes([thrown("Coriander Leaves", 60), thrown("Coriander Leaves", 60), thrown("Coriander Leaves", 60)]);
+    expect(learned.size).toBe(0);
+  });
+
   it("treats name variants of the same item as one", () => {
     expect(learningKey("Palak (Spinach)")).toBe(learningKey("Spinach"));
   });

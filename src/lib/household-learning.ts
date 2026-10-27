@@ -1,4 +1,4 @@
-import { findShelfLifeRow } from "@/lib/shelf-life";
+import { estimateShelfLife, findShelfLifeRow } from "@/lib/shelf-life";
 
 /**
  * Learns, from this household's own history, where our estimate runs long.
@@ -44,12 +44,22 @@ const median = (xs: number[]) => {
   return s.length % 2 ? s[mid] : Math.floor((s[mid - 1] + s[mid]) / 2);
 };
 
+/** The most days our own estimate gives an item outside the freezer. */
+function longestEstimate(name: string): number {
+  const est = estimateShelfLife(name);
+  return Math.max(est.days, est.ifStoredDifferently.fridge ?? 0, est.ifStoredDifferently.counter ?? 0);
+}
+
 export function learnFromOutcomes(outcomes: Outcome[]): Map<string, Adjustment> {
   const early = new Map<string, number[]>();
+  const ceilings = new Map<string, number>();
   for (const o of outcomes) {
     if (o.outcome !== "expired") continue;
     const left = Math.round(Number(o.days_left_at_removal));
     if (!Number.isFinite(left) || left <= 0) continue;
+    // More days left than our estimate ever gives: the date was the pack's or the person's, which says nothing about ours.
+    if (!ceilings.has(o.name)) ceilings.set(o.name, longestEstimate(o.name));
+    if (left > ceilings.get(o.name)!) continue;
     const key = learningKey(o.name);
     if (!early.has(key)) early.set(key, []);
     early.get(key)!.push(left);
