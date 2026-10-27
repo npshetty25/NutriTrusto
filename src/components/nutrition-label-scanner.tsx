@@ -89,9 +89,10 @@ export default function NutritionLabelScanner({ onResult, onClose }: NutritionLa
       }
 
       setSuccess(true);
+      // Long enough to read the warning before the dialog closes, as the expiry scanner does.
       setTimeout(() => {
         onResult(data.nutrition);
-      }, 800);
+      }, n.confidence === "medium" ? 2600 : 800);
     } catch {
       setError("Something went wrong. Please try again.");
     } finally {

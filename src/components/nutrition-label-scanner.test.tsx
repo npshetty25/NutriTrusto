@@ -79,8 +79,13 @@ describe("NutritionLabelScanner — reading a label", () => {
 
     await userEvent.setup({ advanceTimers: vi.advanceTimersByTime }).upload(camera(), photo());
     expect(await screen.findByText(/Some values may be inaccurate/)).toBeInTheDocument();
+    // Held long enough to read, not whisked away after the usual 0.8 s.
     await act(async () => {
       vi.advanceTimersByTime(800);
+    });
+    expect(onResult).not.toHaveBeenCalled();
+    await act(async () => {
+      vi.advanceTimersByTime(1800);
     });
     expect(onResult).toHaveBeenCalledWith(nutrition);
   });
