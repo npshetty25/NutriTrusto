@@ -306,6 +306,36 @@ export class FakeBackend {
       return this.json(route, target.id);
     }
     if (fn === "household_impact_leaderboard") return this.json(route, []);
+
+    // db/supabase-schema-household-v2.sql
+    const myHousehold = () => this.tables.household_members.find((m) => m.user_id === this.user.id)?.household_id;
+    if (fn === "household_members_list") {
+      const hid = myHousehold();
+      const household = this.tables.households.find((h) => h.id === hid);
+      return this.json(
+        route,
+        this.tables.household_members
+          .filter((m) => m.household_id === hid)
+          .map((m) => ({
+            user_id: m.user_id,
+            display_name: m.user_id === this.user.id ? String(this.user.user_metadata.full_name ?? "A member") : String(m.display_name ?? "A member"),
+            joined_at: m.joined_at ?? null,
+            is_creator: household?.created_by === m.user_id,
+          }))
+      );
+    }
+    if (fn === "share_my_items_with_household") {
+      const hid = myHousehold();
+      const mine = this.tables.pantry_items.filter((r) => r.user_id === this.user.id && r.household_id == null);
+      for (const r of mine) r.household_id = hid;
+      return this.json(route, mine.length);
+    }
+    if (fn === "leave_household") {
+      const hid = myHousehold();
+      for (const r of this.tables.pantry_items) if (r.user_id === this.user.id && r.household_id === hid) r.household_id = null;
+      this.tables.household_members = this.tables.household_members.filter((m) => !(m.user_id === this.user.id && m.household_id === hid));
+      return this.json(route, null);
+    }
     return this.json(route, null);
   }
 

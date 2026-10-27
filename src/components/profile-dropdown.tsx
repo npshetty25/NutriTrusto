@@ -19,14 +19,17 @@ interface ProfileDropdownProps {
    * once an account has dismissed it, since that dismissal is permanent by
    * design (see src/components/onboarding-tour.tsx). */
   onReplayTour?: () => void;
+  /** The page owns the household dialog, so an invite link can open it too. */
+  onOpenHousehold?: () => void;
 }
 
-export function ProfileDropdown({ onOpenShoppingList, onReplayTour }: ProfileDropdownProps) {
+export function ProfileDropdown({ onOpenShoppingList, onReplayTour, onOpenHousehold }: ProfileDropdownProps) {
   const { user, signOut } = useAuth();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [showHousehold, setShowHousehold] = useState(false);
+  const openHousehold = () => (onOpenHousehold ? onOpenHousehold() : setShowHousehold(true));
   const [showScanHistory, setShowScanHistory] = useState(false);
   const [showImpactDashboard, setShowImpactDashboard] = useState(false);
   const [showNotificationPreferences, setShowNotificationPreferences] = useState(false);
@@ -142,7 +145,7 @@ export function ProfileDropdown({ onOpenShoppingList, onReplayTour }: ProfileDro
       <ThemeToggle />
 
       <div className="p-1.5 border-t border-border">
-        <button onClick={() => { setOpen(false); setShowHousehold(true); }} role="menuitem" className={itemClass}>
+        <button onClick={() => { setOpen(false); openHousehold(); }} role="menuitem" className={itemClass}>
           <Users size={15} className="text-foreground/50" /> Household Settings
         </button>
         {onOpenShoppingList && (
