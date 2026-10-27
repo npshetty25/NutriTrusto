@@ -47,13 +47,17 @@ const SCENARIOS: Scenario[] = [
   { label: "veg user, chicken in the pantry", diet: "Veg", items: [{ name: "Chicken Breast", daysLeft: 1 }, { name: "Spinach", daysLeft: 2 }, { name: "Paneer", daysLeft: 3 }] },
   { label: "veg: mushroom, peas, capsicum", diet: "Veg", items: [{ name: "Mushrooms", daysLeft: 1 }, { name: "Green Peas", daysLeft: 4 }, { name: "Capsicum", daysLeft: 5 }] },
   { label: "no preference: bread, capsicum", diet: "none", items: [{ name: "Bread", daysLeft: 1 }, { name: "Capsicum", daysLeft: 4 }, { name: "Onions", daysLeft: 20 }] },
+  // Pantries that used to get no recipe at all (no known dish used them).
+  { label: "veg: fruit only", diet: "Veg", items: [{ name: "Bananas", daysLeft: 1 }, { name: "Papaya", daysLeft: 2 }, { name: "Apples", daysLeft: 10 }] },
+  { label: "egg: pav, cheese, potato", diet: "Eggtarian", items: [{ name: "Pav", daysLeft: 1 }, { name: "Cheese Slices", daysLeft: 12 }, { name: "Potatoes", daysLeft: 20 }] },
+  { label: "veg: oats, maggi, nothing urgent", diet: "Veg", items: [{ name: "Oats", daysLeft: 120 }, { name: "Maggi Noodles", daysLeft: 200 }, { name: "Carrots", daysLeft: 14 }] },
 ];
 
 const KNOWN = new Set(DISH_CATALOG.map((d) => d.name.toLowerCase()));
 const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 describe.skipIf(!process.env.GEMINI_API_KEY)("recipe evaluation (real model)", () => {
-  it("scores twelve pantries", async () => {
+  it("scores fifteen pantries", async () => {
     const { POST } = await import("@/app/api/find-recipe/route");
     const rows: Record<string, string | number | boolean>[] = [];
 
@@ -96,6 +100,6 @@ describe.skipIf(!process.env.GEMINI_API_KEY)("recipe evaluation (real model)", (
       expect(r.realDish, String(r.scenario)).toBe(true);
       expect(r.pantryHonest, String(r.scenario)).toBe(true);
     }
-    expect(served.length).toBeGreaterThanOrEqual(10);
+    expect(served.length).toBeGreaterThanOrEqual(12);
   });
 });

@@ -218,7 +218,7 @@ export async function POST(req: Request) {
       );
     }
     const dishList = candidates
-      .map((c) => `- ${c.name} (would use: ${c.uses.join(", ")})`)
+      .map((c) => `- ${c.name} (would use: ${c.uses.join(", ")}; ${c.toBuy.length ? `needs buying: ${c.toBuy.join(", ")}` : "nothing to buy"})`)
       .join("\n");
 
     // Rules 1-3 used to say the opposite: every "MUST USE" item had to go into
@@ -232,8 +232,9 @@ ${sections}
 ${avoid}
 Dietary preference: ${dietaryPreference || "none"}.
 
-Choose ONE dish from this list. These are real dishes that the pantry can make:
+Choose ONE dish from this list. These are real dishes that the pantry can make, best first (most food that is about to go off, least to buy):
 ${dishList}
+Prefer a dish near the top. Prefer one with nothing to buy over one that needs a shopping trip.
 
 Rules, in order of importance:
 1. The dish MUST be one of the dishes listed above. Put its name, exactly as listed, in both "title" and "baseDish". Never invent a new dish, a fusion, or an unusual combination of ingredients.

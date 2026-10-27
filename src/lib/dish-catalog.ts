@@ -157,8 +157,18 @@ export interface DishCandidate {
   name: string;
   /** The pantry items this dish would use, most urgent first. */
   uses: string[];
+  /** Defining ingredients that are neither in the pantry nor a basic staple: what would have to be bought. */
+  toBuy: string[];
   score: number;
 }
+
+/**
+ * What an Indian kitchen can be assumed to have, matching the recipe prompt's
+ * "kitchen staples". A dish needing only these beyond the pantry needs no
+ * shopping trip.
+ */
+const STAPLES = ["rice", "atta", "wheat flour", "dal", "toor dal", "arhar dal", "masoor dal", "lentils", "onion", "pyaz", "tomato", "ginger", "garlic", "besan", "gram flour", "rava", "sooji", "semolina"];
+const isStaple = (slot: string[]) => slot.some((t) => STAPLES.includes(t));
 
 /**
  * The dishes worth suggesting for this pantry: at least one pantry item must
@@ -187,8 +197,14 @@ export function selectDishCandidates(
 
     const uses = items.filter((i) => hasAny(i.name.toLowerCase(), [...coreTerms, ...dish.extras]));
     const allCoreInPantry = dish.core.every((slot) => items.some((i) => hasAny(i.name.toLowerCase(), slot)));
-    const score = uses.reduce((sum, i) => sum + weight(i.daysLeft), 0) + (allCoreInPantry ? 2 : 0);
-    candidates.push({ name: dish.name, uses: uses.map((i) => i.name), score });
+    // A dish that sends someone to the shop ranks below one they can cook now:
+    // oats, Maggi and carrots used to get Gajar Matar (buy peas) over Masala
+    // Oats, which uses two of the three and needs nothing.
+    const toBuy = dish.core
+      .filter((slot) => !isStaple(slot) && !items.some((i) => hasAny(i.name.toLowerCase(), slot)))
+      .map((slot) => slot[0]);
+    const score = uses.reduce((sum, i) => sum + weight(i.daysLeft), 0) + (allCoreInPantry ? 2 : 0) - 1.5 * toBuy.length;
+    candidates.push({ name: dish.name, uses: uses.map((i) => i.name), toBuy, score });
   }
 
   return candidates

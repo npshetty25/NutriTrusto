@@ -53,6 +53,26 @@ describe("selectDishCandidates", () => {
     }
   });
 
+  it("ranks a dish you can cook now above one that needs shopping", () => {
+    const ranked = selectDishCandidates(
+      [{ name: "Oats", daysLeft: 120 }, { name: "Maggi Noodles", daysLeft: 200 }, { name: "Carrots", daysLeft: 14 }],
+      "veg",
+      [],
+      100
+    );
+    const oats = ranked.findIndex((c) => c.name === "Masala Oats");
+    const gajarMatar = ranked.findIndex((c) => c.name === "Gajar Matar");
+    expect(oats).toBeGreaterThanOrEqual(0);
+    expect(gajarMatar === -1 || oats < gajarMatar).toBe(true);
+    expect(ranked[oats].toBuy).toEqual([]);
+    expect(ranked.find((c) => c.name === "Gajar Matar")?.toBuy).toEqual(["peas"]);
+  });
+
+  it("does not count basic staples as shopping", () => {
+    const dal = selectDishCandidates([{ name: "Palak", daysLeft: 1 }], "veg").find((c) => c.name === "Dal Palak");
+    expect(dal?.toBuy).toEqual([]);
+  });
+
   it("does not turn a drink into a fruit chaat ingredient", () => {
     const names = selectDishCandidates([{ name: "Orange Juice", daysLeft: 2 }], "veg").map((c) => c.name);
     expect(names).not.toContain("Fruit Chaat");
