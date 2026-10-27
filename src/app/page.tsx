@@ -1030,7 +1030,8 @@ export default function Home() {
       return;
     }
 
-    let remaining = editingItem.daysLeft;
+    // Signed: negative while past its date, so an edit that leaves the date alone keeps it past.
+    let remaining = editingItem.daysLeft - editingItem.daysPastEstimate;
     let source: ExpirySource = editingItem.expirySource ?? null;
     if (editDate) {
       const fromDate = daysUntilDate(editDate);
@@ -1052,7 +1053,7 @@ export default function Home() {
 
     let note = "";
     const fromStorage = editingItem.storage ?? defaultStorageFor(editingItem.name);
-    if (trackingSchemaReady && editStorage && editStorage !== fromStorage) {
+    if (trackingSchemaReady && editStorage && editStorage !== fromStorage && remaining > 0) {
       const moved = daysLeftAfterMove(trimmedName, remaining, fromStorage, editStorage, source);
       remaining = moved.daysLeft;
       if (!moved.changed) note = moved.reason;
@@ -1107,7 +1108,7 @@ export default function Home() {
       ? {
           ...i,
           name: trimmedName,
-          daysLeft: remaining,
+          daysLeft: Math.max(0, remaining),
           daysPastEstimate: calculateDaysPastEstimate(storedDays, editingItem.purchaseDate),
           risk,
           ...(trackingSchemaReady ? { storage, openedAt, expirySource: source } : {}),
@@ -1132,7 +1133,9 @@ export default function Home() {
       setEditOpened(true);
       return;
     }
-    const opened = afterOpening({ daysLeft: item.daysLeft, expirySource: item.expirySource ?? null, expiryKind: item.expiryKind ?? null }, limit.days);
+    // Signed, as in saveEditItem: opening a pack that is already past its date leaves it past.
+    const remaining = item.daysLeft - item.daysPastEstimate;
+    const opened = afterOpening({ daysLeft: remaining, expirySource: item.expirySource ?? null, expiryKind: item.expiryKind ?? null }, limit.days);
     const openedAt = new Date().toISOString();
     const storedDays = storedDaysLeftFor(opened.daysLeft, item.purchaseDate);
     const risk = deriveRisk(opened.daysLeft, storedDays, item.name);
@@ -1152,7 +1155,7 @@ export default function Home() {
     setItems((prev) => prev.map((i) => i.id === item.id
       ? {
           ...i,
-          daysLeft: opened.daysLeft,
+          daysLeft: Math.max(0, opened.daysLeft),
           daysPastEstimate: calculateDaysPastEstimate(storedDays, item.purchaseDate),
           risk,
           openedAt,
@@ -1163,7 +1166,11 @@ export default function Home() {
     toast(`${item.name} opened`, {
       description: opened.shortened
         ? `Use within ${days(limit.days)} of opening, so ${days(opened.daysLeft)} left (${limit.citation}).`
-        : `Its date is still the sooner one: ${days(opened.daysLeft)} left.`,
+        : remaining < 0
+          ? "It was already past its date. Look at it and smell it before you use it."
+          : remaining === 0
+            ? "Its date is still the sooner one: today is its last day."
+            : `Its date is still the sooner one: ${days(opened.daysLeft)} left.`,
     });
   };
 
