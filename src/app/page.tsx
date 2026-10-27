@@ -9,7 +9,7 @@ import {
   lockedDietScope,
 } from "@/lib/diet";
 
-import { calculateCurrentDaysLeft, calculateDaysPastEstimate } from "@/lib/item-age";
+import { calculateCurrentDaysLeft, calculateDaysPastEstimate, localDateISO } from "@/lib/item-age";
 import { parseGs1, gs1PrintedDate } from "@/lib/gs1";
 import { asDateKind, pastDateMessage, type DateKind } from "@/lib/date-kind";
 
@@ -1092,7 +1092,7 @@ export default function Home() {
         name: entry.name,
         days_left: entry.daysLeft,
         risk,
-        purchase_date: new Date().toISOString(),
+        purchase_date: localDateISO(),
         ...trackingFields(entry),
         ...accuracyFields(entry),
       }])
@@ -1114,7 +1114,7 @@ export default function Home() {
     const getPurchaseDate = (daysAgo: number) => {
       const d = new Date(today);
       d.setDate(d.getDate() - daysAgo);
-      return d.toISOString();
+      return localDateISO(d);
     };
 
     // A demo pantry has to look like a real one, which means a spread — not
@@ -1423,9 +1423,11 @@ export default function Home() {
           })
           .filter((item): item is { name: string; days_left: number; risk: RiskLevel } => Boolean(item));
 
-        const purchaseDate = typeof data.purchase_date === "string" && data.purchase_date
-          ? data.purchase_date
-          : new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        // The receipt's own date when it printed one; otherwise today here,
+        // not the server's today, which is a day behind in India until 5:30 am.
+        const purchaseDate = data.purchase_date_from_receipt && typeof data.purchase_date === "string"
+          ? data.purchase_date.slice(0, 10)
+          : localDateISO();
 
         const rows = normalizedItems.map((apiItem) => ({
           user_id: user.id,
@@ -1854,10 +1856,9 @@ if (nutritionFieldsFilled < 2) {
       name: scannedResult.name,
       days_left: initialDaysLeft,
       risk: deriveRisk(initialDaysLeft, initialDaysLeft, scannedResult.name),
-      // ISO, not toLocaleDateString: a locale string sorts alphabetically
-      // ('Apr' before 'Jan') and cannot be range-queried. See
-      // db/supabase-schema-purchase-date.sql.
-      purchase_date: new Date().toISOString(),
+      // Today in the person's own calendar. toISOString() wrote the UTC
+      // date, which before 5:30 am in India is yesterday.
+      purchase_date: localDateISO(),
     };
 
     const { data: insertedRow, error } = await supabase

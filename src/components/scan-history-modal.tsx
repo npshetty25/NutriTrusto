@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/auth-context";
 import { estimateShelfLife } from "@/lib/shelf-life";
+import { localDateISO } from "@/lib/item-age";
 
 interface ScanHistoryModalProps {
   onClose: () => void;
@@ -98,7 +99,7 @@ export function ScanHistoryModal({ onClose }: ScanHistoryModalProps) {
       name: row.product_name,
       days_left: estimateShelfLife(row.product_name).days,
       risk: "low",
-      purchase_date: new Date().toISOString(),
+      purchase_date: localDateISO(),
     }]);
 
     setReAddingId(null);

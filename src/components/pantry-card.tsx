@@ -9,6 +9,7 @@ import { VegMark } from "@/components/veg-mark";
 import type { ItemDietType } from "@/lib/diet";
 import { dietChipClasses } from "@/lib/colour-semantics";
 import { StoragePanel, type IfStoredDifferently } from "@/components/storage-panel";
+import { dueDateFromToday, parsePurchaseDate } from "@/lib/item-age";
 
 export type RiskLevel = "high" | "medium" | "low";
 
@@ -16,6 +17,8 @@ interface PantryCardProps {
   id: string;
   name: string;
   daysLeft: number;
+  /** Days beyond the date; 0 while still within it (including the day itself). */
+  daysPastEstimate?: number;
   risk: RiskLevel;
   purchaseDate: string;
   // The genuine 1-5 NutriTrust score from a barcode scan, or null/undefined
@@ -84,16 +87,13 @@ const riskConfig = {
   low: { label: "Plenty of time", color: "text-safe-strong", bar: "bg-safe" },
 };
 
-const DAY_MS = 86_400_000;
 // dd/mm — the household convention in the product's home market. The card
-// used to print ISO ("PURCHASED 2026-08-06") in an India-first product.
-const formatDayMonth = (iso: string) => {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short" });
-};
+// used to print ISO ("PURCHASED 2026-08-06") in an India-first product. A
+// bare date is read as that day here, not as midnight UTC.
+const formatDayMonth = (iso: string) =>
+  parsePurchaseDate(iso).toLocaleDateString("en-IN", { day: "2-digit", month: "short" });
 
-export function PantryCard({ name, daysLeft, risk, purchaseDate, healthScore, dietMatch = true, dietLabel, itemDiet = "veg", dietUnverified = false, riskLabel, shelfLifeCitation, shelfLifeConfidence, storageDisclaimer, ifStoredDifferently, currentStorage, trackingTags, pastDateNote, detectedAllergens, healthierAlternative, actions }: PantryCardProps) {
+export function PantryCard({ name, daysLeft, daysPastEstimate = 0, risk, purchaseDate, healthScore, dietMatch = true, dietLabel, itemDiet = "veg", dietUnverified = false, riskLabel, shelfLifeCitation, shelfLifeConfidence, storageDisclaimer, ifStoredDifferently, currentStorage, trackingTags, pastDateNote, detectedAllergens, healthierAlternative, actions }: PantryCardProps) {
   const score = healthScore != null ? Number.parseFloat(healthScore) : NaN;
   const hasScore = Number.isFinite(score);
   // Same thresholds the nutrition trend chart uses, so one score reads the
@@ -135,13 +135,10 @@ export function PantryCard({ name, daysLeft, risk, purchaseDate, healthScore, di
     risk === "medium" ? (daysLeft <= 5 ? "w-5/12" : "w-6/12") :
     daysLeft >= 14 ? "w-full" : daysLeft >= 10 ? "w-10/12" : "w-8/12";
 
-  // Reading the clock during render is impure, but the expiry date is
-  // genuinely relative to now: daysLeft is already "days remaining as of
-  // this render", computed by the dashboard from purchase_date + shelf life.
-  // This card is only ever rendered on the client, after auth, so there is
-  // no server snapshot for it to disagree with.
-  // eslint-disable-next-line react-hooks/purity
-  const expiryLabel = formatDayMonth(new Date(Date.now() + daysLeft * DAY_MS).toISOString());
+  // Relative to today on purpose: daysLeft is already "days remaining as of
+  // this render". This card is only ever rendered on the client, after auth,
+  // so there is no server snapshot for it to disagree with.
+  const expiryLabel = formatDayMonth(dueDateFromToday(daysLeft, daysPastEstimate));
 
   const chipTone =
     risk === "high"
