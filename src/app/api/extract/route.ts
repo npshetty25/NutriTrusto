@@ -22,11 +22,20 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000;
 // is correct for receipts scanned days after the actual purchase. Null when
 // the receipt gave none: the client then uses its own today, because this
 // server's today is UTC and a day behind in India until 5:30 am.
+// UTC midnight of the date as written, so toISOString() gives that date back; null for "2026-02-31" and the like.
+const calendarDate = (value: string): Date | null => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
+  if (!m) return null;
+  const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+  return d.getUTCMonth() === Number(m[2]) - 1 && d.getUTCDate() === Number(m[3]) ? d : null;
+};
+
 const resolveReceiptDate = (isoDate: unknown): Date | null => {
   const today = new Date();
   if (typeof isoDate === "string" && isoDate.trim()) {
-    const parsed = new Date(`${isoDate.trim()}T00:00:00`);
-    if (!Number.isNaN(parsed.getTime())) {
+    // Not `${iso}T00:00:00`: that is the server's own midnight, which anywhere east of UTC is the day before.
+    const parsed = calendarDate(isoDate);
+    if (parsed) {
       const twoYearsAgo = new Date(today.getTime() - 2 * 365 * MS_PER_DAY);
       // Guard against OCR misreads: a receipt can't be dated in the
       // future, and a date wildly in the past is more likely a
