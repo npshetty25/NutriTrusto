@@ -437,6 +437,9 @@ export default function Home() {
   const totalPages = Math.max(1, Math.ceil(sortedInventoryItems.length / INVENTORY_PAGE_SIZE));
   const paginatedItems = sortedInventoryItems.slice((currentPage - 1) * INVENTORY_PAGE_SIZE, currentPage * INVENTORY_PAGE_SIZE);
   const highRiskItems = displayedItems.filter(i => i.risk === "high");
+  // Items a recipe may use: anything not already past our estimate (the same
+  // rule generateRecipe applies before sending the pantry).
+  const cookableCount = displayedItems.filter(i => i.daysPastEstimate === 0).length;
   // Share of items that are not expiring soon. The old formula divided every
   // item's days-left by a fixed 14, so a 6-day staple bought that morning
   // contributed 43% and a perishable-heavy pantry could never score well —
@@ -2057,13 +2060,23 @@ if (nutritionFieldsFilled < 2) {
             part of the site banner, and it sat above the section holding the
             actual data. It carries its own padding now that it no longer
             inherits the header's. */}
-        {highRiskItems.length > 0 && (
+        {/* Shown whenever there is something to cook with. It used to need a
+            critical item, so a pantry that was all green had no way to ask
+            for a recipe at all — the moment it is most pleasant to cook. The
+            route already ranks dishes by whatever expires soonest. */}
+        {cookableCount > 0 && (
           <div className="mx-4 mt-5 neu-raised rounded-2xl overflow-hidden">
             {!generatedRecipe ? (
               <div className="p-4 flex flex-col gap-4">
                 <div>
-                  <h2 className="font-semibold text-sm flex items-center gap-2"><BrainCircuit size={14} /> Use up what&apos;s expiring</h2>
-                  <p className="text-xs text-foreground/60 mt-1">Cook something using what expires first.</p>
+                  <h2 className="font-semibold text-sm flex items-center gap-2">
+                    <BrainCircuit size={14} /> {highRiskItems.length > 0 ? "Use up what's expiring" : "What can I cook?"}
+                  </h2>
+                  <p className="text-xs text-foreground/60 mt-1">
+                    {highRiskItems.length > 0
+                      ? "Cook something using what expires first."
+                      : "Nothing is close to expiring. Get a dish that uses what you have, soonest-to-go first."}
+                  </p>
                 </div>
                 <motion.button
                   whileHover={{ scale: isGeneratingRecipe ? 1 : 1.04 }}
