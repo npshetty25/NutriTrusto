@@ -108,9 +108,10 @@ export interface ShelfLifeRow {
  * it at export, so a value can always be traced to the revision it came from.
  * See CHANGELOG.md for what moved and why.
  */
-export const DATA_VERSION = "2026-09-07";
-// Unchanged: no figure moved in the 2026-09-07 revision, only row identity.
-export const EFFECTIVE_DATE = "2026-08-31";
+export const DATA_VERSION = "2026-10-27";
+// 2026-10-27 added three sourced rows (chikoo, drumstick, gulab jamun); no
+// existing figure moved.
+export const EFFECTIVE_DATE = "2026-10-27";
 
 const USDA = "USDA FoodKeeper";
 const FSIS = "USDA FSIS";
@@ -273,6 +274,17 @@ const RAW_ROWS: Omit<ShelfLifeRow, "data_version" | "effective_date">[] = [
   { id: "onion", keys: ["onion", "pyaz", "pyaaz"], exclude: ["onion pickle", "spring onion", "onion powder"], days: 30, refTempC: 29, storage: "counter", tier: "semi-perishable", source: "FAO Farm Structures Ch. 9", confidence: "medium" },
   { id: "potato", keys: ["potato", "aloo"], chilling_sensitive: { min_safe_temp_c: 3, injury_mode: "mahogany browning, cold-induced sweetening", source: "USDA Agriculture Handbook 66, Table 1 (Fresh produce susceptible to chilling injury)", confidence: "high" }, exclude: ["potato chips", "sweet potato", "potato wafers"], days: 28, refTempC: 29, storage: "counter", tier: "semi-perishable", source: "FAO Farm Structures Ch. 9", confidence: "medium" },
   { id: "sweet-potato", keys: ["sweet potato", "shakarkandi"], chilling_sensitive: { min_safe_temp_c: 13, injury_mode: "decay, pitting, internal discoloration, hardcore when cooked", source: "USDA Agriculture Handbook 66, Table 1 (Fresh produce susceptible to chilling injury)", confidence: "high" }, days: 21, refTempC: 29, storage: "counter", tier: "semi-perishable", source: USDA, confidence: "low" },
+  {
+    id: "drumstick",
+    keys: ["drumstick", "moringa", "sahjan", "murungakkai", "shevga"],
+    // The longer key would otherwise win over "chicken" for a chicken leg.
+    exclude: ["chicken drumstick", "drumstick leaves", "moringa leaves", "moringa powder"],
+    // Room temperature in the study was 25–28 °C; 27 is its middle, so the
+    // figure is converted the short step to our 29 °C shelf.
+    days: 6, refTempC: 27, storage: "counter", tier: "perishable",
+    source: "Rahman et al., J. Bangladesh Agricultural University 18(2):316-322 (2020): moringa pods kept 6 days at room temperature (25-28 °C)",
+    confidence: "medium",
+  },
 
   // ── Fruit ──────────────────────────────────────────────────────────
   { id: "banana", keys: ["banana", "kela"], chilling_sensitive: { min_safe_temp_c: 13, injury_mode: "dull colour when ripened", source: "USDA Agriculture Handbook 66, Table 1 (Fresh produce susceptible to chilling injury) — 11.5-13 C range; 13 used", confidence: "high" }, days: 5, refTempC: 29, storage: "counter", tier: "perishable", source: USDA, confidence: "medium" },
@@ -281,6 +293,17 @@ const RAW_ROWS: Omit<ShelfLifeRow, "data_version" | "effective_date">[] = [
   { id: "grapes", keys: ["grapes", "angoor"], days: 7, refTempC: 29, storage: "counter", tier: "perishable", source: USDA, confidence: "medium" },
   { id: "guava", keys: ["guava", "amrood"], chilling_sensitive: { min_safe_temp_c: 4.5, injury_mode: "pulp injury, decay", source: "USDA Agriculture Handbook 66, Table 1 (Fresh produce susceptible to chilling injury)", confidence: "high" }, days: 7, refTempC: 29, storage: "counter", tier: "perishable", source: IN_HOUSEHOLD, confidence: "low" },
   { id: "pomegranate", keys: ["pomegranate", "anar"], days: 14, refTempC: 29, storage: "counter", tier: "semi-perishable", source: USDA, confidence: "low" },
+  {
+    id: "chikoo",
+    keys: ["chikoo", "chiku", "sapota", "sapodilla"],
+    // "Ordinary conditions" in an Indian review, so quoted at our shelf
+    // temperature. No fridge figure: none was sourced, and a 22 °C jump is
+    // beyond what the generic model may extrapolate.
+    days: 7, refTempC: 29, storage: "counter", tier: "perishable",
+    source: "Baidya et al., review of sapota post-harvest management, J. Pharmacognosy and Phytochemistry 9(4):2030-2035 (2020): 7-8 days in ordinary storage after harvest",
+    source_caveat: "Counted from harvest in the source; fruit bought already ripe has less left.",
+    confidence: "low",
+  },
   { id: "orange", keys: ["orange", "mosambi", "santra"], chilling_sensitive: { min_safe_temp_c: 3, injury_mode: "pitting, brown stain", source: "USDA Agriculture Handbook 66, Table 1 (Fresh produce susceptible to chilling injury)", confidence: "high" }, exclude: ["orange juice"], days: 14, refTempC: 29, storage: "counter", tier: "semi-perishable", source: USDA, confidence: "medium" },
   { id: "apple", keys: ["apple", "seb"], exclude: ["apple juice", "custard apple", "pineapple"], days: 21, refTempC: 29, storage: "counter", tier: "semi-perishable", source: USDA, confidence: "medium" },
   { id: "lemon", keys: ["lemon", "nimbu", "lime"], chilling_sensitive: { min_safe_temp_c: 13, injury_mode: "pitting, membranous staining, red blotch", source: "USDA Agriculture Handbook 66, Table 1 (Fresh produce susceptible to chilling injury) — 11-13 C range; 13 used", confidence: "high" }, days: 21, refTempC: 29, storage: "counter", tier: "semi-perishable", source: USDA, confidence: "medium" },
@@ -327,12 +350,26 @@ const RAW_ROWS: Omit<ShelfLifeRow, "data_version" | "effective_date">[] = [
   { id: "frozen", keys: ["frozen", "frozen peas", "ice cream"], days: 90, refTempC: -18, storage: "freezer", tier: "shelf-stable", lookupOnly: true, source: `${USDA} (freezer −18 °C)`, confidence: "medium" },
   { id: "biscuit", keys: ["biscuit", "cookie", "namkeen", "chips", "wafers"], days: 120, refTempC: 29, storage: "counter", tier: "shelf-stable", lookupOnly: true, source: "Food-science general (sealed, rancidity-limited)", confidence: "medium" },
   { id: "chocolate", keys: ["chocolate"], days: 240, refTempC: 29, storage: "counter", tier: "shelf-stable", lookupOnly: true, source: "Food-science general", confidence: "medium" },
+  {
+    id: "gulab-jamun",
+    // Not on FSSAI's sweets list, so it never reached a sourced figure.
+    keys: ["gulab jamun", "gulabjamun", "kala jamun", "kalojam"],
+    exclude: ["gulab jamun mix", "jamun mix", "instant mix", "tin", "tinned", "canned"],
+    days: 2, refTempC: 29, storage: "counter", tier: "highly-perishable",
+    source: "NDDB, Khoa and Khoa-based Products: khoa keeps 2-3 days at room temperature",
+    extrapolation_warning: "Figure is for plain khoa, the base of gulab jamun; applied to the sweet in syrup",
+    source_caveat: "Tinned gulab jamun keeps for months (NDDB gives 9) — use the date on the tin.",
+    confidence: "low",
+  },
   { id: "tea", keys: ["tea", "chai patti"], days: 540, refTempC: 29, storage: "counter", tier: "shelf-stable", lookupOnly: true, source: "Food-science general", confidence: "medium" },
   { id: "coffee", keys: ["coffee"], days: 365, refTempC: 29, storage: "counter", tier: "shelf-stable", lookupOnly: true, source: "Food-science general", confidence: "medium" },
   {
     id: "ground-spices",
     keys: ["masala", "spice", "haldi", "turmeric", "jeera", "cumin", "mirch",
            "garam masala", "hing", "elaichi", "dhania powder", "coriander powder"],
+    // Fresh green chillies, not chilli powder. "Hari Mirch" matched "mirch"
+    // and was given a spice's 365 days; it now reaches USDA's hot peppers.
+    exclude: ["hari mirch", "green mirch"],
     days: 365, refTempC: 29, storage: "counter", tier: "shelf-stable", lookupOnly: true,
     source: "Food-science general (whole spices 1–2 yr)", confidence: "medium",
   },

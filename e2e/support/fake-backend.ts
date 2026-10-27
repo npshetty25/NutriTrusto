@@ -113,7 +113,7 @@ export class FakeBackend {
     },
   };
 
-  seedPantry(rows: Array<{ name: string; days_left: number; purchase_date?: string }>) {
+  seedPantry(rows: Array<{ name: string; days_left: number; purchase_date?: string } & Record<string, unknown>>) {
     for (const r of rows) {
       this.tables.pantry_items.push({
         id: uuid(),

@@ -54,8 +54,14 @@ describe("colour is never the sole carrier of meaning (WCAG 1.4.1)", () => {
   });
 
   it("distinct day counts produce distinct advice, not one generic string", () => {
-    const labels = new Set([0, 1, 2, 5, 20, 400].map(riskLabelForDays));
+    const labels = new Set([0, 1, 2, 5, 20, 400].map((d) => riskLabelForDays(d)));
     expect(labels.size).toBeGreaterThanOrEqual(5);
+  });
+
+  it("calls the date itself 'today' and only a passed date 'past'", () => {
+    expect(riskLabelForDays(0)).toBe("Eat today");
+    expect(riskLabelForDays(1)).toBe("Eat by tomorrow");
+    expect(riskLabelForDays(0, { daysPast: 2 })).toBe("Past date");
   });
 });
 

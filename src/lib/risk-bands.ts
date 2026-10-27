@@ -103,10 +103,15 @@ export function deriveRiskFromDaysOnly(daysLeft: number): RiskLevel {
  * month left would be plainly wrong. The band drives colour and sorting —
  * how urgent this is relative to its own life — while the label states the
  * literal deadline.
+ *
+ * 0 days left is the date itself, which is still within it: "Eat today", not
+ * "Past date". Only `daysPast` > 0 is past. It used to say "Past date" on the
+ * day, and "Eat today" a day early.
  */
-export function riskLabelForDays(daysLeft: number): string {
-  if (daysLeft <= 0) return "Past date";
-  if (daysLeft === 1) return "Eat today";
+export function riskLabelForDays(daysLeft: number, opts: { daysPast?: number } = {}): string {
+  if ((opts.daysPast ?? 0) > 0) return "Past date";
+  if (daysLeft <= 0) return "Eat today";
+  if (daysLeft === 1) return "Eat by tomorrow";
   if (daysLeft <= 3) return "Eat in a day or two";
   if (daysLeft <= 7) return "Eat this week";
   if (daysLeft <= 30) return "Eat this month";

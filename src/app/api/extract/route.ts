@@ -19,8 +19,10 @@ type ExtractedItem = {
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 // The receipt's own transaction date, not "today", so freshness tracking
-// is correct for receipts scanned days after the actual purchase.
-const resolveReceiptDate = (isoDate: unknown): Date => {
+// is correct for receipts scanned days after the actual purchase. Null when
+// the receipt gave none: the client then uses its own today, because this
+// server's today is UTC and a day behind in India until 5:30 am.
+const resolveReceiptDate = (isoDate: unknown): Date | null => {
   const today = new Date();
   if (typeof isoDate === "string" && isoDate.trim()) {
     const parsed = new Date(`${isoDate.trim()}T00:00:00`);
@@ -34,7 +36,7 @@ const resolveReceiptDate = (isoDate: unknown): Date => {
       }
     }
   }
-  return today;
+  return null;
 };
 
 const normalizeDaysLeft = (value: number | string | undefined): number => {
@@ -184,7 +186,7 @@ Return ONLY the raw JSON string, with no markdown formatting.`;
     const receiptDate = resolveReceiptDate(parsedData?.purchase_date_iso);
     // Returned to the client, which writes it straight into pantry_items.
     // ISO so every row in that column has one shape.
-    const purchase_date = receiptDate.toISOString();
+    const purchase_date = (receiptDate ?? new Date()).toISOString();
 
     log.info("Receipt extraction completed", {
       normalizedItemsCount: items.length,
@@ -196,6 +198,7 @@ Return ONLY the raw JSON string, with no markdown formatting.`;
       success: true,
       items,
       purchase_date,
+      purchase_date_from_receipt: receiptDate !== null,
       // How many day counts came from where, so the app can say so.
       estimate_sources: {
         table: items.filter((i) => i.days_source === "table").length,

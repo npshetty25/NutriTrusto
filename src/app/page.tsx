@@ -9,9 +9,9 @@ import {
   lockedDietScope,
 } from "@/lib/diet";
 
-import { calculateCurrentDaysLeft, calculateDaysPastEstimate } from "@/lib/item-age";
+import { calculateCurrentDaysLeft, calculateDaysPastEstimate, localDateISO, parsePurchaseDate } from "@/lib/item-age";
 import { parseGs1, gs1PrintedDate } from "@/lib/gs1";
-import { asDateKind, pastDateMessage, type DateKind } from "@/lib/date-kind";
+import { asDateKind, type DateKind } from "@/lib/date-kind";
 
 // One definition, in lib/risk-bands.ts. This was a byte-identical copy of
 // the rule in api/extract/route.ts — the same duplication that let the
@@ -103,8 +103,8 @@ import { AddItemModal, type NewItem } from "@/components/add-item-modal";
 import {
   STORAGE_OPTIONS,
   OPENED_DAYS_OPTIONS,
+  afterOpening,
   daysLeftAfterMove,
-  daysLeftAfterOpening,
   daysUntilDate,
   defaultStorageFor,
   storedDaysLeftFor,
@@ -113,7 +113,7 @@ import {
 import type { StorageLocation } from "@/lib/temperature";
 import {
   Camera, BrainCircuit, Loader2, TrendingUp, ScanLine,
-  Clock, X, Trash2, Info, Activity, Zap, AlertTriangle, CheckCircle2, Search, CircleAlert, Bell, Carrot, Apple, Milk, Drumstick, Wheat, CupSoda, Croissant, Snowflake, Candy, Package, ChevronLeft, ChevronRight, CalendarClock, Pencil, Sparkles, Plus, RefreshCw, SlidersHorizontal, Leaf, UtensilsCrossed, Check, Egg as EggIcon, Images, FileText, Users
+  Clock, X, Trash2, Info, Activity, Zap, AlertTriangle, CheckCircle2, Search, CircleAlert, Bell, Carrot, Apple, Milk, Drumstick, Wheat, CupSoda, Croissant, Snowflake, Candy, Package, ChevronLeft, ChevronRight, CalendarClock, Pencil, Sparkles, Plus, RefreshCw, SlidersHorizontal, Leaf, UtensilsCrossed, Check, Egg as EggIcon, Images, FileText, Users, PackageOpen
 } from "lucide-react";
 import ShoppingListModal from "@/components/shopping-list-modal";
 import { HouseholdModal } from "@/components/household-modal";
@@ -623,15 +623,27 @@ export default function Home() {
     const createdAt = row.created_at || new Date().toISOString();
     const category = inferItemCategory(String(row.name || ""));
 
-    if (currentDays <= 0) {
+    if (calculateDaysPastEstimate(row.days_left, row.purchase_date) > 0) {
       return {
         id: `${row.id}-${createdAt}`,
         // Not "expired" / "has spoiled". Nobody has looked at this food; the
-        // app only knows its own estimate ran out, which is a statement about
-        // our table, not about the item. Asserting spoilage would also send
-        // edible food to the bin, which is the opposite of the point.
-        title: "Past our estimate",
-        message: `Our estimate for ${row.name} has run out. Check it yourself before using it.`,
+        // app only knows the date has passed, which may be our own estimate.
+        // Asserting spoilage would also send edible food to the bin, which is
+        // the opposite of the point.
+        title: "Past its date",
+        message: `${row.name} is past its date. Check it yourself before using it.`,
+        severity: "high",
+        createdAt,
+        category,
+      };
+    }
+
+    // The date itself is still within it.
+    if (currentDays <= 0) {
+      return {
+        id: `${row.id}-${createdAt}`,
+        title: "Use today",
+        message: `Today is the last day for ${row.name}.`,
         severity: "high",
         createdAt,
         category,
@@ -1029,7 +1041,9 @@ export default function Home() {
         setInlineError("Pick how soon it should be used once opened.");
         return;
       }
-      remaining = daysLeftAfterOpening(remaining, useWithin);
+      const opened = afterOpening({ daysLeft: remaining, expirySource: source, expiryKind: editingItem.expiryKind ?? null }, useWithin);
+      remaining = opened.daysLeft;
+      source = opened.expirySource;
     }
     const openedAt = editOpened ? (editingItem.openedAt ?? new Date().toISOString()) : null;
     const storage = editStorage ?? editingItem.storage ?? null;
@@ -1080,6 +1094,55 @@ export default function Home() {
     closeEditItem();
   };
 
+  // ─── Opened it ──────────────────────────────────────────────────
+  // One tap, because a pack's date only covers it unopened: UHT milk printed
+  // three months out keeps about a week once opened. Buried in the edit
+  // dialog, the step that changes the number most was the one nobody took.
+  // Where USDA gives no use-within figure, the dialog opens to ask.
+  const markOpened = async (item: Item) => {
+    if (!trackingSchemaReady || item.openedAt) return;
+    const storage = item.storage ?? defaultStorageFor(item.name);
+    const limit = openedDaysFor(item.name, storage);
+    if (!limit) {
+      openEditItem(item);
+      setEditOpened(true);
+      return;
+    }
+    const opened = afterOpening({ daysLeft: item.daysLeft, expirySource: item.expirySource ?? null, expiryKind: item.expiryKind ?? null }, limit.days);
+    const openedAt = new Date().toISOString();
+    const storedDays = storedDaysLeftFor(opened.daysLeft, item.purchaseDate);
+    const risk = deriveRisk(opened.daysLeft, storedDays, item.name);
+    const { error } = await supabase
+      .from("pantry_items")
+      .update({
+        days_left: storedDays,
+        risk,
+        ...trackingFields({ storage: item.storage ?? null, openedAt, expirySource: opened.expirySource }),
+        ...(accuracySchemaReady ? { expiry_kind: opened.expiryKind } : {}),
+      })
+      .eq("id", item.id);
+    if (error) {
+      toast("Couldn't save that", { description: "Please try again." });
+      return;
+    }
+    setItems((prev) => prev.map((i) => i.id === item.id
+      ? {
+          ...i,
+          daysLeft: opened.daysLeft,
+          daysPastEstimate: calculateDaysPastEstimate(storedDays, item.purchaseDate),
+          risk,
+          openedAt,
+          expirySource: opened.expirySource,
+          ...(accuracySchemaReady ? { expiryKind: opened.expiryKind } : {}),
+        }
+      : i));
+    toast(`${item.name} opened`, {
+      description: opened.shortened
+        ? `Use within ${days(limit.days)} of opening, so ${days(opened.daysLeft)} left (${limit.citation}).`
+        : `Its date is still the sooner one: ${days(opened.daysLeft)} left.`,
+    });
+  };
+
   // ─── Add by hand ────────────────────────────────────────────────
   const addManualItem = async (entry: NewItem): Promise<boolean> => {
     if (!user) return false;
@@ -1092,7 +1155,7 @@ export default function Home() {
         name: entry.name,
         days_left: entry.daysLeft,
         risk,
-        purchase_date: new Date().toISOString(),
+        purchase_date: localDateISO(),
         ...trackingFields(entry),
         ...accuracyFields(entry),
       }])
@@ -1114,7 +1177,7 @@ export default function Home() {
     const getPurchaseDate = (daysAgo: number) => {
       const d = new Date(today);
       d.setDate(d.getDate() - daysAgo);
-      return d.toISOString();
+      return localDateISO(d);
     };
 
     // A demo pantry has to look like a real one, which means a spread — not
@@ -1423,9 +1486,11 @@ export default function Home() {
           })
           .filter((item): item is { name: string; days_left: number; risk: RiskLevel } => Boolean(item));
 
-        const purchaseDate = typeof data.purchase_date === "string" && data.purchase_date
-          ? data.purchase_date
-          : new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        // The receipt's own date when it printed one; otherwise today here,
+        // not the server's today, which is a day behind in India until 5:30 am.
+        const purchaseDate = data.purchase_date_from_receipt && typeof data.purchase_date === "string"
+          ? data.purchase_date.slice(0, 10)
+          : localDateISO();
 
         const rows = normalizedItems.map((apiItem) => ({
           user_id: user.id,
@@ -1854,31 +1919,27 @@ if (nutritionFieldsFilled < 2) {
       name: scannedResult.name,
       days_left: initialDaysLeft,
       risk: deriveRisk(initialDaysLeft, initialDaysLeft, scannedResult.name),
-      // ISO, not toLocaleDateString: a locale string sorts alphabetically
-      // ('Apr' before 'Jan') and cannot be range-queried. See
-      // db/supabase-schema-purchase-date.sql.
-      purchase_date: new Date().toISOString(),
+      // Today in the person's own calendar. toISOString() wrote the UTC
+      // date, which before 5:30 am in India is yesterday.
+      purchase_date: localDateISO(),
     };
 
     const { data: insertedRow, error } = await supabase
       .from("pantry_items")
       .insert([newItem])
-      .select("id, name, days_left, purchase_date")
+      .select("*")
       .single();
 
     if (!error && insertedRow) {
-       const daysLeft = calculateCurrentDaysLeft(insertedRow.days_left, insertedRow.purchase_date);
+       // The same mapping every fetch uses, so the card shows where its date
+       // came from ("Best before …") straight away, not after a reload.
+       const inserted = rowToItem(insertedRow as PantryRow);
        setItems(prev => {
          if (prev.some((item) => item.id === insertedRow.id)) return prev;
          return [{
-           id: insertedRow.id,
-           name: insertedRow.name,
-           daysLeft,
-           daysPastEstimate: calculateDaysPastEstimate(insertedRow.days_left, insertedRow.purchase_date),
-           risk: deriveRisk(daysLeft),
-           purchaseDate: insertedRow.purchase_date,
-           ingredientsText: scannedResult.ingredients ?? null,
-           healthScore: scannedResult.analysis?.health_score ?? null,
+           ...inserted,
+           ingredientsText: inserted.ingredientsText ?? scannedResult.ingredients ?? null,
+           healthScore: inserted.healthScore ?? scannedResult.analysis?.health_score ?? null,
          }, ...prev];
        });
        toast(`Added — ${days(initialDaysLeft)} left`, {
@@ -1887,17 +1948,7 @@ if (nutritionFieldsFilled < 2) {
          // right there, rather than a note telling the user to go and find
          // the item later.
          action: shelfLife.wantsConfirmation
-           ? {
-               label: "Set date",
-               onClick: () => openEditItem({
-                 id: insertedRow.id,
-                 name: insertedRow.name,
-                 daysLeft,
-                 daysPastEstimate: calculateDaysPastEstimate(insertedRow.days_left, insertedRow.purchase_date),
-                 risk: deriveRisk(daysLeft),
-                 purchaseDate: insertedRow.purchase_date,
-               }),
-             }
+           ? { label: "Set date", onClick: () => openEditItem(inserted) }
            : undefined,
        });
     } else if (error) {
@@ -1960,21 +2011,24 @@ if (nutritionFieldsFilled < 2) {
     source: "printed_expiry" | "mfd_plus_shelf_life" | "shelf_life_from_today" | "unknown";
     confidence: "high" | "medium" | "low";
     date_kind?: string | null;
+    notes?: string[];
   }) => {
     setShowExpiryScanner(false);
     if (expiry.days_left === null) return;
 
+    const kind = asDateKind(expiry.date_kind);
     setScannedExpiry({
       daysLeft: expiry.days_left,
       expiryDate: expiry.expiry_date,
       source: expiry.source,
       confidence: expiry.confidence,
-      kind: asDateKind(expiry.date_kind),
+      kind,
     });
+    const printed = expiry.expiry_date
+      ? ` (${kind === "best_before" ? "best before" : kind === "use_by" ? "use by" : "date"} ${parsePurchaseDate(expiry.expiry_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })})`
+      : "";
     toast("Expiry date detected", {
-      description: expiry.expiry_date
-        ? `${days(expiry.days_left)} left (expires ${expiry.expiry_date}).`
-        : `${days(expiry.days_left)} left.`,
+      description: [`${days(expiry.days_left)} left${printed}.`, ...(expiry.notes ?? [])].join(" "),
     });
   };
 
@@ -2688,6 +2742,13 @@ if (nutritionFieldsFilled < 2) {
               // panel can highlight where this item is actually assumed to
               // live rather than showing three equally-weighted options.
               const shelfRow = findShelfLifeRow(item.name)?.row;
+              const openedLimit = item.openedAt ? null : openedDaysFor(item.name, item.storage ?? shelfEstimate.storage);
+              // Offered for anything that comes in a pack: a printed date, or a
+              // USDA use-within figure. Fresh produce is not "opened".
+              const canMarkOpened = !!trackingSchemaReady && !item.openedAt && (item.expirySource === "printed" || !!openedLimit);
+              // Once opening has replaced the date, the unopened estimate's
+              // source and storage figures no longer describe it.
+              const openedOwnsDate = !!item.openedAt && !item.expirySource;
 
               return (
                 <PantryCard
@@ -2702,21 +2763,21 @@ if (nutritionFieldsFilled < 2) {
                   dietLabel={dietChipLabel(userDietPreference, itemDiet)}
                   itemDiet={itemDiet}
                   dietUnverified={!item.ingredientsText}
-                  riskLabel={riskLabelForDays(item.daysLeft)}
+                  riskLabel={riskLabelForDays(item.daysLeft, { daysPast: item.daysPastEstimate })}
                   // A date from the pack or from the person is not our
                   // estimate, so it must not carry the estimate's provenance
                   // line or its "if stored differently" figures.
                   shelfLifeCitation={
                     item.expirySource === "printed" ? "From the date on the pack"
                     : item.expirySource === "user" ? "From the date you set"
+                    : openedOwnsDate ? `Counted from opening: ${openedDaysFor(item.name, item.storage ?? shelfEstimate.storage)?.citation ?? "the use-within limit you chose"}`
                     : formatProvenance(shelfEstimate)
                   }
-                  shelfLifeConfidence={item.expirySource ? "high" : shelfEstimate.confidence}
-                  storageDisclaimer={item.expirySource ? undefined : shelfEstimate.disclaimer}
-                  ifStoredDifferently={item.expirySource ? undefined : shelfEstimate.ifStoredDifferently}
+                  shelfLifeConfidence={item.expirySource ? "high" : openedOwnsDate ? "medium" : shelfEstimate.confidence}
+                  storageDisclaimer={item.expirySource || openedOwnsDate ? undefined : shelfEstimate.disclaimer}
+                  ifStoredDifferently={item.expirySource || openedOwnsDate ? undefined : shelfEstimate.ifStoredDifferently}
                   currentStorage={item.storage ?? shelfRow?.storage}
                   trackingTags={[...ownerTagFor(item), ...trackingTagsFor(item)]}
-                  pastDateNote={item.expirySource ? pastDateMessage(item.expiryKind ?? null) : null}
                   healthierAlternative={healthierAlternative}
                   detectedAllergens={detectedAllergens}
                   actions={
@@ -2733,6 +2794,16 @@ if (nutritionFieldsFilled < 2) {
                       >
                         <Check size={15} /> Used it
                       </button>
+                      {canMarkOpened && confirmDeleteId !== item.id && (
+                        <button
+                          onClick={() => { void markOpened(item); }}
+                          className="neu-raised-sm h-11 px-3 shrink-0 rounded-xl flex items-center justify-center gap-1.5 text-xs font-semibold text-foreground/75 hover:text-foreground transition-colors"
+                          title={openedLimit ? `Opened — use within ${days(openedLimit.days)}` : "Opened — choose how soon to use it"}
+                          aria-label={`Mark ${item.name} as opened`}
+                        >
+                          <PackageOpen size={15} /> Opened it
+                        </button>
+                      )}
                       <button
                         onClick={() => openEditItem(item)}
                         className="neu-raised-sm w-11 h-11 shrink-0 rounded-xl flex items-center justify-center text-foreground/70 hover:text-foreground transition-colors"

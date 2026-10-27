@@ -4,7 +4,49 @@ import {
   daysElapsedSince,
   calculateCurrentDaysLeft,
   calculateDaysPastEstimate,
+  dueDateFromToday,
+  localDateISO,
 } from "./item-age";
+
+describe("calendar days, in the person's own timezone", () => {
+  // Built with local-time constructors, so these hold in any timezone. In
+  // India the old 24-hours-from-midnight-UTC count failed the first two.
+  it("a new day starts at local midnight, not at midnight UTC", () => {
+    expect(daysElapsedSince("2026-10-27", new Date(2026, 9, 28, 1, 0))).toBe(1);
+    expect(daysElapsedSince("2026-10-27", new Date(2026, 9, 27, 23, 59))).toBe(0);
+  });
+
+  it("reads a stored timestamp as the local day it falls on", () => {
+    const lateLastNight = new Date(2026, 9, 27, 23, 30).toISOString();
+    expect(daysElapsedSince(lateLastNight, new Date(2026, 9, 28, 0, 30))).toBe(1);
+    expect(daysElapsedSince(lateLastNight, new Date(2026, 9, 27, 23, 45))).toBe(0);
+  });
+
+  it("keeps a printed date's count exact for the item's whole life", () => {
+    // Pack says 31 Oct; scanned at 1 am on 28 Oct, so stored as 3 days from 28 Oct.
+    expect(calculateCurrentDaysLeft(3, "2026-10-28", new Date(2026, 9, 28, 6, 0))).toBe(3);
+    expect(calculateCurrentDaysLeft(3, "2026-10-28", new Date(2026, 9, 31, 2, 0))).toBe(0);
+    expect(calculateDaysPastEstimate(3, "2026-10-28", new Date(2026, 9, 31, 23, 0))).toBe(0);
+    expect(calculateDaysPastEstimate(3, "2026-10-28", new Date(2026, 10, 1, 0, 5))).toBe(1);
+  });
+
+  it("writes today's date in the local calendar", () => {
+    expect(localDateISO(new Date(2026, 0, 5, 0, 30))).toBe("2026-01-05");
+    expect(localDateISO(new Date(2026, 11, 31, 23, 59))).toBe("2026-12-31");
+  });
+
+  it("works out the due date by the calendar, across month ends", () => {
+    const now = new Date(2026, 9, 29, 23, 50);
+    expect(dueDateFromToday(5, 0, now)).toBe("2026-11-03");
+    expect(dueDateFromToday(0, 0, now)).toBe("2026-10-29");
+    expect(dueDateFromToday(0, 3, now)).toBe("2026-10-26");
+  });
+
+  it("parses a bare date as local midnight of that day", () => {
+    const d = parsePurchaseDate("2026-10-27");
+    expect([d.getFullYear(), d.getMonth(), d.getDate(), d.getHours()]).toEqual([2026, 9, 27, 0]);
+  });
+});
 
 /** An ISO date `n` whole days before now. */
 const daysAgo = (n: number) => new Date(Date.now() - n * 24 * 60 * 60 * 1000).toISOString();

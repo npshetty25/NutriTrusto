@@ -9,6 +9,8 @@ import { VegMark } from "@/components/veg-mark";
 import type { ItemDietType } from "@/lib/diet";
 import { dietChipClasses } from "@/lib/colour-semantics";
 import { StoragePanel, type IfStoredDifferently } from "@/components/storage-panel";
+import { dueDateFromToday, parsePurchaseDate } from "@/lib/item-age";
+import { dueLine, pastDateMessage, type DateKind, type DateOrigin } from "@/lib/date-kind";
 
 export type RiskLevel = "high" | "medium" | "low";
 
@@ -16,6 +18,8 @@ interface PantryCardProps {
   id: string;
   name: string;
   daysLeft: number;
+  /** Days beyond the date; 0 while still within it (including the day itself). */
+  daysPastEstimate?: number;
   risk: RiskLevel;
   purchaseDate: string;
   // The genuine 1-5 NutriTrust score from a barcode scan, or null/undefined
@@ -61,9 +65,10 @@ interface PantryCardProps {
   currentStorage?: "fridge" | "counter" | "freezer";
   /** Short facts the person told us: "In the fridge", "Opened 3 Oct", "Date from pack". */
   trackingTags?: string[];
-  /** Shown instead of "our estimate ran out" when the date came from the
-   * pack or the person and we know whether it was a use-by or best-before. */
-  pastDateNote?: string | null;
+  /** Where the date came from: the pack, the person, or (null) our estimate. */
+  expirySource?: DateOrigin;
+  /** Use-by (safety) or best-before (quality), when known. */
+  expiryKind?: DateKind | null;
   // Rendered in the card's own footer. These used to be free-floating
   // buttons absolutely positioned over the card by the dashboard, which
   // meant they overlapped whatever the card happened to render last.
@@ -84,16 +89,13 @@ const riskConfig = {
   low: { label: "Plenty of time", color: "text-safe-strong", bar: "bg-safe" },
 };
 
-const DAY_MS = 86_400_000;
 // dd/mm — the household convention in the product's home market. The card
-// used to print ISO ("PURCHASED 2026-08-06") in an India-first product.
-const formatDayMonth = (iso: string) => {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short" });
-};
+// used to print ISO ("PURCHASED 2026-08-06") in an India-first product. A
+// bare date is read as that day here, not as midnight UTC.
+const formatDayMonth = (iso: string) =>
+  parsePurchaseDate(iso).toLocaleDateString("en-IN", { day: "2-digit", month: "short" });
 
-export function PantryCard({ name, daysLeft, risk, purchaseDate, healthScore, dietMatch = true, dietLabel, itemDiet = "veg", dietUnverified = false, riskLabel, shelfLifeCitation, shelfLifeConfidence, storageDisclaimer, ifStoredDifferently, currentStorage, trackingTags, pastDateNote, detectedAllergens, healthierAlternative, actions }: PantryCardProps) {
+export function PantryCard({ name, daysLeft, daysPastEstimate = 0, risk, purchaseDate, healthScore, dietMatch = true, dietLabel, itemDiet = "veg", dietUnverified = false, riskLabel, shelfLifeCitation, shelfLifeConfidence, storageDisclaimer, ifStoredDifferently, currentStorage, trackingTags, expirySource = null, expiryKind = null, detectedAllergens, healthierAlternative, actions }: PantryCardProps) {
   const score = healthScore != null ? Number.parseFloat(healthScore) : NaN;
   const hasScore = Number.isFinite(score);
   // Same thresholds the nutrition trend chart uses, so one score reads the
@@ -105,7 +107,12 @@ export function PantryCard({ name, daysLeft, risk, purchaseDate, healthScore, di
       : score >= 2.5
         ? "bg-warning/15 text-warning"
         : "bg-danger/15 text-danger";
-  const config = riskConfig[risk];
+  const isPast = daysPastEstimate > 0;
+  const isDueToday = !isPast && daysLeft <= 0;
+  // A best-before date is about quality, not safety (FSSAI's definitions), so
+  // a pack past it reads as "check it", in amber, rather than as a danger.
+  const tone: RiskLevel = isPast && expiryKind === "best_before" ? "medium" : risk;
+  const config = riskConfig[tone];
   const category = inferItemCategory(name);
 
   const categoryIconMap = {
@@ -135,18 +142,15 @@ export function PantryCard({ name, daysLeft, risk, purchaseDate, healthScore, di
     risk === "medium" ? (daysLeft <= 5 ? "w-5/12" : "w-6/12") :
     daysLeft >= 14 ? "w-full" : daysLeft >= 10 ? "w-10/12" : "w-8/12";
 
-  // Reading the clock during render is impure, but the expiry date is
-  // genuinely relative to now: daysLeft is already "days remaining as of
-  // this render", computed by the dashboard from purchase_date + shelf life.
-  // This card is only ever rendered on the client, after auth, so there is
-  // no server snapshot for it to disagree with.
-  // eslint-disable-next-line react-hooks/purity
-  const expiryLabel = formatDayMonth(new Date(Date.now() + daysLeft * DAY_MS).toISOString());
+  // Relative to today on purpose: daysLeft is already "days remaining as of
+  // this render". This card is only ever rendered on the client, after auth,
+  // so there is no server snapshot for it to disagree with.
+  const expiryLabel = formatDayMonth(dueDateFromToday(daysLeft, daysPastEstimate));
 
   const chipTone =
-    risk === "high"
+    tone === "high"
       ? "bg-danger/15 text-danger-strong"
-      : risk === "medium"
+      : tone === "medium"
         ? "bg-warning/15 text-warning-strong"
         : "bg-safe/15 text-safe-strong";
   const hasDetails = !!shelfLifeCitation || !!ifStoredDifferently || !!storageDisclaimer || !!healthierAlternative;
@@ -176,16 +180,24 @@ export function PantryCard({ name, daysLeft, risk, purchaseDate, healthScore, di
           <h3 title={name} className="font-bold text-[15px] sm:text-base text-foreground tracking-tight leading-snug line-clamp-2 wrap-break-word">
             {name}
           </h3>
-          {/* The expiry date, not just the purchase date: an expiry tracker
-              that never printed one left people holding it in their head. */}
+          {/* The date itself, named for what it is: "Use by" only for a
+              use-by, "Best before" for a best-before, and our own estimate
+              says it is one. Every card used to say "Use by", a safety
+              claim, even for a guess. */}
           <p className="mt-0.5 text-[11px] text-foreground/60 font-medium">
-            {daysLeft > 0 ? `Use by ${expiryLabel}` : `Was due ${expiryLabel}`}
+            {dueLine({ kind: expiryKind, origin: expirySource, date: expiryLabel, daysLeft, daysPast: daysPastEstimate })}
             <span className="text-foreground/40"> · bought {formatDayMonth(purchaseDate)}</span>
           </p>
         </div>
+        {/* Days left, "Today" on the date itself, or days past it — a pack a
+            day over and a month over used to read the same "0 days left". */}
         <div className="text-right shrink-0 -mt-1">
-          <p className={`${config.color} font-extrabold text-4xl leading-none tracking-tight tabular-nums`}>{daysLeft}</p>
-          <p className="mt-1 text-[10px] uppercase tracking-widest font-semibold text-foreground/55">{daysLeft === 1 ? "day left" : "days left"}</p>
+          <p className={`${config.color} font-extrabold ${isDueToday ? "text-3xl" : "text-4xl"} leading-none tracking-tight tabular-nums`}>
+            {isPast ? daysPastEstimate : isDueToday ? "Today" : daysLeft}
+          </p>
+          <p className="mt-1 text-[10px] uppercase tracking-widest font-semibold text-foreground/55">
+            {isPast ? (daysPastEstimate === 1 ? "day past" : "days past") : isDueToday ? "last day" : daysLeft === 1 ? "day left" : "days left"}
+          </p>
         </div>
       </div>
 
@@ -194,12 +206,13 @@ export function PantryCard({ name, daysLeft, risk, purchaseDate, healthScore, di
         <div className={`h-full rounded-full transition-all duration-500 ${freshnessWidthClass} ${config.bar}`} />
       </div>
 
-      {daysLeft === 0 && (
-        // Says what we know — our estimate ran out — not what we don't:
+      {isPast && (
+        // Says what we know — the date has passed — not what we don't:
         // whether the food is actually off. Only the person holding it can
         // tell, and telling them it has spoiled bins food that is still good.
-        <p className="mt-3 text-[11px] leading-relaxed font-semibold text-danger">
-          {pastDateNote ?? `Our estimate for ${name} has run out. Look at it and smell it before you use it.`}
+        // Not shown on the day itself, which is still within the date.
+        <p className={`mt-3 text-[11px] leading-relaxed font-semibold ${tone === "medium" ? "text-warning-strong" : "text-danger"}`}>
+          {pastDateMessage(expiryKind, !!expirySource) ?? `Our estimate for ${name} has run out. Look at it and smell it before you use it.`}
         </p>
       )}
 

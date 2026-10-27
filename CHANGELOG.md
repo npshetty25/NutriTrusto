@@ -6,6 +6,36 @@ reason. Nothing changes silently.
 
 ---
 
+## 2026-10-27 — three sourced rows, Indian names for three USDA products, and `Hari Mirch`
+
+**New rows** (no existing row's figure moved; `DATA_VERSION` 2026-09-07 → 2026-10-27):
+
+| Row | Figure | Source | Confidence |
+|---|---|---|---|
+| `drumstick` | 6 d at 27 °C → **4 d** on a 29 °C shelf | Rahman et al., J. Bangladesh Agricultural University 18(2):316-322 (2020): 6 days at 25–28 °C | medium → low (converted) |
+| `chikoo` | **7 d** on the shelf | Baidya et al., J. Pharmacognosy and Phytochemistry 9(4):2030-2035 (2020): 7–8 days in ordinary storage after harvest | low — counted from harvest |
+| `gulab-jamun` | **2 d** on the shelf | NDDB, Khoa and Khoa-based Products: khoa 2–3 days at room temperature | low — plain khoa used as a proxy, shown as an extrapolation warning |
+
+No fridge figure for chikoo or drumstick: neither source gives one at a home
+fridge's 7 °C, and the generic model may not be stretched 20 °C.
+
+**Matcher fixes**, which move what some items resolve to:
+
+| Item | Before | After | Why |
+|---|---|---|---|
+| Hari Mirch | **365 d** (`ground-spices`, via "mirch") | **5 d** fridge | excluded from the spice row; USDA "Hot peppers" (7 d at 4 °C) |
+| Green Chillies | 14 d (blind fallback) | **5 d** fridge | USDA "Hot peppers" |
+| Cornflakes | 14 d (blind fallback) | **180 d** | USDA "Cereal, ready-to-eat" |
+| Soya Chunks | 14 d (blind fallback) | **730 d** | USDA "Textured soy protein" |
+| Chicken Drumsticks | unchanged (`chicken`) | unchanged | the new `drumstick` row excludes it explicitly |
+
+Hari Mirch was a confident wrong match of the Goat Milk kind: about 70× too
+long, in the unsafe direction. Lal Mirch Powder still resolves to the spice row.
+
+Benchmark (107 items): sourced 87.9% → 93.5%, blind fallback 10.3% → 4.7%.
+
+---
+
 ## 2026-09-07b — matcher fix: `Goat Milk` was reported as 365 days
 
 **No row in `shelf-life-data.ts` changed.** This is a matcher fix, but it moves

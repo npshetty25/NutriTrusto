@@ -72,6 +72,29 @@ describe("false-friend regressions (all seven, tier 3)", () => {
     expect(rowIdFor(name)).not.toBe(forbiddenId);
   });
 
+  it("Hari Mirch is a fresh chilli, not a year-long spice", () => {
+    // It matched "mirch" in the ground-spices row and was given 365 days.
+    expect(rowIdFor("Hari Mirch")).not.toBe("ground-spices");
+    const est = estimateShelfLife("Hari Mirch");
+    expect(est.citation).toMatch(/hot peppers/);
+    expect(est.days).toBeLessThanOrEqual(7);
+    expect(rowIdFor("Lal Mirch Powder")).toBe("ground-spices");
+  });
+
+  it("a chicken drumstick is chicken, not the vegetable", () => {
+    expect(rowIdFor("Chicken Drumsticks")).toBe("chicken");
+    expect(rowIdFor("Drumsticks")).toBe("drumstick");
+  });
+
+  it("the Indian items that had no source now resolve to their own rows", () => {
+    expect(rowIdFor("Chikoo")).toBe("chikoo");
+    expect(rowIdFor("Sapota")).toBe("chikoo");
+    expect(rowIdFor("Gulab Jamun")).toBe("gulab-jamun");
+    expect(rowIdFor("Gits Gulab Jamun Mix")).not.toBe("gulab-jamun");
+    // Plain khoa is a proxy, so the stretch is shown, not hidden.
+    expect(estimateShelfLife("Gulab Jamun").extrapolationWarning).toMatch(/plain khoa/);
+  });
+
   it("Goat Milk is dairy, not a shelf-stable plant milk", () => {
     // The worst matcher failure this project has had. Two independent raw
     // `includes` calls compounded: the key "oat milk" matched inside "goat
