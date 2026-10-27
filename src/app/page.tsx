@@ -116,6 +116,8 @@ import {
   Clock, X, Trash2, Info, Activity, Zap, AlertTriangle, CheckCircle2, Search, CircleAlert, Bell, Carrot, Apple, Milk, Drumstick, Wheat, CupSoda, Croissant, Snowflake, Candy, Package, ChevronLeft, ChevronRight, CalendarClock, Pencil, Sparkles, Plus, RefreshCw, SlidersHorizontal, Leaf, UtensilsCrossed, Check, Egg as EggIcon, Images, FileText
 } from "lucide-react";
 import ShoppingListModal from "@/components/shopping-list-modal";
+import { HouseholdModal } from "@/components/household-modal";
+import { looksLikeInviteCode, PENDING_JOIN_KEY } from "@/lib/household";
 import { CountUp } from "@/components/count-up";
 import { motion, AnimatePresence, MotionConfig } from "framer-motion";
 import { toast } from "sonner";
@@ -151,10 +153,15 @@ interface Item {
   // db/supabase-schema-accuracy.sql — undefined until it has run.
   expiryKind?: DateKind | null;
   quantity?: string | null;
+  // Who added it, and whether it is in a household (null = private).
+  ownerId?: string | null;
+  householdId?: string | null;
 }
 
 type PantryRow = {
   id: string;
+  user_id?: string | null;
+  household_id?: string | null;
   name: string;
   days_left: number;
   purchase_date: string;
@@ -188,6 +195,8 @@ function rowToItem(row: PantryRow): Item {
     expirySource: asExpirySource(row.expiry_source),
     expiryKind: asDateKind(row.expiry_kind),
     quantity: row.quantity ?? null,
+    ownerId: row.user_id ?? null,
+    householdId: row.household_id ?? null,
   };
 }
 
@@ -267,7 +276,7 @@ const INVENTORY_PAGE_SIZE = 6;
 // No fallback items — real users start with an empty pantry.
 
 export default function Home() {
-  const { user, loading: authLoading, household, householdSchemaReady, ingredientsSchemaReady, healthScoreSchemaReady, trackingSchemaReady, accuracySchemaReady } = useAuth();
+  const { user, loading: authLoading, household, householdLoading, householdMembers, sharedShoppingReady, householdSchemaReady, ingredientsSchemaReady, healthScoreSchemaReady, trackingSchemaReady, accuracySchemaReady } = useAuth();
   // UI-only gate, not a security one — see lib/admin.ts. Hides "Add Demo
   // Data" from everyone but the project owner, so a real user never sees a
   // button that fills their pantry with sample groceries.
@@ -390,6 +399,11 @@ export default function Home() {
   }, [user]);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [showShoppingList, setShowShoppingList] = useState(false);
+  const [showHousehold, setShowHousehold] = useState(false);
+  // A code from an invite link (?join=CODE), waiting for the dialog.
+  const [inviteJoinCode, setInviteJoinCode] = useState("");
+  // In a household: everyone's items, or only the ones I added.
+  const [ownerFilter, setOwnerFilter] = useState<"all" | "mine">("all");
   const [showPantryChat, setShowPantryChat] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
 
@@ -427,8 +441,18 @@ export default function Home() {
   const inventoryFilteredItems = displayedItems.filter((item) => {
     const matchesSearch = item.name.toLowerCase().includes(searchQuery.trim().toLowerCase());
     const matchesRisk = riskFilter === "all" ? true : item.risk === riskFilter;
-    return matchesSearch && matchesRisk;
+    const matchesOwner = ownerFilter === "all" || !household || item.ownerId === user?.id;
+    return matchesSearch && matchesRisk && matchesOwner;
   });
+
+  // Who added an item, said on its card while in a household. Names come
+  // from household_members_list() (the v2 migration); without it, "a member".
+  const ownerTagFor = (item: Item): string[] => {
+    if (!household) return [];
+    if (item.ownerId === user?.id) return [item.householdId ? "Added by you" : "Private to you"];
+    const name = householdMembers.find((m) => m.userId === item.ownerId)?.displayName;
+    return [name ? `Added by ${name}` : "Added by a member"];
+  };
   const sortedInventoryItems = [...inventoryFilteredItems].sort((a, b) => {
     if (inventorySortBy === "name") return a.name.localeCompare(b.name);
     if (inventorySortBy === "freshest") return b.daysLeft - a.daysLeft;
@@ -805,7 +829,33 @@ export default function Home() {
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [user]);
+    // household?.id: creating, joining or leaving a household changes which
+    // rows this user can see. Without it a new member saw an empty pantry
+    // until they reloaded the page.
+  }, [user, household?.id]);
+
+  // ─── Invite links (?join=CODE) ──────────────────────────────────
+  // Kept in localStorage first, so the code survives a trip through the
+  // login page for someone who was not signed in yet.
+  useEffect(() => {
+    const code = new URLSearchParams(window.location.search).get("join");
+    if (!code) return;
+    try { localStorage.setItem(PENDING_JOIN_KEY, code.trim()); } catch { /* storage unavailable */ }
+    const url = new URL(window.location.href);
+    url.searchParams.delete("join");
+    window.history.replaceState(null, "", url.pathname + url.search + url.hash);
+  }, []);
+  useEffect(() => {
+    if (!user || householdLoading) return;
+    let code: string | null = null;
+    try { code = localStorage.getItem(PENDING_JOIN_KEY); localStorage.removeItem(PENDING_JOIN_KEY); } catch { /* storage unavailable */ }
+    if (!code || !looksLikeInviteCode(code)) return;
+    // Opening a dialog in response to a one-time URL value is a sync with
+    // the outside world, which is what effects are for.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setInviteJoinCode(code);
+    setShowHousehold(true);
+  }, [user, householdLoading]);
 
   // ─── Expiry nudge ───────────────────────────────────────────────
   // Both read straight from user_metadata — see NotificationPreferencesModal,
@@ -1309,6 +1359,8 @@ export default function Home() {
       user_id: user.id,
       name: row.quantity ? `${row.item} — ${row.quantity}` : row.item,
       source_recipe: generatedRecipe.title,
+      // On the household's shared list once that column exists (v2 migration).
+      ...(sharedShoppingReady && household ? { household_id: household.id } : {}),
     }));
 
     const { error } = await supabase.from("shopping_list_items").insert(rows);
@@ -1981,7 +2033,11 @@ if (nutritionFieldsFilled < 2) {
                 </motion.span>
               )}
             </motion.button>
-            <ProfileDropdown onOpenShoppingList={() => setShowShoppingList(true)} onReplayTour={() => setShowOnboarding(true)} />
+            <ProfileDropdown
+              onOpenShoppingList={() => setShowShoppingList(true)}
+              onReplayTour={() => setShowOnboarding(true)}
+              onOpenHousehold={() => { setInviteJoinCode(""); setShowHousehold(true); }}
+            />
           </div>
         </motion.div>
 
@@ -2416,6 +2472,26 @@ if (nutritionFieldsFilled < 2) {
                   </div>
                 )}
 
+                {household && (
+                  <div role="group" aria-label="Whose items" className="grid grid-cols-2 gap-2">
+                    {([
+                      { id: "all", label: `Everyone's` },
+                      { id: "mine", label: "Only mine" },
+                    ] as const).map(({ id, label }) => (
+                      <button
+                        key={id}
+                        onClick={() => setOwnerFilter(id)}
+                        aria-pressed={ownerFilter === id}
+                        className={`h-11 rounded-xl text-xs font-bold transition-all ${
+                          ownerFilter === id ? "bg-foreground text-background" : "neu-raised-sm text-foreground/70 hover:text-foreground"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
                 <div className="grid grid-cols-2 gap-2">
                   <div className="flex flex-col gap-1.5">
                     <label htmlFor="risk-filter" className="text-[10px] font-semibold uppercase tracking-widest text-foreground/60">Show</label>
@@ -2550,7 +2626,7 @@ if (nutritionFieldsFilled < 2) {
                   storageDisclaimer={item.expirySource ? undefined : shelfEstimate.disclaimer}
                   ifStoredDifferently={item.expirySource ? undefined : shelfEstimate.ifStoredDifferently}
                   currentStorage={item.storage ?? shelfRow?.storage}
-                  trackingTags={trackingTagsFor(item)}
+                  trackingTags={[...ownerTagFor(item), ...trackingTagsFor(item)]}
                   pastDateNote={item.expirySource ? pastDateMessage(item.expiryKind ?? null) : null}
                   healthierAlternative={healthierAlternative}
                   detectedAllergens={detectedAllergens}
@@ -3378,6 +3454,9 @@ if (nutritionFieldsFilled < 2) {
         />
       )}
 
+      {showHousehold && (
+        <HouseholdModal initialJoinCode={inviteJoinCode} onClose={() => { setShowHousehold(false); setInviteJoinCode(""); }} />
+      )}
       {showShoppingList && (
         <ShoppingListModal onClose={() => setShowShoppingList(false)} />
       )}
