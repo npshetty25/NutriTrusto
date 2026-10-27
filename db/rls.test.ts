@@ -298,9 +298,8 @@ describe("household isolation", () => {
 });
 
 /**
- * supabase-schema-household-v2.sql, applied on top of the production
- * migrations. Not yet in MIGRATIONS because it has not yet been run in
- * production; move it there once it has.
+ * supabase-schema-household-v2.sql, applied on top of the earlier
+ * migrations. Run in production by the owner on 2026-10-27.
  */
 describe("households v2", () => {
   let db: PGlite;

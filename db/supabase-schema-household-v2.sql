@@ -1,5 +1,6 @@
 -- ============================================================
 -- Nutri-Trust — households, finished
+-- Applied to production by the owner on 2026-10-27 (SQL editor).
 -- Run this in Supabase: SQL Editor > New Query > paste > Run.
 -- Run it AFTER supabase-schema-household-guard.sql.
 --
