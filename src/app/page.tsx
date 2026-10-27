@@ -852,7 +852,6 @@ export default function Home() {
     if (!code || !looksLikeInviteCode(code)) return;
     // Opening a dialog in response to a one-time URL value is a sync with
     // the outside world, which is what effects are for.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setInviteJoinCode(code);
     setShowHousehold(true);
   }, [user, householdLoading]);
