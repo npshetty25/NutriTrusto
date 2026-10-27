@@ -50,6 +50,37 @@ test.describe("pantry", () => {
     expect(inserted[0].body).toMatchObject([{ health_score: "3.1" }]);
   });
 
+  test("a product with ingredients but no name asks only for the name, never says Unknown Product", async ({ backend, page }) => {
+    backend.off = {
+      status: 1,
+      code: "8904063200127",
+      product: {
+        brands: "Haldiram's",
+        ingredients_text: "Gram flour, edible vegetable oil, moth flour, salt, spices",
+        categories: "Snacks, Salty snacks, Namkeen",
+        lc: "hi",
+        nutriments: { sodium_100g: 0.9, sugars_100g: 1.2 },
+      },
+    };
+    await openDashboard(page);
+    await page.getByRole("button", { name: /Barcode/ }).first().click();
+    await page.getByPlaceholder("e.g., 8901234567890").fill("8904063200127");
+    await page.getByRole("button", { name: "Use", exact: true }).click();
+
+    const dialog = page.getByRole("dialog");
+    await expect(dialog.getByRole("heading", { name: "Found it, but it has no name" })).toBeVisible();
+    await expect(dialog.getByLabel("Product name")).toHaveValue("Haldiram's Namkeen");
+    await expect(page.getByText("Unknown Product")).toHaveCount(0);
+
+    await dialog.getByLabel("Product name").fill("Haldiram's Aloo Bhujia");
+    await dialog.getByRole("button", { name: /Continue|Analy/ }).click();
+    // The real ingredients and nutrition went to the analysis, not placeholders.
+    await expect.poll(() => backend.requests.filter((r) => r.path === "/api/analyze-food").length).toBe(1);
+    const sent = JSON.parse(String(backend.requests.find((r) => r.path === "/api/analyze-food")!.body));
+    expect(sent.ingredients).toContain("Gram flour");
+    expect(sent.nutritionData.sugars_g_100g).toBe(1.2);
+  });
+
   test("shows the category the model predicts for a scanned product", async ({ backend, page }) => {
     void backend;
     await openDashboard(page);

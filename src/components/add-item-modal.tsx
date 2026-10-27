@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { X, Loader2, Plus, ScanLine } from "lucide-react";
 import BarcodeScanner from "@/components/barcode-scanner";
 import { parseGs1 } from "@/lib/gs1";
+import { OFF_NAME_FIELDS, offProductName, suggestNameFromCategories } from "@/lib/off-product";
 import { matchesTerm } from "@/lib/text-match";
 import { estimateShelfLife, formatProvenance } from "@/lib/shelf-life";
 import { openedDaysFor } from "@/lib/foodkeeper";
@@ -115,15 +116,24 @@ export function AddItemModal({ userDiet, trackingAvailable, accuracyAvailable, o
     const code = parseGs1(decoded)?.lookupCode ?? decoded;
     setLooking(true);
     try {
-      const res = await fetch(`https://world.openfoodfacts.org/api/v2/product/${code}.json?fields=product_name,brands,quantity`);
+      const res = await fetch(`https://world.openfoodfacts.org/api/v2/product/${code}.json?fields=${OFF_NAME_FIELDS.join(",")},brands,quantity,categories`);
       const data = await res.json();
-      const product = data?.status === 1 ? (data.product as { product_name?: string; brands?: string; quantity?: string } | undefined) : undefined;
-      const base = product?.product_name?.trim();
-      if (!base) {
+      const product = data?.status === 1 ? (data.product as Record<string, unknown> | undefined) : undefined;
+      const brand = typeof product?.brands === "string" ? product.brands.split(",")[0]?.trim() : undefined;
+      const base = offProductName(product);
+      if (!product) {
         setError("That barcode isn't in the product database. Type the name instead.");
         return;
       }
-      const brand = product?.brands?.split(",")[0]?.trim();
+      if (!base) {
+        // The product is there, but nobody entered its name: suggest one from
+        // its category and let the person correct it from the pack.
+        const suggestion = suggestNameFromCategories(product.categories);
+        const guess = [brand, suggestion].filter(Boolean).join(" ");
+        if (guess) setName(guess.slice(0, 80));
+        setError("Found this barcode, but the product database has no name for it. Check the name from the pack.");
+        return;
+      }
       const withBrand = brand && !matchesTerm(base.toLowerCase(), brand.toLowerCase()) ? `${brand} ${base}` : base;
       setName(withBrand.slice(0, 80));
     } catch {

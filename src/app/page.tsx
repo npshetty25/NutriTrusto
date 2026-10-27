@@ -118,6 +118,7 @@ import {
 import ShoppingListModal from "@/components/shopping-list-modal";
 import { HouseholdModal } from "@/components/household-modal";
 import { looksLikeInviteCode, PENDING_JOIN_KEY } from "@/lib/household";
+import { OFF_NAME_FIELDS, offProductName, ownLanguageNameFields, suggestNameFromCategories } from "@/lib/off-product";
 import { CountUp } from "@/components/count-up";
 import { motion, AnimatePresence, MotionConfig } from "framer-motion";
 import { toast } from "sonner";
@@ -350,7 +351,17 @@ export default function Home() {
   const [showLabelScanner, setShowLabelScanner] = useState(false);
   const [inlineError, setInlineError] = useState<string | null>(null);
   const [dietConflictPrompt, setDietConflictPrompt] = useState<{ userDiet: DietPreference; itemDiet: ItemDietType; itemName: string } | null>(null);
-  const [manualBarcodeEntry, setManualBarcodeEntry] = useState<{ code: string; ingredients: string; categories: string } | null>(null);
+  const [manualBarcodeEntry, setManualBarcodeEntry] = useState<{
+    code: string;
+    ingredients: string;
+    categories: string;
+    /** True when the database knew the product (ingredients, nutrition) but had no name for it. */
+    found?: boolean;
+    nutritionData?: Record<string, number | boolean | undefined>;
+    additivesCount?: number;
+    additiveColors?: string[];
+    nutriScoreGrade?: string;
+  } | null>(null);
   const [manualBarcodeName, setManualBarcodeName] = useState("");
   const [contributeToOFF, setContributeToOFF] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -1532,7 +1543,7 @@ export default function Home() {
     setShowBarcodeScanner(false);
     setIsAnalyzingFood(true);
     try {
-      const OFF_FIELDS = "product_name,product_name_en,product_name_in,generic_name,brands,brand_owner,quantity,ingredients_text,categories,nutriscore_grade,additives_n,additives_tags,nutriments,image_url";
+      const OFF_FIELDS = `${OFF_NAME_FIELDS.join(",")},brands,brand_owner,quantity,ingredients_text,categories,nutriscore_grade,additives_n,additives_tags,nutriments,image_url`;
 
 let res = await fetch(`https://world.openfoodfacts.org/api/v2/product/${decodedText}.json?fields=${OFF_FIELDS}`);
 let data = await res.json();
@@ -1586,20 +1597,29 @@ if (data.status === 0) {
           };
         };
 
-        const baseName =
-         product.product_name ||
-         product.product_name_en ||
-         product.product_name_in ||
-         product.generic_name ||
-         "Unknown Product";
+        let baseName = offProductName(product);
+        // Some products are named only in their own language; ask for
+        // exactly those fields once before giving up on a name.
+        if (!baseName) {
+          const langFields = ownLanguageNameFields((product as { lc?: unknown }).lc);
+          if (langFields.length) {
+            try {
+              const again = await fetch(`https://world.openfoodfacts.org/api/v2/product/${data.code ?? decodedText}.json?fields=${langFields.join(",")}`);
+              const extra = await again.json();
+              baseName = offProductName({ ...(extra?.product ?? {}), lc: (product as { lc?: unknown }).lc });
+            } catch {
+              // Not fatal: we ask the person for the name below.
+            }
+          }
+        }
         const brand = product.brands?.split(",")?.[0] || product.brand_owner || "";
+        productIngredients = product.ingredients_text || productIngredients;
+        productCategories = product.categories || productCategories;
         productName = buildDisplayProductName({
          baseName,
          brand,
          quantity: product.quantity || "",
         });
-        productIngredients = product.ingredients_text || productIngredients;
-        productCategories = product.categories || productCategories;
         const nutriments = product.nutriments || {};
         // OFF stores sodium_100g in grams, so ×1000 converts to mg
 const sodiumFromSodium = typeof nutriments.sodium_100g === "number" ? nutriments.sodium_100g * 1000 : undefined;
@@ -1652,6 +1672,27 @@ if (nutritionFieldsFilled < 2) {
          } catch(e) {
             console.error("UPC proxy fallback failed:", e);
          }
+      }
+
+      // Found in the database, with ingredients, but no name in any field:
+      // keep everything we found and ask only for the name. This used to be
+      // labelled "Unknown Product" — shown above its own real ingredients.
+      if (!productName.trim() && data.status === 1 && data.product) {
+        setIsAnalyzingFood(false);
+        const brand = String(data.product.brands ?? "").split(",")[0]?.trim() ?? "";
+        const suggestion = suggestNameFromCategories(productCategories);
+        setManualBarcodeName(suggestion ? normalizeLabel(`${brand} ${suggestion}`) : brand);
+        setManualBarcodeEntry({
+          code: decodedText,
+          ingredients: productIngredients,
+          categories: productCategories,
+          found: true,
+          nutritionData,
+          additivesCount,
+          additiveColors,
+          nutriScoreGrade: (data.product.nutriscore_grade as string | undefined) || undefined,
+        });
+        return;
       }
 
       // Final fallback: unknown product metadata
@@ -1730,9 +1771,12 @@ if (nutritionFieldsFilled < 2) {
           name: typedName,
           ingredients: manualBarcodeEntry.ingredients,
           categories: manualBarcodeEntry.categories,
-          nutritionData: {},
-          additivesCount: 0,
-          additiveColors: [],
+          // Everything the database did know, when it knew the product.
+          nutritionData: manualBarcodeEntry.nutritionData ?? {},
+          additivesCount: manualBarcodeEntry.additivesCount ?? 0,
+          additiveColors: manualBarcodeEntry.additiveColors ?? [],
+          nutriScoreGrade: manualBarcodeEntry.nutriScoreGrade,
+          isEstimated: !Object.values(manualBarcodeEntry.nutritionData ?? {}).some((v) => typeof v === "number"),
         }),
       });
 
@@ -3312,12 +3356,17 @@ if (nutritionFieldsFilled < 2) {
       {manualBarcodeEntry && (
         <div className="fixed inset-0 z-50 bg-background/85 backdrop-blur-sm flex items-center justify-center p-4">
           <div role="dialog" aria-modal="true" aria-labelledby="manual-barcode-heading" className="neu-panel w-full max-w-md rounded-2xl p-5">
-            <h3 id="manual-barcode-heading" className="text-lg font-bold tracking-tight mb-1">Item not found in global database</h3>
+            <h3 id="manual-barcode-heading" className="text-lg font-bold tracking-tight mb-1">
+              {manualBarcodeEntry.found ? "Found it, but it has no name" : "Item not found in global database"}
+            </h3>
             <p className="text-sm text-foreground/60 mb-4">
-              Enter the product name for barcode {manualBarcodeEntry.code} to continue AI analysis.
+              {manualBarcodeEntry.found
+                ? `Open Food Facts has the ingredients for barcode ${manualBarcodeEntry.code}, but nobody has entered its name. Check the name below and correct it from the pack.`
+                : `Enter the product name for barcode ${manualBarcodeEntry.code} to continue AI analysis.`}
             </p>
             <input
               type="text"
+              aria-label="Product name"
               value={manualBarcodeName}
               onChange={(e) => setManualBarcodeName(e.target.value)}
               placeholder="e.g., Whole Wheat Pasta"
