@@ -549,8 +549,12 @@ export default function Home() {
     }
   }, [currentPage, totalPages]);
 
+  // A sleeping phone suspends timers and the realtime socket: refetch on a new day, or on return after a minute away.
   useEffect(() => {
     if (!user) return;
+
+    let countedFor = localDateISO();
+    let hiddenAt: number | null = null;
 
     const refreshItemAgingFromDb = async () => {
       const { data, error } = await supabase
@@ -560,27 +564,28 @@ export default function Home() {
 
       if (error || !data) return;
 
+      countedFor = localDateISO();
       setItems(data.map((row) => rowToItem(row as PantryRow)));
     };
 
-    const now = new Date();
-    const nextMidnight = new Date(now);
-    nextMidnight.setHours(24, 0, 0, 0);
-    const firstDelay = Math.max(1000, nextMidnight.getTime() - now.getTime());
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") {
+        hiddenAt = Date.now();
+        return;
+      }
+      const away = hiddenAt === null ? 0 : Date.now() - hiddenAt;
+      hiddenAt = null;
+      if (away > 60_000 || localDateISO() !== countedFor) void refreshItemAgingFromDb();
+    };
 
-    let intervalId: ReturnType<typeof setInterval> | undefined;
-
-    const timeoutId = setTimeout(() => {
-      void refreshItemAgingFromDb();
-
-      intervalId = setInterval(() => {
-        void refreshItemAgingFromDb();
-      }, 24 * 60 * 60 * 1000);
-    }, firstDelay);
+    const dayCheck = setInterval(() => {
+      if (localDateISO() !== countedFor) void refreshItemAgingFromDb();
+    }, 60_000);
+    document.addEventListener("visibilitychange", onVisibility);
 
     return () => {
-      clearTimeout(timeoutId);
-      if (intervalId) clearInterval(intervalId);
+      clearInterval(dayCheck);
+      document.removeEventListener("visibilitychange", onVisibility);
     };
   }, [user]);
 
