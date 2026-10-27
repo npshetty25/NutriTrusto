@@ -11,7 +11,7 @@ import {
 
 import { calculateCurrentDaysLeft, calculateDaysPastEstimate, localDateISO, parsePurchaseDate } from "@/lib/item-age";
 import { parseGs1, gs1PrintedDate } from "@/lib/gs1";
-import { asDateKind, pastDateMessage, type DateKind } from "@/lib/date-kind";
+import { asDateKind, type DateKind } from "@/lib/date-kind";
 
 // One definition, in lib/risk-bands.ts. This was a byte-identical copy of
 // the rule in api/extract/route.ts — the same duplication that let the
@@ -623,15 +623,27 @@ export default function Home() {
     const createdAt = row.created_at || new Date().toISOString();
     const category = inferItemCategory(String(row.name || ""));
 
-    if (currentDays <= 0) {
+    if (calculateDaysPastEstimate(row.days_left, row.purchase_date) > 0) {
       return {
         id: `${row.id}-${createdAt}`,
         // Not "expired" / "has spoiled". Nobody has looked at this food; the
-        // app only knows its own estimate ran out, which is a statement about
-        // our table, not about the item. Asserting spoilage would also send
-        // edible food to the bin, which is the opposite of the point.
-        title: "Past our estimate",
-        message: `Our estimate for ${row.name} has run out. Check it yourself before using it.`,
+        // app only knows the date has passed, which may be our own estimate.
+        // Asserting spoilage would also send edible food to the bin, which is
+        // the opposite of the point.
+        title: "Past its date",
+        message: `${row.name} is past its date. Check it yourself before using it.`,
+        severity: "high",
+        createdAt,
+        category,
+      };
+    }
+
+    // The date itself is still within it.
+    if (currentDays <= 0) {
+      return {
+        id: `${row.id}-${createdAt}`,
+        title: "Use today",
+        message: `Today is the last day for ${row.name}.`,
         severity: "high",
         createdAt,
         category,
@@ -1864,22 +1876,19 @@ if (nutritionFieldsFilled < 2) {
     const { data: insertedRow, error } = await supabase
       .from("pantry_items")
       .insert([newItem])
-      .select("id, name, days_left, purchase_date")
+      .select("*")
       .single();
 
     if (!error && insertedRow) {
-       const daysLeft = calculateCurrentDaysLeft(insertedRow.days_left, insertedRow.purchase_date);
+       // The same mapping every fetch uses, so the card shows where its date
+       // came from ("Best before …") straight away, not after a reload.
+       const inserted = rowToItem(insertedRow as PantryRow);
        setItems(prev => {
          if (prev.some((item) => item.id === insertedRow.id)) return prev;
          return [{
-           id: insertedRow.id,
-           name: insertedRow.name,
-           daysLeft,
-           daysPastEstimate: calculateDaysPastEstimate(insertedRow.days_left, insertedRow.purchase_date),
-           risk: deriveRisk(daysLeft),
-           purchaseDate: insertedRow.purchase_date,
-           ingredientsText: scannedResult.ingredients ?? null,
-           healthScore: scannedResult.analysis?.health_score ?? null,
+           ...inserted,
+           ingredientsText: inserted.ingredientsText ?? scannedResult.ingredients ?? null,
+           healthScore: inserted.healthScore ?? scannedResult.analysis?.health_score ?? null,
          }, ...prev];
        });
        toast(`Added — ${days(initialDaysLeft)} left`, {
@@ -1888,17 +1897,7 @@ if (nutritionFieldsFilled < 2) {
          // right there, rather than a note telling the user to go and find
          // the item later.
          action: shelfLife.wantsConfirmation
-           ? {
-               label: "Set date",
-               onClick: () => openEditItem({
-                 id: insertedRow.id,
-                 name: insertedRow.name,
-                 daysLeft,
-                 daysPastEstimate: calculateDaysPastEstimate(insertedRow.days_left, insertedRow.purchase_date),
-                 risk: deriveRisk(daysLeft),
-                 purchaseDate: insertedRow.purchase_date,
-               }),
-             }
+           ? { label: "Set date", onClick: () => openEditItem(inserted) }
            : undefined,
        });
     } else if (error) {
@@ -2706,7 +2705,7 @@ if (nutritionFieldsFilled < 2) {
                   dietLabel={dietChipLabel(userDietPreference, itemDiet)}
                   itemDiet={itemDiet}
                   dietUnverified={!item.ingredientsText}
-                  riskLabel={riskLabelForDays(item.daysLeft)}
+                  riskLabel={riskLabelForDays(item.daysLeft, { daysPast: item.daysPastEstimate })}
                   // A date from the pack or from the person is not our
                   // estimate, so it must not carry the estimate's provenance
                   // line or its "if stored differently" figures.
@@ -2720,7 +2719,6 @@ if (nutritionFieldsFilled < 2) {
                   ifStoredDifferently={item.expirySource ? undefined : shelfEstimate.ifStoredDifferently}
                   currentStorage={item.storage ?? shelfRow?.storage}
                   trackingTags={[...ownerTagFor(item), ...trackingTagsFor(item)]}
-                  pastDateNote={item.expirySource ? pastDateMessage(item.expiryKind ?? null) : null}
                   healthierAlternative={healthierAlternative}
                   detectedAllergens={detectedAllergens}
                   actions={
