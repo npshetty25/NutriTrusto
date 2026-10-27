@@ -259,13 +259,13 @@ export default function RecipesPage() {
           </button>
 
           <div className="relative h-56 w-full bg-foreground/5">
-            selectedMeal.strMealThumb ? (
+            {selectedMeal.strMealThumb ? (
               <img src={selectedMeal.strMealThumb} alt={selectedMeal.strMeal} className="w-full h-full object-cover" />
             ) : (
               <div className="w-full h-full flex items-center justify-center bg-foreground/5 text-foreground/30">
                 <UtensilsCrossed size={32} />
               </div>
-            )
+            )}
             <div className="absolute inset-0 bg-linear-to-t from-background to-transparent" />
           </div>
 
@@ -460,13 +460,13 @@ export default function RecipesPage() {
                     className="flex flex-col overflow-hidden rounded-xl border border-border bg-card hover:border-foreground/20 transition-all text-left"
                   >
                     <div className="h-28 w-full overflow-hidden bg-foreground/5">
-                      meal.strMealThumb ? (
+                      {meal.strMealThumb ? (
                         <img src={meal.strMealThumb} alt={meal.strMeal} className="w-full h-full object-cover hover:scale-105 transition-transform duration-300" />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center bg-foreground/5 text-foreground/30">
                           <UtensilsCrossed size={28} />
                         </div>
-                      )
+                      )}
                     </div>
                     <div className="p-3 flex items-start gap-1.5">
                       <VegMark
