@@ -93,6 +93,14 @@ describe("NutritionLabelScanner — reading a label", () => {
     expect(onResult).not.toHaveBeenCalled();
   });
 
+  it("refuses per-serving values it could not convert, rather than scoring them as per 100 g", async () => {
+    respond({ success: true, nutrition: { sugars_g: 4, sodium_mg: 200, per_unit: "serving", confidence: "high" } });
+    const { onResult } = setup();
+    await userEvent.upload(camera(), photo());
+    expect(await screen.findByText(/per serving without the serving weight/)).toBeInTheDocument();
+    expect(onResult).not.toHaveBeenCalled();
+  });
+
   it("rejects a table in which every tracked value is null", async () => {
     respond({
       success: true,

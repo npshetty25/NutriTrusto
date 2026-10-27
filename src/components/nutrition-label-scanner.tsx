@@ -68,6 +68,13 @@ export default function NutritionLabelScanner({ onResult, onClose }: NutritionLa
         return;
       }
 
+      // The rating's thresholds are per 100 g; unconverted per-serving numbers would be judged as if they were.
+      if (n.per_unit === "serving") {
+        setError("This label gives values per serving without the serving weight, so they can't be compared per 100 g. Try the per 100 g column if the pack has one.");
+        setIsScanning(false);
+        return;
+      }
+
       if (n.confidence === "medium") {
         setWarning("Some values may be inaccurate. Check against the physical label.");
       }
