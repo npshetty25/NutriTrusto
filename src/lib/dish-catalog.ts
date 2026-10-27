@@ -42,6 +42,18 @@ const FISH = ["fish", "rohu", "pomfret", "surmai", "basa", "tilapia", "salmon", 
 const MILK = ["milk", "doodh"];
 const RAVA = ["rava", "sooji", "semolina"];
 const BESAN = ["besan", "gram flour"];
+const CUCUMBER = ["cucumber", "kheera"];
+const BANANA = ["banana", "kela"];
+const RAW_BANANA = ["raw banana", "plantain", "kacha kela"];
+const MANGO = ["mango", "aam"];
+const COCONUT = ["coconut", "nariyal"];
+const LEMON = ["lemon", "lime", "nimbu"];
+const BREAD = ["bread", "pav", "bun"];
+const CHEESE = ["cheese"];
+const CORN = ["corn", "sweet corn", "bhutta", "makai"];
+const NOODLES = ["noodles", "maggi"];
+// No "orange": it would make "Orange Juice" a fruit-chaat ingredient.
+const FRUIT = ["apple", ...BANANA, "papaya", "guava", "pomegranate", "grapes", "pineapple", "watermelon", "chikoo", "sapota", ...MANGO, "pear"];
 
 export const DISH_CATALOG: KnownDish[] = [
   { name: "Palak Paneer", core: [SPINACH, PANEER], extras: ["tomato", "cream", "onion"] },
@@ -67,7 +79,7 @@ export const DISH_CATALOG: KnownDish[] = [
   { name: "Dal Tadka", core: [["dal", "toor dal", "arhar dal", "masoor dal", "lentils"]], extras: ["tomato", "onion", "garlic"] },
   { name: "Chana Masala", core: [["chickpeas", "chana", "kabuli chana"]], extras: ["onion", "tomato"] },
   { name: "Rajma", core: [["kidney beans", "rajma"]], extras: ["onion", "tomato"] },
-  { name: "Kadhi", core: [CURD, BESAN], extras: ["onion"] },
+  { name: "Kadhi", core: [[...CURD, "buttermilk", "chaas"], BESAN], extras: ["onion"] },
   { name: "Mixed Raita", core: [CURD], extras: ["cucumber", "onion", "tomato"] },
   { name: "Curd Rice", core: [CURD, ["rice"]], extras: ["cucumber", "carrot"] },
   { name: "Poha", core: [["poha", "flattened rice"]], extras: [...POTATO, ...PEAS, "onion", "peanuts"] },
@@ -95,6 +107,43 @@ export const DISH_CATALOG: KnownDish[] = [
   { name: "Fish Curry", core: [FISH], extras: ["tomato", "coconut"] },
   { name: "Fish Fry", core: [FISH], extras: [] },
   { name: "Prawn Masala", core: [["prawn", "shrimp"]], extras: ["onion", "tomato", "coconut"] },
+
+  // Added after measuring: 68 of the 107 everyday benchmark items had no dish
+  // at all, so a pantry of fruit, bread or a packet of oats got "none of the
+  // dishes we know use these items" instead of a recipe. Still only real,
+  // commonly cooked dishes — the point of the list is that nothing is invented.
+  { name: "Kachumber Salad", core: [CUCUMBER], extras: ["tomato", "onion", ...LEMON] },
+  { name: "Cucumber Raita", core: [CUCUMBER, CURD], extras: [] },
+  { name: "Onion Pakoda", core: [["onion", "pyaz"], BESAN], extras: ["green chilli", "coriander"] },
+  { name: "Lemon Rice", core: [LEMON, ["rice"]], extras: ["peanuts", "curry leaves"] },
+  { name: "Coconut Chutney", core: [COCONUT], extras: ["green chilli", "curry leaves"] },
+  { name: "Coconut Rice", core: [COCONUT, ["rice"]], extras: ["curry leaves", "peanuts"] },
+  { name: "Hari Chutney", core: [["coriander", "dhania", "mint", "pudina"]], extras: ["green chilli", ...LEMON, "ginger"] },
+  { name: "Raw Banana Fry", core: [RAW_BANANA], extras: [] },
+  { name: "Banana Milkshake", core: [BANANA, MILK], extras: [] },
+  { name: "Banana Sheera", core: [BANANA, RAVA], extras: [...MILK, "ghee"] },
+  { name: "Fruit Chaat", core: [FRUIT], extras: [...FRUIT, ...LEMON] },
+  { name: "Fruit Raita", core: [CURD, ["pomegranate", "pineapple", ...BANANA, "apple", "grapes"]], extras: [] },
+  { name: "Mango Lassi", core: [MANGO, CURD], extras: [...MILK] },
+  { name: "Aamras", core: [MANGO], extras: [...MILK] },
+  { name: "Pav Bhaji", core: [["pav", "bun"], POTATO], extras: [...PEAS, ...CAPSICUM, "tomato", "butter", ...CAULIFLOWER] },
+  { name: "Vada Pav", core: [["pav", "bun"], POTATO], extras: [] },
+  { name: "Bread Pakora", core: [BREAD, BESAN], extras: [...POTATO] },
+  { name: "Bombay Vegetable Sandwich", core: [BREAD], extras: [...CUCUMBER, "tomato", ...POTATO, ...CHEESE, "butter"] },
+  { name: "Cheese Sandwich", core: [CHEESE, BREAD], extras: ["butter", "tomato", ...CAPSICUM] },
+  { name: "Cheese Paratha", core: [CHEESE], extras: ["onion", ...CAPSICUM] },
+  { name: "Tofu Bhurji", core: [["tofu"]], extras: ["onion", "tomato", ...CAPSICUM] },
+  { name: "Soya Chunks Curry", core: [["soya chunks", "soya", "nutrela"]], extras: ["onion", "tomato", ...POTATO] },
+  { name: "Soya Pulao", core: [["soya chunks", "soya", "nutrela"], ["rice"]], extras: [...PEAS, ...CARROT] },
+  { name: "Masala Oats", core: [["oats"]], extras: [...CARROT, ...PEAS, "onion", "tomato"] },
+  { name: "Oats Chilla", core: [["oats"]], extras: ["onion", "tomato", ...SPINACH] },
+  { name: "Masala Maggi", core: [NOODLES], extras: [...PEAS, ...CARROT, ...CAPSICUM, "onion"] },
+  { name: "Veg Hakka Noodles", core: [NOODLES], extras: [...CAPSICUM, "cabbage", ...CARROT, "spring onion"] },
+  { name: "Masala Pasta", core: [["pasta", "macaroni", "penne"]], extras: [...CAPSICUM, "tomato", "onion", ...CHEESE] },
+  { name: "Corn Chaat", core: [CORN], extras: ["onion", "tomato", ...LEMON] },
+  { name: "Kanda Paat Sabzi", core: [["spring onion", "green onion", "hara pyaz"]], extras: ["besan"] },
+  { name: "Atta Halwa", core: [["atta", "wheat flour"]], extras: ["ghee", "jaggery"] },
+  { name: "Cornflakes Chivda", core: [["cornflakes"]], extras: ["peanuts", "curry leaves"] },
 ];
 
 /** The diet a dish's own ingredients give it. */

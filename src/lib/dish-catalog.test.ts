@@ -36,8 +36,32 @@ describe("selectDishCandidates", () => {
   });
 
   it("needs a pantry item to be a defining ingredient, not just an extra", () => {
-    // Onion is an extra for many dishes and a staple, so alone it proposes nothing.
-    expect(selectDishCandidates([{ name: "Onion", daysLeft: 1 }], "veg")).toEqual([]);
+    // Cream is an extra in several dishes and defines none, so alone it proposes nothing.
+    expect(selectDishCandidates([{ name: "Fresh Cream", daysLeft: 1 }], "veg")).toEqual([]);
+  });
+
+  it("has a dish for the everyday things people actually cook with", () => {
+    // Measured before these dishes were added: every one of these alone got
+    // "none of the dishes we know use these items".
+    const cookable = [
+      "Cucumber", "Bananas", "Raw Banana", "Mangoes", "Apples", "Papaya", "Pomegranate", "Coconut", "Lemons",
+      "Coriander Leaves", "Onions", "Pav", "Bread", "Cheese Slices", "Tofu", "Soya Chunks", "Oats",
+      "Maggi Noodles", "Frozen Corn", "Spring Onions", "Atta", "Cornflakes", "Buttermilk",
+    ];
+    for (const name of cookable) {
+      expect(selectDishCandidates([{ name, daysLeft: 2 }], "veg").length, name).toBeGreaterThan(0);
+    }
+  });
+
+  it("does not turn a drink into a fruit chaat ingredient", () => {
+    const names = selectDishCandidates([{ name: "Orange Juice", daysLeft: 2 }], "veg").map((c) => c.name);
+    expect(names).not.toContain("Fruit Chaat");
+  });
+
+  it("keeps every new dish vegetarian unless its ingredients say otherwise", () => {
+    for (const name of ["Fruit Chaat", "Pav Bhaji", "Cheese Sandwich", "Tofu Bhurji", "Masala Maggi", "Coconut Chutney"]) {
+      expect(dishDiet(findDish(name)!), name).toBe("veg");
+    }
   });
 
   it("skips dishes already shown", () => {
