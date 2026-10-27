@@ -384,7 +384,6 @@ export default function Home() {
   const [notificationPage, setNotificationPage] = useState(0);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [hasMoreNotifications, setHasMoreNotifications] = useState(true);
-  const [notificationsInitialized, setNotificationsInitialized] = useState(false);
   const [notificationSeverityFilter, setNotificationSeverityFilter] = useState<"all" | NotificationEntry["severity"]>("all");
   const [notificationSort, setNotificationSort] = useState<"newest" | "urgent">("newest");
   const [isSeedingMockData, setIsSeedingMockData] = useState(false);
@@ -742,10 +741,8 @@ export default function Home() {
     }
 
     setShowNotificationsPanel(true);
-    if (!notificationsInitialized) {
-      setNotificationsInitialized(true);
-      await loadNotifications(true);
-    }
+    // Read again on every opening: the list is built from the pantry as it is now.
+    await loadNotifications(true);
   };
 
   const handleNotificationsScroll = async (e: React.UIEvent<HTMLDivElement>) => {
@@ -758,15 +755,13 @@ export default function Home() {
 
   // Notifications are derived live from current pantry state (not a stored
   // inbox), so "clear" empties what's shown now rather than dismissing
-  // something permanently. Resetting notificationsInitialized means the
-  // next time the panel opens it re-fetches — a genuinely still-critical
-  // item will reappear, which is correct: it isn't done being critical
-  // just because you closed the panel.
+  // something permanently. The panel re-fetches every time it opens — a
+  // genuinely still-critical item will reappear, which is correct: it isn't
+  // done being critical just because you closed the panel.
   const clearAllNotifications = () => {
     setNotifications([]);
     setHasMoreNotifications(false);
     setNotificationPage(0);
-    setNotificationsInitialized(false);
   };
 
   // ─── Guard + redirect ──────────────────────────────────────────
