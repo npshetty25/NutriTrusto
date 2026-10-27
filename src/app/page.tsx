@@ -9,7 +9,7 @@ import {
   lockedDietScope,
 } from "@/lib/diet";
 
-import { calculateCurrentDaysLeft, calculateDaysPastEstimate, localDateISO, parsePurchaseDate } from "@/lib/item-age";
+import { calculateCurrentDaysLeft, calculateDaysPastEstimate, localDateISO, parsePurchaseDate, remainingFor } from "@/lib/item-age";
 import { parseGs1, gs1PrintedDate } from "@/lib/gs1";
 import { asDateKind, type DateKind } from "@/lib/date-kind";
 
@@ -153,6 +153,8 @@ interface Item {
   expirySource?: ExpirySource;
   // db/supabase-schema-accuracy.sql — undefined until it has run.
   expiryKind?: DateKind | null;
+  // The pack's or the person's own date, YYYY-MM-DD (db/supabase-schema-printed-date.sql).
+  expiryDate?: string | null;
   quantity?: string | null;
   // Who added it, and whether it is in a household (null = private).
   ownerId?: string | null;
@@ -172,6 +174,7 @@ type PantryRow = {
   opened_at?: string | null;
   expiry_source?: string | null;
   expiry_kind?: string | null;
+  expiry_date?: string | null;
   quantity?: string | null;
 };
 
@@ -181,12 +184,12 @@ const asExpirySource = (v: unknown): ExpirySource => (v === "printed" || v === "
 
 /** One mapping from a stored row to what the page shows, used by every fetch. */
 function rowToItem(row: PantryRow): Item {
-  const daysLeft = calculateCurrentDaysLeft(row.days_left, row.purchase_date);
+  const { daysLeft, daysPast } = remainingFor(row);
   return {
     id: row.id,
     name: row.name,
     daysLeft,
-    daysPastEstimate: calculateDaysPastEstimate(row.days_left, row.purchase_date),
+    daysPastEstimate: daysPast,
     risk: deriveRisk(daysLeft, row.days_left, row.name),
     purchaseDate: row.purchase_date,
     ingredientsText: row.ingredients_text ?? null,
@@ -195,6 +198,7 @@ function rowToItem(row: PantryRow): Item {
     openedAt: row.opened_at ?? null,
     expirySource: asExpirySource(row.expiry_source),
     expiryKind: asDateKind(row.expiry_kind),
+    expiryDate: row.expiry_date ?? null,
     quantity: row.quantity ?? null,
     ownerId: row.user_id ?? null,
     householdId: row.household_id ?? null,
