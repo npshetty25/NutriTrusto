@@ -167,8 +167,9 @@ export interface DishCandidate {
  * "kitchen staples". A dish needing only these beyond the pantry needs no
  * shopping trip.
  */
-const STAPLES = ["rice", "atta", "wheat flour", "dal", "toor dal", "arhar dal", "masoor dal", "lentils", "onion", "pyaz", "tomato", "ginger", "garlic", "besan", "gram flour", "rava", "sooji", "semolina"];
-const isStaple = (slot: string[]) => slot.some((t) => STAPLES.includes(t));
+const STAPLES = new Set(["rice", "atta", "wheat flour", "dal", "toor dal", "arhar dal", "masoor dal", "lentils", "onion", "pyaz", "tomato", "ginger", "garlic", "besan", "gram flour", "rava", "sooji", "semolina"]);
+// Exact membership between two of our own lists; no user text involved.
+const isStaple = (slot: string[]) => slot.some((t) => STAPLES.has(t));
 
 /**
  * The dishes worth suggesting for this pantry: at least one pantry item must

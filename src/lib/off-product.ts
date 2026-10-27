@@ -58,7 +58,7 @@ export function suggestNameFromCategories(categories: unknown): string {
     .map((c) => c.trim())
     .filter(Boolean)
     // OFF writes untranslated categories as "hi:…" or "fr:…"; "en:…" is fine.
-    .filter((c) => !/^[a-z]{2}:/.test(c) || c.startsWith("en:"))
+    .filter((c) => !/^(?!en:)[a-z]{2}:/.test(c))
     .map((c) => c.replace(/^en:/, "").replace(/-/g, " ").trim());
   const last = parts[parts.length - 1];
   if (!last || last.length > 60) return "";
