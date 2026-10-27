@@ -35,7 +35,7 @@ const rise: Variants = {
 };
 
 export default function LoginPage() {
-  const { user, loading: authLoading, signIn, signUp, signInWithGoogle } = useAuth();
+  const { user, loading: authLoading, signIn, signUp, signInWithGoogle, sendPasswordReset } = useAuth();
   // Hidden until Google is configured in Supabase (see README); a button that
   // errors on a live site is worse than no button.
   const googleEnabled = process.env.NEXT_PUBLIC_GOOGLE_SIGNIN === "1";
@@ -57,7 +57,9 @@ export default function LoginPage() {
     if (!authLoading && user) router.replace("/");
   }, [user, authLoading, router]);
 
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
+  // "reset" is reached from "Forgot password?", not from the Sign In / Sign Up switch.
+  const [mode, setMode] = useState<"signin" | "signup" | "reset">("signin");
+  const [resetSent, setResetSent] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -81,6 +83,19 @@ export default function LoginPage() {
     // Checked here so mistakes show before a round trip. Not the security
     // boundary: Supabase must enforce its own rules too (see auth-validation.ts).
     const cleanEmail = normaliseEmail(email);
+    if (mode === "reset") {
+      const emailProblem = validateEmail(cleanEmail);
+      if (emailProblem) {
+        setError(emailProblem);
+        return;
+      }
+      setLoading(true);
+      const result = await sendPasswordReset(cleanEmail);
+      setLoading(false);
+      if (result.error) setError(friendlyAuthError(result.error));
+      else setResetSent(true);
+      return;
+    }
     const problem =
       validateEmail(cleanEmail) ??
       (mode === "signup" ? validateName(name) ?? validateNewPassword(password) : password ? null : "Enter your password.");
@@ -145,7 +160,7 @@ export default function LoginPage() {
           </motion.div>
 
           <AnimatePresence mode="wait" initial={false}>
-            {emailSent ? (
+            {emailSent || resetSent ? (
               <motion.div
                 key="sent"
                 initial={{ opacity: 0, scale: 0.96 }}
@@ -164,7 +179,12 @@ export default function LoginPage() {
                 </motion.div>
                 <h2 className="text-xl font-bold tracking-tight mb-2 text-foreground">Check your inbox</h2>
                 <p className="text-sm text-foreground/60 mb-6 leading-relaxed">
-                  We sent a confirmation link to <strong className="text-foreground">{email}</strong>. Click the link in the email to activate your account, then sign in here.
+                  {resetSent ? (
+                    // Supabase answers the same for an unknown address, so this must not claim an account exists.
+                    <>If an account uses <strong className="text-foreground">{email}</strong>, we&apos;ve sent it a link to choose a new password.</>
+                  ) : (
+                    <>We sent a confirmation link to <strong className="text-foreground">{email}</strong>. Click the link in the email to activate your account, then sign in here.</>
+                  )}
                 </p>
                 <motion.button
                   type="button"
@@ -172,6 +192,7 @@ export default function LoginPage() {
                   whileTap={{ scale: 0.97 }}
                   onClick={() => {
                     setEmailSent(false);
+                    setResetSent(false);
                     setMode("signin");
                     setError(null);
                   }}
@@ -188,7 +209,7 @@ export default function LoginPage() {
                 exit={{ opacity: 0, scale: 0.98 }}
                 transition={{ duration: 0.25 }}
               >
-                {googleEnabled && (
+                {googleEnabled && mode !== "reset" && (
                   <>
                     {/* Google, not "a button that happens to say Google": white
                         pill, the real four-colour mark, Google's own documented
@@ -218,8 +239,18 @@ export default function LoginPage() {
                   </>
                 )}
 
+                {mode === "reset" && (
+                  <div className="mb-6 text-center">
+                    <h2 className="text-lg font-bold tracking-tight text-foreground">Reset your password</h2>
+                    <p className="text-sm text-foreground/60 mt-1 leading-relaxed">
+                      Enter the email you signed up with and we&apos;ll send a link to choose a new password.
+                    </p>
+                  </div>
+                )}
+
                 {/* Segmented control — the active pill is a single shared
                     element that slides between tabs via layoutId. */}
+                {mode !== "reset" && (
                 <motion.div variants={rise} className="neu-inset flex items-center rounded-2xl p-1.5 mb-7">
                   {(["signin", "signup"] as const).map((m) => (
                     <button
@@ -244,6 +275,7 @@ export default function LoginPage() {
                     </button>
                   ))}
                 </motion.div>
+                )}
 
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <AnimatePresence>
@@ -348,6 +380,7 @@ export default function LoginPage() {
                       />
                     </div>
 
+                    {mode !== "reset" && (
                     <div className="space-y-2">
                       <label className="text-[12px] font-semibold uppercase tracking-widest text-foreground/60">Password</label>
                       <div className="relative">
@@ -376,7 +409,20 @@ export default function LoginPage() {
                           At least {PASSWORD_MIN_LENGTH} characters, with a letter and a number.
                         </p>
                       )}
+                      {mode === "signin" && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setMode("reset");
+                            setError(null);
+                          }}
+                          className="min-h-11 text-xs font-semibold text-foreground/70 underline underline-offset-2 hover:text-foreground"
+                        >
+                          Forgot password?
+                        </button>
+                      )}
                     </div>
+                    )}
 
                     <motion.button
                       type="submit"
@@ -391,8 +437,20 @@ export default function LoginPage() {
                       ) : (
                         <ArrowRight size={16} className="transition-transform duration-300 group-hover:translate-x-1" />
                       )}
-                      {mode === "signin" ? "Sign In" : "Create Account"}
+                      {mode === "signin" ? "Sign In" : mode === "signup" ? "Create Account" : "Send reset link"}
                     </motion.button>
+                    {mode === "reset" && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMode("signin");
+                          setError(null);
+                        }}
+                        className="w-full min-h-11 text-sm font-semibold text-foreground/70 hover:text-foreground"
+                      >
+                        Back to sign in
+                      </button>
+                    )}
                   </div>
                 </form>
               </motion.div>
