@@ -55,7 +55,9 @@ test.describe("household", () => {
     await openMenuItem(page, /Household Settings/);
 
     await page.getByRole("button", { name: /Create a Household/ }).click();
-    await expect(page.getByText("Asha Rao's Household")).toBeVisible();
+    // In the dialog; the header names the household too once you're in one.
+    await expect(page.getByRole("dialog").getByText("Asha Rao's Household")).toBeVisible();
+    await expect(page.getByRole("button", { name: /Asha Rao's Household/ })).toBeVisible();
     const code = backend.tables.households[0].invite_code as string;
     await expect(page.getByText(code)).toBeVisible();
     expect(backend.tables.household_members).toHaveLength(1);
@@ -68,7 +70,7 @@ test.describe("household", () => {
 
     await page.getByPlaceholder("Enter invite code").fill("abc123def456");
     await page.getByRole("button", { name: "Join" }).click();
-    await expect(page.getByText("Rao family")).toBeVisible();
+    await expect(page.getByRole("dialog").getByText("Rao family")).toBeVisible();
   });
 
   test("after joining, offers to share the items you already had, and shares them", async ({ backend, page }) => {
