@@ -6,7 +6,24 @@ import {
   calculateDaysPastEstimate,
   dueDateFromToday,
   localDateISO,
+  remainingFor,
 } from "./item-age";
+
+describe("remainingFor", () => {
+  const now = new Date(2026, 9, 28, 1, 0); // 1 am here: still the 27th in UTC
+
+  it("counts from the item's own date when it has one, past it included", () => {
+    // Scanned today, printed 30 Sep: days_left could only hold 0.
+    expect(remainingFor({ days_left: 0, purchase_date: "2026-10-28", expiry_date: "2026-09-30" }, now)).toEqual({ daysLeft: 0, daysPast: 28 });
+    expect(remainingFor({ days_left: 3, purchase_date: "2026-10-28", expiry_date: "2026-10-31" }, now)).toEqual({ daysLeft: 3, daysPast: 0 });
+    expect(remainingFor({ days_left: 0, purchase_date: "2026-10-28", expiry_date: "2026-10-28" }, now)).toEqual({ daysLeft: 0, daysPast: 0 });
+  });
+
+  it("falls back to the life counted from purchase without one", () => {
+    expect(remainingFor({ days_left: 5, purchase_date: "2026-10-25" }, now)).toEqual({ daysLeft: 2, daysPast: 0 });
+    expect(remainingFor({ days_left: 1, purchase_date: "2026-10-25", expiry_date: null }, now)).toEqual({ daysLeft: 0, daysPast: 2 });
+  });
+});
 
 describe("calendar days, in the person's own timezone", () => {
   // Built with local-time constructors, so these hold in any timezone. In

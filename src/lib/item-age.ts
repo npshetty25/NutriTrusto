@@ -75,6 +75,22 @@ export const calculateCurrentDaysLeft = (initialDaysLeft: number, purchaseDate: 
 export const calculateDaysPastEstimate = (initialDaysLeft: number, purchaseDate: string, now: Date = new Date()) =>
   Math.max(0, daysElapsedSince(purchaseDate, now) - initialDaysLeft);
 
+/** Days left and days past for a stored item: from its own date when it has one, else its life counted from purchase. */
+export function remainingFor(
+  row: { days_left: number; purchase_date: string; expiry_date?: string | null },
+  now: Date = new Date()
+): { daysLeft: number; daysPast: number } {
+  const due = row.expiry_date ? calendarDay(row.expiry_date) : null;
+  if (due !== null) {
+    const ahead = Math.round(due - today(now));
+    return { daysLeft: Math.max(0, ahead), daysPast: Math.max(0, -ahead) };
+  }
+  return {
+    daysLeft: calculateCurrentDaysLeft(row.days_left, row.purchase_date, now),
+    daysPast: calculateDaysPastEstimate(row.days_left, row.purchase_date, now),
+  };
+}
+
 /**
  * The item's last good day as YYYY-MM-DD, from what a card already knows:
  * today plus the days left, or minus the days it is past. For a date read
