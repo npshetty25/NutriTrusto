@@ -1538,43 +1538,29 @@ export default function Home() {
           purchase_date: purchaseDate,
         }));
 
-        const failedLocalItems: Item[] = [];
+        // A row that failed to save is named, not shown as a card that the next refetch would silently remove.
+        const failedNames: string[] = [];
         const successfulInsertedItems: Item[] = [];
-        let insertedCount = 0;
 
         for (const row of rows) {
           const { data: insertedRow, error } = await supabase
             .from("pantry_items")
             .insert([row])
-            .select("id, name, days_left, purchase_date")
+            .select("*")
             .single();
 
-          if (error) {
-            failedLocalItems.push({
-              id: `local-${Math.random().toString(36).slice(2, 10)}`,
-              name: row.name,
-              daysLeft: row.days_left,
-              // Just built from a fresh purchase_date, so it cannot already
-              // be past its own estimate.
-              daysPastEstimate: 0,
-              risk: row.risk as RiskLevel,
-              purchaseDate: row.purchase_date,
-            });
+          if (error || !insertedRow) {
+            failedNames.push(row.name);
           } else {
-            insertedCount += 1;
-            if (insertedRow) {
-              const daysLeft = calculateCurrentDaysLeft(insertedRow.days_left, insertedRow.purchase_date);
-              successfulInsertedItems.push({
-                id: insertedRow.id,
-                name: insertedRow.name,
-                daysLeft,
-                daysPastEstimate: calculateDaysPastEstimate(insertedRow.days_left, insertedRow.purchase_date),
-                risk: deriveRisk(daysLeft, insertedRow.days_left, insertedRow.name),
-                purchaseDate: insertedRow.purchase_date,
-              });
-              logScanHistory(insertedRow.name, "receipt");
-            }
+            successfulInsertedItems.push(rowToItem(insertedRow as PantryRow));
+            logScanHistory(insertedRow.name, "receipt");
           }
+        }
+        const insertedCount = successfulInsertedItems.length;
+
+        if (insertedCount === 0 && rows.length > 0) {
+          setInlineError("Couldn't save the items from this receipt. Check your connection and try again.");
+          return;
         }
 
         if (successfulInsertedItems.length > 0) {
@@ -1583,10 +1569,6 @@ export default function Home() {
             const fresh = successfulInsertedItems.filter((item) => !existingIds.has(item.id));
             return [...fresh, ...prev];
           });
-        }
-
-        if (failedLocalItems.length > 0) {
-          setItems(prev => [...failedLocalItems, ...prev]);
         }
 
         // Say how many day counts are guesses, so a person knows which cards
@@ -1598,10 +1580,11 @@ export default function Home() {
             ? " Every day count is from our shelf-life sources."
             : ` ${guessed} of the day counts are estimates — tap Edit on a card to set the real date.`
           : "";
+        const failedList = `${failedNames.slice(0, 3).join(", ")}${failedNames.length > 3 ? ` and ${failedNames.length - 3} more` : ""}`;
         toast("Receipt Parsed", {
-          description: (insertedCount === rows.length
+          description: (failedNames.length === 0
             ? `Added all ${rows.length} items to your inventory.`
-            : `Added ${insertedCount}/${rows.length} items to cloud inventory. Remaining items were added locally.`) + sourceNote,
+            : `Added ${insertedCount} of ${rows.length} items. Couldn't save ${failedList}; add ${failedNames.length === 1 ? "it" : "them"} again by hand.`) + sourceNote,
         });
       } else {
         setInlineError(data.error || "We couldn't parse this receipt. Try a clearer image in good lighting.");
