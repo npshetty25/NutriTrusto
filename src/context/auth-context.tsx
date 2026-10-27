@@ -53,6 +53,8 @@ interface AuthContextType {
   // (db/supabase-schema-accuracy.sql). Until true, the quantity field and the
   // recipe feedback buttons stay hidden.
   accuracySchemaReady: boolean | null;
+  /** pantry_items.expiry_date (db/supabase-schema-printed-date.sql); until true, nothing writes it. */
+  printedDateSchemaReady: boolean | null;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -71,6 +73,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [healthScoreSchemaReady, setHealthScoreSchemaReady] = useState<boolean | null>(null);
   const [trackingSchemaReady, setTrackingSchemaReady] = useState<boolean | null>(null);
   const [accuracySchemaReady, setAccuracySchemaReady] = useState<boolean | null>(null);
+  const [printedDateSchemaReady, setPrintedDateSchemaReady] = useState<boolean | null>(null);
   const [householdMembers, setHouseholdMembers] = useState<HouseholdMember[]>([]);
   const [householdV2Ready, setHouseholdV2Ready] = useState<boolean | null>(null);
   const [sharedShoppingReady, setSharedShoppingReady] = useState<boolean | null>(null);
@@ -172,6 +175,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       ]).then(([columns, feedback]) => {
         setAccuracySchemaReady(!columns.error && !feedback.error);
       });
+      supabase.from("pantry_items").select("expiry_date").limit(1).then(({ error }) => {
+        setPrintedDateSchemaReady(!error);
+      });
     } else {
       setHousehold(null);
       setHouseholdMembers([]);
@@ -182,6 +188,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setHealthScoreSchemaReady(null);
       setTrackingSchemaReady(null);
       setAccuracySchemaReady(null);
+      setPrintedDateSchemaReady(null);
     }
   }, [user, refreshHousehold]);
 
@@ -222,7 +229,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, signIn, signUp, signOut, signInWithGoogle, sendPasswordReset, household, householdLoading, refreshHousehold, householdMembers, householdV2Ready, sharedShoppingReady, householdSchemaReady, ingredientsSchemaReady, healthScoreSchemaReady, trackingSchemaReady, accuracySchemaReady }}>
+    <AuthContext.Provider value={{ user, session, loading, signIn, signUp, signOut, signInWithGoogle, sendPasswordReset, household, householdLoading, refreshHousehold, householdMembers, householdV2Ready, sharedShoppingReady, householdSchemaReady, ingredientsSchemaReady, healthScoreSchemaReady, trackingSchemaReady, accuracySchemaReady, printedDateSchemaReady }}>
       {children}
     </AuthContext.Provider>
   );
