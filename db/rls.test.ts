@@ -419,7 +419,8 @@ describe("households v2", () => {
 
 /**
  * supabase-schema-household-v3.sql, applied on top of v2: one pantry per
- * household, with nothing to share by hand.
+ * household, with nothing to share by hand. Run in production by the owner
+ * on 2026-10-27.
  */
 describe("households v3 — one shared pantry", () => {
   let db: PGlite;

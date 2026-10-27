@@ -1,7 +1,7 @@
 -- ============================================================
 -- Nutri-Trust — a household has ONE pantry
--- NOT YET APPLIED to production. Review it, then run it in Supabase:
--- SQL Editor > New Query > paste > Run.
+-- Applied to production by the owner on 2026-10-27 (SQL editor).
+-- Run this in Supabase: SQL Editor > New Query > paste > Run.
 -- Run it AFTER supabase-schema-household-v2.sql.
 --
 -- Safe to run more than once. Deletes no pantry or shopping-list row.
