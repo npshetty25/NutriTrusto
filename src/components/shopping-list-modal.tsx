@@ -29,7 +29,9 @@ const splitQuantity = (name: string): { item: string; quantity: string } => {
 };
 
 export default function ShoppingListModal({ onClose }: ShoppingListModalProps) {
-  const { user } = useAuth();
+  const { user, household, sharedShoppingReady } = useAuth();
+  // One list for the whole household once the v2 migration has run.
+  const shared = !!household && !!sharedShoppingReady;
   const [rows, setRows] = useState<ShoppingListRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -64,7 +66,7 @@ export default function ShoppingListModal({ onClose }: ShoppingListModalProps) {
   useEffect(() => {
     void fetchList();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+  }, [user, household?.id]);
 
   const toggleChecked = async (row: ShoppingListRow) => {
     setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, checked: !r.checked } : r)));
@@ -89,7 +91,7 @@ export default function ShoppingListModal({ onClose }: ShoppingListModalProps) {
     setIsAdding(true);
     const { data, error: insertError } = await supabase
       .from("shopping_list_items")
-      .insert([{ user_id: user.id, name }])
+      .insert([{ user_id: user.id, name, ...(shared && household ? { household_id: household.id } : {}) }])
       .select("id, name, source_recipe, checked, created_at")
       .single();
     setIsAdding(false);
@@ -128,7 +130,12 @@ export default function ShoppingListModal({ onClose }: ShoppingListModalProps) {
         <div className="flex items-center justify-between p-4 border-b border-border shrink-0">
           <div className="flex items-center gap-2">
             <ShoppingCart size={16} className="text-foreground/60" />
-            <h3 className="font-bold text-sm tracking-tight">Shopping List</h3>
+            <div>
+              <h3 className="font-bold text-sm tracking-tight">Shopping List</h3>
+              {shared && household && (
+                <p className="text-[11px] text-foreground/55">Shared with {household.name}</p>
+              )}
+            </div>
           </div>
           <button
             onClick={onClose}
