@@ -1,6 +1,7 @@
 import { estimateShelfLife } from "@/lib/shelf-life";
 import { daysElapsedSince } from "@/lib/item-age";
 import type { StorageLocation } from "@/lib/temperature";
+import type { DateKind } from "@/lib/date-kind";
 
 /**
  * Where an item is kept, whether it has been opened, and where its date came
@@ -80,6 +81,23 @@ export function daysLeftAfterMove(
 /** Days left once opened: never more than what was left, never more than N. */
 export function daysLeftAfterOpening(daysLeft: number, useWithinDays: number): number {
   return Math.max(0, Math.min(daysLeft, Math.floor(useWithinDays)));
+}
+
+/**
+ * What opening a pack does to its date. A printed date is for the UNOPENED
+ * pack — Codex defines best before as the end of the period in which "the
+ * unopened product will remain fully marketable" — so once it is opened, the
+ * use-within limit takes over wherever it is sooner. The date is then no
+ * longer the pack's, and stops being labelled as one; where the pack's date
+ * is still the sooner of the two, it stays exactly as it was.
+ */
+export function afterOpening(
+  item: { daysLeft: number; expirySource: ExpirySource; expiryKind: DateKind | null },
+  useWithinDays: number
+): { daysLeft: number; expirySource: ExpirySource; expiryKind: DateKind | null; shortened: boolean } {
+  const daysLeft = daysLeftAfterOpening(item.daysLeft, useWithinDays);
+  if (daysLeft >= item.daysLeft) return { ...item, shortened: false };
+  return { daysLeft, expirySource: null, expiryKind: null, shortened: true };
 }
 
 /**

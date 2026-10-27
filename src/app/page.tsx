@@ -103,8 +103,8 @@ import { AddItemModal, type NewItem } from "@/components/add-item-modal";
 import {
   STORAGE_OPTIONS,
   OPENED_DAYS_OPTIONS,
+  afterOpening,
   daysLeftAfterMove,
-  daysLeftAfterOpening,
   daysUntilDate,
   defaultStorageFor,
   storedDaysLeftFor,
@@ -113,7 +113,7 @@ import {
 import type { StorageLocation } from "@/lib/temperature";
 import {
   Camera, BrainCircuit, Loader2, TrendingUp, ScanLine,
-  Clock, X, Trash2, Info, Activity, Zap, AlertTriangle, CheckCircle2, Search, CircleAlert, Bell, Carrot, Apple, Milk, Drumstick, Wheat, CupSoda, Croissant, Snowflake, Candy, Package, ChevronLeft, ChevronRight, CalendarClock, Pencil, Sparkles, Plus, RefreshCw, SlidersHorizontal, Leaf, UtensilsCrossed, Check, Egg as EggIcon, Images, FileText, Users
+  Clock, X, Trash2, Info, Activity, Zap, AlertTriangle, CheckCircle2, Search, CircleAlert, Bell, Carrot, Apple, Milk, Drumstick, Wheat, CupSoda, Croissant, Snowflake, Candy, Package, ChevronLeft, ChevronRight, CalendarClock, Pencil, Sparkles, Plus, RefreshCw, SlidersHorizontal, Leaf, UtensilsCrossed, Check, Egg as EggIcon, Images, FileText, Users, PackageOpen
 } from "lucide-react";
 import ShoppingListModal from "@/components/shopping-list-modal";
 import { HouseholdModal } from "@/components/household-modal";
@@ -1041,7 +1041,9 @@ export default function Home() {
         setInlineError("Pick how soon it should be used once opened.");
         return;
       }
-      remaining = daysLeftAfterOpening(remaining, useWithin);
+      const opened = afterOpening({ daysLeft: remaining, expirySource: source, expiryKind: editingItem.expiryKind ?? null }, useWithin);
+      remaining = opened.daysLeft;
+      source = opened.expirySource;
     }
     const openedAt = editOpened ? (editingItem.openedAt ?? new Date().toISOString()) : null;
     const storage = editStorage ?? editingItem.storage ?? null;
@@ -1090,6 +1092,55 @@ export default function Home() {
       : i));
     toast("Item updated", note ? { description: note } : undefined);
     closeEditItem();
+  };
+
+  // ─── Opened it ──────────────────────────────────────────────────
+  // One tap, because a pack's date only covers it unopened: UHT milk printed
+  // three months out keeps about a week once opened. Buried in the edit
+  // dialog, the step that changes the number most was the one nobody took.
+  // Where USDA gives no use-within figure, the dialog opens to ask.
+  const markOpened = async (item: Item) => {
+    if (!trackingSchemaReady || item.openedAt) return;
+    const storage = item.storage ?? defaultStorageFor(item.name);
+    const limit = openedDaysFor(item.name, storage);
+    if (!limit) {
+      openEditItem(item);
+      setEditOpened(true);
+      return;
+    }
+    const opened = afterOpening({ daysLeft: item.daysLeft, expirySource: item.expirySource ?? null, expiryKind: item.expiryKind ?? null }, limit.days);
+    const openedAt = new Date().toISOString();
+    const storedDays = storedDaysLeftFor(opened.daysLeft, item.purchaseDate);
+    const risk = deriveRisk(opened.daysLeft, storedDays, item.name);
+    const { error } = await supabase
+      .from("pantry_items")
+      .update({
+        days_left: storedDays,
+        risk,
+        ...trackingFields({ storage: item.storage ?? null, openedAt, expirySource: opened.expirySource }),
+        ...(accuracySchemaReady ? { expiry_kind: opened.expiryKind } : {}),
+      })
+      .eq("id", item.id);
+    if (error) {
+      toast("Couldn't save that", { description: "Please try again." });
+      return;
+    }
+    setItems((prev) => prev.map((i) => i.id === item.id
+      ? {
+          ...i,
+          daysLeft: opened.daysLeft,
+          daysPastEstimate: calculateDaysPastEstimate(storedDays, item.purchaseDate),
+          risk,
+          openedAt,
+          expirySource: opened.expirySource,
+          ...(accuracySchemaReady ? { expiryKind: opened.expiryKind } : {}),
+        }
+      : i));
+    toast(`${item.name} opened`, {
+      description: opened.shortened
+        ? `Use within ${days(limit.days)} of opening, so ${days(opened.daysLeft)} left (${limit.citation}).`
+        : `Its date is still the sooner one: ${days(opened.daysLeft)} left.`,
+    });
   };
 
   // ─── Add by hand ────────────────────────────────────────────────
@@ -2691,6 +2742,13 @@ if (nutritionFieldsFilled < 2) {
               // panel can highlight where this item is actually assumed to
               // live rather than showing three equally-weighted options.
               const shelfRow = findShelfLifeRow(item.name)?.row;
+              const openedLimit = item.openedAt ? null : openedDaysFor(item.name, item.storage ?? shelfEstimate.storage);
+              // Offered for anything that comes in a pack: a printed date, or a
+              // USDA use-within figure. Fresh produce is not "opened".
+              const canMarkOpened = !!trackingSchemaReady && !item.openedAt && (item.expirySource === "printed" || !!openedLimit);
+              // Once opening has replaced the date, the unopened estimate's
+              // source and storage figures no longer describe it.
+              const openedOwnsDate = !!item.openedAt && !item.expirySource;
 
               return (
                 <PantryCard
@@ -2712,11 +2770,12 @@ if (nutritionFieldsFilled < 2) {
                   shelfLifeCitation={
                     item.expirySource === "printed" ? "From the date on the pack"
                     : item.expirySource === "user" ? "From the date you set"
+                    : openedOwnsDate ? `Counted from opening: ${openedDaysFor(item.name, item.storage ?? shelfEstimate.storage)?.citation ?? "the use-within limit you chose"}`
                     : formatProvenance(shelfEstimate)
                   }
-                  shelfLifeConfidence={item.expirySource ? "high" : shelfEstimate.confidence}
-                  storageDisclaimer={item.expirySource ? undefined : shelfEstimate.disclaimer}
-                  ifStoredDifferently={item.expirySource ? undefined : shelfEstimate.ifStoredDifferently}
+                  shelfLifeConfidence={item.expirySource ? "high" : openedOwnsDate ? "medium" : shelfEstimate.confidence}
+                  storageDisclaimer={item.expirySource || openedOwnsDate ? undefined : shelfEstimate.disclaimer}
+                  ifStoredDifferently={item.expirySource || openedOwnsDate ? undefined : shelfEstimate.ifStoredDifferently}
                   currentStorage={item.storage ?? shelfRow?.storage}
                   trackingTags={[...ownerTagFor(item), ...trackingTagsFor(item)]}
                   healthierAlternative={healthierAlternative}
@@ -2735,6 +2794,16 @@ if (nutritionFieldsFilled < 2) {
                       >
                         <Check size={15} /> Used it
                       </button>
+                      {canMarkOpened && confirmDeleteId !== item.id && (
+                        <button
+                          onClick={() => { void markOpened(item); }}
+                          className="neu-raised-sm h-11 px-3 shrink-0 rounded-xl flex items-center justify-center gap-1.5 text-xs font-semibold text-foreground/75 hover:text-foreground transition-colors"
+                          title={openedLimit ? `Opened — use within ${days(openedLimit.days)}` : "Opened — choose how soon to use it"}
+                          aria-label={`Mark ${item.name} as opened`}
+                        >
+                          <PackageOpen size={15} /> Opened it
+                        </button>
+                      )}
                       <button
                         onClick={() => openEditItem(item)}
                         className="neu-raised-sm w-11 h-11 shrink-0 rounded-xl flex items-center justify-center text-foreground/70 hover:text-foreground transition-colors"

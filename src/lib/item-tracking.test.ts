@@ -1,6 +1,21 @@
 import { describe, expect, it } from "vitest";
 import { estimateShelfLife } from "./shelf-life";
-import { daysLeftAfterMove, daysLeftAfterOpening, daysUntilDate, dateInDays, storedDaysLeftFor } from "./item-tracking";
+import { afterOpening, daysLeftAfterMove, daysLeftAfterOpening, daysUntilDate, dateInDays, storedDaysLeftFor } from "./item-tracking";
+
+describe("afterOpening", () => {
+  it("swaps a printed date for the sooner use-within limit, and stops calling it the pack's", () => {
+    // UHT milk: best before is months away, but 7 days once opened.
+    expect(afterOpening({ daysLeft: 85, expirySource: "printed", expiryKind: "best_before" }, 7)).toEqual({
+      daysLeft: 7, expirySource: null, expiryKind: null, shortened: true,
+    });
+  });
+
+  it("keeps the pack's date when it is already the sooner of the two", () => {
+    expect(afterOpening({ daysLeft: 2, expirySource: "printed", expiryKind: "use_by" }, 7)).toEqual({
+      daysLeft: 2, expirySource: "printed", expiryKind: "use_by", shortened: false,
+    });
+  });
+});
 
 describe("daysLeftAfterOpening", () => {
   it("only ever shortens", () => {
