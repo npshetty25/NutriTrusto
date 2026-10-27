@@ -1,7 +1,8 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from "react";
-import { supabase } from "@/lib/supabase";
+import { useRouter } from "next/navigation";
+import { openedFromPasswordResetLink, supabase } from "@/lib/supabase";
 import { fetchMembers, type HouseholdMember } from "@/lib/household";
 import type { User, Session } from "@supabase/supabase-js";
 
@@ -110,6 +111,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     setHouseholdLoading(false);
   }, [user]);
+
+  // Supabase sends a reset link to the site's home page when /reset-password is not in its redirect list.
+  const router = useRouter();
+  useEffect(() => {
+    if (openedFromPasswordResetLink && window.location.pathname !== "/reset-password") router.replace("/reset-password");
+  }, [router]);
 
   useEffect(() => {
     const applySession = (next: Session | null) => {
