@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { AuthProvider } from "@/context/auth-context";
 import { AppToaster } from "@/components/app-toaster";
+import { UpdateReadyToast } from "@/components/update-ready-toast";
 import { THEME_INIT_SCRIPT } from "@/lib/theme";
 import "./globals.css";
 
@@ -116,6 +117,8 @@ const SW_REGISTER_SCRIPT = `if ('serviceWorker' in navigator) {
     navigator.serviceWorker.addEventListener('controllerchange', function () {
       if (!hadController || updateReady) return;
       updateReady = true;
+      window.__nutriTrustUpdateReady = true;
+      window.dispatchEvent(new Event('nutri-trust-update-ready'));
     });
     document.addEventListener('visibilitychange', function () {
       if (!updateReady) return;
@@ -165,6 +168,7 @@ export default function RootLayout({
           <main className="flex-1 w-full max-w-md md:max-w-3xl mx-auto min-h-screen relative flex flex-col">
             {children}
             <AppToaster />
+            <UpdateReadyToast />
           </main>
         </AuthProvider>
       </body>
