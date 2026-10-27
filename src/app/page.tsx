@@ -897,7 +897,8 @@ export default function Home() {
   useEffect(() => {
     if (!user || !notificationsEnabled) return;
     const t = setTimeout(() => {
-      const soonToSpoil = visibleItems.filter(i => i.daysLeft > 0 && i.daysLeft <= notifyDaysBefore);
+      // Includes the last day itself (0 left, not past), the most urgent reminder of all.
+      const soonToSpoil = visibleItems.filter(i => i.daysPastEstimate === 0 && i.daysLeft <= notifyDaysBefore);
       soonToSpoil.forEach((item) => {
         const key = `expiry-notify-${user.id}-${item.id}-${new Date().toDateString()}`;
         if (typeof window !== "undefined" && localStorage.getItem(key)) return;
@@ -907,7 +908,9 @@ export default function Home() {
         // about one specific item, so the action offers the one thing that
         // resolves it.
         toast("Expiry Reminder", {
-          description: `${item.name} may spoil in ${days(item.daysLeft)}. Use it soon.`,
+          description: item.daysLeft === 0
+            ? `Today is the last day for ${item.name}. Use it today.`
+            : `${item.name} may spoil in ${days(item.daysLeft)}. Use it soon.`,
           action: {
             label: "Cook it",
             onClick: () => {
