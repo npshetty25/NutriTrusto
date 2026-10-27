@@ -2074,7 +2074,7 @@ if (nutritionFieldsFilled < 2) {
   // omitting those fields from the very first insert (confirmed
   // reproducible: the probes are still in flight for a beat after a fresh
   // signup, before the dashboard would otherwise already be interactive).
-  const schemaProbesPending = !!user && (householdSchemaReady === null || ingredientsSchemaReady === null || healthScoreSchemaReady === null || trackingSchemaReady === null);
+  const schemaProbesPending = !!user && (householdSchemaReady === null || ingredientsSchemaReady === null || healthScoreSchemaReady === null || trackingSchemaReady === null || accuracySchemaReady === null);
   if (authLoading || (!user && !authLoading) || schemaProbesPending) {
     return (
       <div className="flex flex-col items-center justify-center gap-5 min-h-screen">
