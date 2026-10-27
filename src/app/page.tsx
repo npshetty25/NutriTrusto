@@ -935,18 +935,25 @@ export default function Home() {
     if (!itemToUndo) return;
 
     setItems(prev => prev.filter(i => i.id !== id));
+    // The outcome row this removal logged, so Undo can take it back out of the stats and the learning.
+    let loggedOutcomeId: PromiseLike<string | null> = Promise.resolve(null);
     if (!id.startsWith("seed-")) {
-      await supabase.from("pantry_items").delete().eq("id", id);
+      const { error: deleteError } = await supabase.from("pantry_items").delete().eq("id", id);
+      if (deleteError) {
+        setItems(prev => (prev.some(i => i.id === id) ? prev : [itemToUndo, ...prev]));
+        toast("Couldn't remove that", { description: `${itemToUndo.name} is still in your pantry. Check your connection and try again.` });
+        return;
+      }
       if (user) {
         // Best-effort impact-dashboard log — never blocks the removal, and
         // silently no-ops if the migration adding this table hasn't run yet.
-        supabase.from("item_outcomes").insert([{
+        loggedOutcomeId = supabase.from("item_outcomes").insert([{
           user_id: user.id,
           name: itemToUndo.name,
           category: inferItemCategory(itemToUndo.name),
           outcome,
           days_left_at_removal: itemToUndo.daysLeft,
-        }]).then(() => {}, () => {});
+        }]).select("id").single().then(({ data }) => (data?.id as string | undefined) ?? null, () => null);
       }
     }
 
@@ -959,18 +966,30 @@ export default function Home() {
         action: {
           label: "Undo",
           onClick: async () => {
-            setItems(prev => [...prev, itemToUndo]);
+            setItems(prev => (prev.some(i => i.id === id) ? prev : [...prev, itemToUndo]));
             if (!id.startsWith("seed-") && user) {
+              // Back as it was: days_left is the full life from purchase, not what remained; a housemate's item stays theirs.
               const rowToInsert = {
-                 id: itemToUndo.id,
-                 user_id: user.id,
-                 ...householdIdField(),
-                 name: itemToUndo.name,
-                 days_left: itemToUndo.daysLeft,
-                 risk: itemToUndo.risk,
-                 purchase_date: itemToUndo.purchaseDate
+                id: itemToUndo.id,
+                user_id: household && itemToUndo.householdId === household.id && itemToUndo.ownerId ? itemToUndo.ownerId : user.id,
+                ...householdIdField(),
+                ...ingredientsTextField(itemToUndo.ingredientsText),
+                ...healthScoreField(itemToUndo.healthScore),
+                ...trackingFields(itemToUndo),
+                ...accuracyFields(itemToUndo),
+                name: itemToUndo.name,
+                days_left: storedDaysLeftFor(itemToUndo.daysLeft - itemToUndo.daysPastEstimate, itemToUndo.purchaseDate),
+                risk: itemToUndo.risk,
+                purchase_date: itemToUndo.purchaseDate,
               };
-              await supabase.from("pantry_items").insert([rowToInsert]);
+              const { error: restoreError } = await supabase.from("pantry_items").insert([rowToInsert]);
+              if (restoreError) {
+                setItems(prev => prev.filter(i => i.id !== id));
+                toast("Couldn't put it back", { description: `Add ${itemToUndo.name} again if you still have it.` });
+                return;
+              }
+              const outcomeId = await loggedOutcomeId;
+              if (outcomeId) await supabase.from("item_outcomes").delete().eq("id", outcomeId);
             }
           }
         }
