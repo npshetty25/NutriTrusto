@@ -47,6 +47,11 @@ describe("friendlyAuthError", () => {
     expect(friendlyAuthError("Email not confirmed")).toMatch(/confirm your email/);
     expect(friendlyAuthError("Email rate limit exceeded")).toMatch(/Too many attempts/);
   });
+  it("rewords the password-reset messages", () => {
+    expect(friendlyAuthError("For security purposes, you can only request this after 37 seconds.")).toMatch(/wait a minute/);
+    expect(friendlyAuthError("Email address not authorized")).toMatch(/couldn't send email/);
+    expect(friendlyAuthError("New password should be different from the old password.")).toMatch(/haven't used/);
+  });
   it("passes unknown messages through unchanged", () => {
     expect(friendlyAuthError("Something new")).toBe("Something new");
   });

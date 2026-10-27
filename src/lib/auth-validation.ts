@@ -51,6 +51,11 @@ export function friendlyAuthError(message: string): string {
   if (m.includes("already registered") || m.includes("already been registered") || m.includes("user already exists"))
     return "An account with this email already exists. Sign in instead.";
   if (m.includes("rate limit") || m.includes("too many")) return "Too many attempts. Please wait a minute and try again.";
+  // "For security purposes, you can only request this after 37 seconds."
+  if (m.includes("for security purposes")) return "Please wait a minute before asking for another link.";
+  // Supabase's built-in mailer only reaches the project's own team until a custom SMTP server is set up.
+  if (m.includes("email address not authorized")) return "We couldn't send email to that address just now. Please try again later.";
+  if (m.includes("should be different from the old password")) return "Choose a password you haven't used for this account before.";
   if (m.includes("password should be")) return message; // Supabase's own password policy, already readable
   return message;
 }
