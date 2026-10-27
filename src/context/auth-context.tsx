@@ -21,6 +21,8 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   /** Redirects to Google. Only offered when NEXT_PUBLIC_GOOGLE_SIGNIN=1. */
   signInWithGoogle: () => Promise<{ error?: string }>;
+  /** Emails a link that opens /reset-password, signed in, to choose a new password. */
+  sendPasswordReset: (email: string) => Promise<{ error?: string }>;
   household: HouseholdInfo | null;
   householdLoading: boolean;
   refreshHousehold: () => Promise<void>;
@@ -201,12 +203,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return error ? { error: error.message } : {};
   };
 
+  const sendPasswordReset = async (email: string): Promise<{ error?: string }> => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    return error ? { error: error.message } : {};
+  };
+
   const signOut = async () => {
     await supabase.auth.signOut();
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, signIn, signUp, signOut, signInWithGoogle, household, householdLoading, refreshHousehold, householdMembers, householdV2Ready, sharedShoppingReady, householdSchemaReady, ingredientsSchemaReady, healthScoreSchemaReady, trackingSchemaReady, accuracySchemaReady }}>
+    <AuthContext.Provider value={{ user, session, loading, signIn, signUp, signOut, signInWithGoogle, sendPasswordReset, household, householdLoading, refreshHousehold, householdMembers, householdV2Ready, sharedShoppingReady, householdSchemaReady, ingredientsSchemaReady, healthScoreSchemaReady, trackingSchemaReady, accuracySchemaReady }}>
       {children}
     </AuthContext.Provider>
   );
