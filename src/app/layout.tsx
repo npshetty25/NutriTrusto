@@ -107,14 +107,20 @@ export const viewport: Viewport = {
 // cache and makes the browser treat this as a new worker to install.
 const BUILD_ID = process.env.NEXT_PUBLIC_BUILD_ID || "dev";
 
+// A new version reloads only when the person returns after over a minute away, never mid-form or mid-scan.
 const SW_REGISTER_SCRIPT = `if ('serviceWorker' in navigator) {
   window.addEventListener('load', function () {
     var hadController = !!navigator.serviceWorker.controller;
-    var refreshing = false;
+    var updateReady = false;
+    var hiddenAt = 0;
     navigator.serviceWorker.addEventListener('controllerchange', function () {
-      if (!hadController || refreshing) return;
-      refreshing = true;
-      window.location.reload();
+      if (!hadController || updateReady) return;
+      updateReady = true;
+    });
+    document.addEventListener('visibilitychange', function () {
+      if (!updateReady) return;
+      if (document.visibilityState === 'hidden') { hiddenAt = Date.now(); return; }
+      if (hiddenAt && Date.now() - hiddenAt > 60000) window.location.reload();
     });
     navigator.serviceWorker.register('/sw.js?v=${BUILD_ID}', { updateViaCache: 'none' }).then(function (reg) {
       reg.update();
