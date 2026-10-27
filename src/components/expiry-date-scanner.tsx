@@ -169,7 +169,7 @@ export default function ExpiryDateScanner({ onResult, onClose }: ExpiryDateScann
               title="Capture expiry date"
               aria-label="Capture expiry date"
               className="hidden"
-              onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImage(f); }}
+              onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) handleImage(f); }}
             />
             <input
               ref={galleryRef}
@@ -178,7 +178,7 @@ export default function ExpiryDateScanner({ onResult, onClose }: ExpiryDateScann
               title="Upload expiry date photo"
               aria-label="Upload expiry date photo"
               className="hidden"
-              onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImage(f); }}
+              onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) handleImage(f); }}
             />
 
             <button

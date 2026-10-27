@@ -176,7 +176,7 @@ export default function NutritionLabelScanner({ onResult, onClose }: NutritionLa
               title="Capture nutrition label"
               aria-label="Capture nutrition label"
               className="hidden"
-              onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImage(f); }}
+              onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) handleImage(f); }}
             />
             <input
               ref={galleryRef}
@@ -185,7 +185,7 @@ export default function NutritionLabelScanner({ onResult, onClose }: NutritionLa
               title="Upload nutrition label"
               aria-label="Upload nutrition label"
               className="hidden"
-              onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImage(f); }}
+              onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) handleImage(f); }}
             />
 
             <button
