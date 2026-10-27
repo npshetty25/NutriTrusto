@@ -3646,7 +3646,7 @@ if (nutritionFieldsFilled < 2) {
 
       {showPantryChat && (
         <PantryChatModal
-          items={visibleItems.map((i) => ({ name: i.name, daysLeft: i.daysLeft, risk: i.risk, ingredientsText: i.ingredientsText }))}
+          items={visibleItems.map((i) => ({ name: i.name, daysLeft: i.daysLeft, daysPastEstimate: i.daysPastEstimate, risk: i.risk, ingredientsText: i.ingredientsText }))}
           dietaryPreference={String(user?.user_metadata?.dietary_preference || "none")}
           onClose={() => setShowPantryChat(false)}
         />

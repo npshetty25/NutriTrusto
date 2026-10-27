@@ -12,6 +12,7 @@ interface ChatMessage {
 interface PantryChatItem {
   name: string;
   daysLeft: number;
+  daysPastEstimate: number;
   risk: string;
   ingredientsText?: string | null;
 }
