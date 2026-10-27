@@ -821,8 +821,10 @@ export default function Home() {
   useEffect(() => {
     if (!user) return;
 
+    // Only the first load shows the spinner; a refetch after a live change swaps the list in place.
+    let firstLoad = true;
     const fetchItems = async () => {
-      setDbLoading(true);
+      if (firstLoad) setDbLoading(true);
       const { data, error } = await supabase
         .from("pantry_items")
         .select("*")
@@ -830,13 +832,13 @@ export default function Home() {
 
       if (error) {
         console.warn("Supabase fetch error:", error.message);
-        setItems([]);
-      } else if (data && data.length > 0) {
-        setItems(data.map((row) => rowToItem(row as PantryRow)));
+        // Keep what is shown: an empty list here would tell the person their pantry is empty.
+        if (firstLoad) setInlineError("Couldn't load your pantry. Check your connection and reload the page.");
       } else {
-        setItems([]);
+        setItems((data ?? []).map((row) => rowToItem(row as PantryRow)));
       }
-      setDbLoading(false);
+      if (firstLoad) setDbLoading(false);
+      firstLoad = false;
     };
 
     fetchItems();
