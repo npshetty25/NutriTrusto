@@ -1723,7 +1723,7 @@ if (nutritionFieldsFilled < 2) {
       } else {
          // Auto fallback to server-side UPCItemDB proxy (Fixes CORS block)
          try {
-            const fallbackRes = await fetch(`/api/lookup-upc?upc=${decodedText}`);
+            const fallbackRes = await apiFetch(`/api/lookup-upc?upc=${encodeURIComponent(decodedText)}`);
             const fallbackData = await fallbackRes.json();
             if (fallbackData.items && fallbackData.items.length > 0) {
             const upcItem = fallbackData.items[0] as {
