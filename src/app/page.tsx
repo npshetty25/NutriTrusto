@@ -681,7 +681,7 @@ export default function Home() {
       id: `${row.id}-${createdAt}`,
       title: "Inventory update",
       message: `${row.name} is in good condition with ${days(currentDays)} left.`,
-      severity: "info",
+      severity: "low",
       createdAt,
       category,
     };
@@ -2464,7 +2464,6 @@ if (nutritionFieldsFilled < 2) {
                   <option value="high">Critical</option>
                   <option value="medium">Expiring soon</option>
                   <option value="low">Still good</option>
-                  <option value="info">Info</option>
                 </select>
                 <select
                   value={notificationSort}
