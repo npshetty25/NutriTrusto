@@ -113,7 +113,7 @@ import {
 import type { StorageLocation } from "@/lib/temperature";
 import {
   Camera, BrainCircuit, Loader2, TrendingUp, ScanLine,
-  Clock, X, Trash2, Info, Activity, Zap, AlertTriangle, CheckCircle2, Search, CircleAlert, Bell, Carrot, Apple, Milk, Drumstick, Wheat, CupSoda, Croissant, Snowflake, Candy, Package, ChevronLeft, ChevronRight, CalendarClock, Pencil, Sparkles, Plus, RefreshCw, SlidersHorizontal, Leaf, UtensilsCrossed, Check, Egg as EggIcon, Images, FileText
+  Clock, X, Trash2, Info, Activity, Zap, AlertTriangle, CheckCircle2, Search, CircleAlert, Bell, Carrot, Apple, Milk, Drumstick, Wheat, CupSoda, Croissant, Snowflake, Candy, Package, ChevronLeft, ChevronRight, CalendarClock, Pencil, Sparkles, Plus, RefreshCw, SlidersHorizontal, Leaf, UtensilsCrossed, Check, Egg as EggIcon, Images, FileText, Users
 } from "lucide-react";
 import ShoppingListModal from "@/components/shopping-list-modal";
 import { HouseholdModal } from "@/components/household-modal";
@@ -1976,7 +1976,7 @@ if (nutritionFieldsFilled < 2) {
           initial={{ opacity: 0, y: -14 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ type: "spring", stiffness: 300, damping: 26 }}
-          className="flex justify-between items-center mb-8"
+          className="flex justify-between items-center mb-5"
         >
           {/* min-w-0 has to live on the flex CHILD, not two levels deep on a
               grandchild — a nested min-w-0 zeroes out that branch's own
@@ -1998,13 +1998,18 @@ if (nutritionFieldsFilled < 2) {
               />
             </motion.div>
             <div className="min-w-0 flex-1">
-              <h1 className="text-xl font-bold tracking-tight leading-none">Nutri-Trust</h1>
-              {/* A greeting and one plain sentence. The header was a logo and
-                  two icons: it identified the app but told the user nothing,
-                  so the first thing they read was an uppercase metric label. */}
-              <p className="text-[11px] text-foreground/60 mt-1 truncate">
-                {greeting}{firstName ? `, ${firstName}` : ""} · {pantrySummary}
-              </p>
+              <h1 className="text-base font-bold tracking-tight leading-none">Nutri-Trust</h1>
+              {household && (
+                <button
+                  type="button"
+                  onClick={() => { setInviteJoinCode(""); setShowHousehold(true); }}
+                  className="mt-1 text-[11px] font-semibold text-foreground/60 hover:text-foreground inline-flex items-center gap-1 max-w-full"
+                  title="Household settings"
+                >
+                  <Users size={11} className="shrink-0" />
+                  <span className="truncate">{household.name}{householdMembers.length > 1 ? ` · ${householdMembers.length} people` : ""}</span>
+                </button>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -2041,6 +2046,45 @@ if (nutritionFieldsFilled < 2) {
           </div>
         </motion.div>
 
+        {/* The greeting, then what to do about it. The header used to fit the
+            whole state of the pantry into one 11px line; the items that need
+            eating are the first thing a person opening this app wants, so
+            they get named, at size, and each one goes straight to its card. */}
+        <div className="mb-5">
+          <p className="text-[28px] sm:text-3xl font-bold tracking-tight leading-tight text-balance">
+            {greeting}{firstName ? `, ${firstName}` : ""}
+          </p>
+          <p className="text-sm text-foreground/65 mt-1">
+            {highRiskItems.length > 0
+              ? `${highRiskItems.length} ${highRiskItems.length === 1 ? "item needs" : "items need"} eating soon.`
+              : visibleItems.length === 0
+                ? "Your pantry is empty. Add what you bought to start tracking it."
+                : `${pantrySummary.charAt(0).toUpperCase()}${pantrySummary.slice(1)}.`}
+          </p>
+          {highRiskItems.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-2" aria-label="Eat soon">
+              {[...highRiskItems].sort((a, b) => a.daysLeft - b.daysLeft).slice(0, 5).map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => {
+                    setRiskFilter("high");
+                    setSearchQuery(item.name);
+                    document.getElementById("inventory-log")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                  }}
+                  className="neu-pressable min-h-11 pl-3 pr-3.5 rounded-xl inline-flex items-center gap-2 text-sm font-semibold"
+                >
+                  <span className="tabular-nums font-extrabold text-danger-strong">{item.daysLeft === 0 ? "!" : `${item.daysLeft}d`}</span>
+                  <span className="max-w-[10rem] truncate">{item.name}</span>
+                </button>
+              ))}
+              {highRiskItems.length > 5 && (
+                <span className="min-h-11 inline-flex items-center px-2 text-xs font-semibold text-foreground/55">+{highRiskItems.length - 5} more</span>
+              )}
+            </div>
+          )}
+        </div>
+
         {/* KPI Widgets */}
         <motion.div
           initial="hidden"
@@ -2066,7 +2110,9 @@ if (nutritionFieldsFilled < 2) {
               <TrendingUp size={14} className="text-safe" />
               <span className="text-[10px] uppercase font-semibold tracking-widest text-foreground/70">Pantry Freshness</span>
             </div>
-            <p className="text-3xl font-semibold tracking-tighter">
+            <p className={`text-4xl font-extrabold tracking-tight tabular-nums ${
+              displayedItems.length === 0 ? "" : freshnessScore >= 66 ? "text-safe-strong" : freshnessScore >= 33 ? "text-warning-strong" : "text-danger-strong"
+            }`}>
               <CountUp value={freshnessScore} suffix="%" />
             </p>
             <div className="mt-2 h-1.5 w-full rounded-full bg-foreground/10 overflow-hidden">
@@ -2099,7 +2145,7 @@ if (nutritionFieldsFilled < 2) {
               <span className={`inline-flex w-2 h-2 rounded-full ${highRiskItems.length > 0 ? "bg-danger" : "bg-safe"}`} />
               <span className="text-[10px] uppercase font-semibold tracking-widest text-foreground/70">Critical Items</span>
             </div>
-            <p className="text-3xl font-semibold tracking-tighter">
+            <p className={`text-4xl font-extrabold tracking-tight tabular-nums ${highRiskItems.length > 0 ? "text-danger-strong" : "text-safe-strong"}`}>
               <CountUp value={highRiskItems.length} />
             </p>
             <p className="text-xs text-foreground/60 mt-1">

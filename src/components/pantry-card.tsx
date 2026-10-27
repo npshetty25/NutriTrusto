@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 import { motion } from "framer-motion";
-import { ShieldCheck, ShieldAlert, ArrowRight, Leaf, Info, Carrot, Apple, Milk, Drumstick, Wheat, CupSoda, Croissant, Snowflake, Candy, Package } from "lucide-react";
+import { ShieldCheck, ShieldAlert, ArrowRight, Leaf, Info, ChevronDown, Carrot, Apple, Milk, Drumstick, Wheat, CupSoda, Croissant, Snowflake, Candy, Package } from "lucide-react";
 import { inferItemCategory } from "@/lib/item-category";
 import { ALLERGEN_LABELS, type AllergenTag } from "@/lib/allergens";
 import { VegMark } from "@/components/veg-mark";
@@ -143,6 +143,14 @@ export function PantryCard({ name, daysLeft, risk, purchaseDate, healthScore, di
   // eslint-disable-next-line react-hooks/purity
   const expiryLabel = formatDayMonth(new Date(Date.now() + daysLeft * DAY_MS).toISOString());
 
+  const chipTone =
+    risk === "high"
+      ? "bg-danger/15 text-danger-strong"
+      : risk === "medium"
+        ? "bg-warning/15 text-warning-strong"
+        : "bg-safe/15 text-safe-strong";
+  const hasDetails = !!shelfLifeCitation || !!ifStoredDifferently || !!storageDisclaimer || !!healthierAlternative;
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 16, scale: 0.98 }}
@@ -152,156 +160,131 @@ export function PantryCard({ name, daysLeft, risk, purchaseDate, healthScore, di
       whileHover={{ y: -4 }}
       className="neu-pressable group relative p-4 sm:p-5 rounded-2xl"
     >
-      <div className="flex items-start justify-between gap-3 mb-4">
+      {/* The reading leads. The day count is the one number this product
+          exists to produce, so it sits at the card's top right at full
+          display size, coloured by its band; the name and dates read beside
+          it. Everything about where the number came from is one tap away
+          below, instead of a tall nested panel on every card — on a phone a
+          pantry of seven items used to be a dozen screens of grey. */}
+      <div className="flex items-start gap-3">
+        <div className="w-10 h-10 rounded-xl neu-inset flex items-center justify-center text-foreground/70 shrink-0" aria-hidden>
+          <ItemIcon size={18} />
+        </div>
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 mb-1.5">
-            <div className="w-7 h-7 rounded-lg bg-foreground/6 border border-border flex items-center justify-center text-foreground/70 shrink-0">
-              <ItemIcon size={14} />
-            </div>
-            <div
-              title={hasScore ? `NutriTrust score ${score.toFixed(1)} out of 5` : "Not scanned — no score available"}
-              className={`h-6 px-1.5 rounded-md flex items-center justify-center text-[11px] font-bold tabular-nums shrink-0 ${scoreTone}`}
-            >
-              {hasScore ? score.toFixed(1) : "—"}
-            </div>
-            <VegMark diet={itemDiet} unverified={dietUnverified} size={15} />
-          </div>
-          {/* The name gets its own row. Beside the icon, score and veg mark it
-              was left with about 80px once the risk badge took its share, so
-              "Whole Wheat Bread" rendered as "Whole ...". Two lines of the
-              full column width fit any real product name. */}
-          <h3 title={name} className="mb-1 font-bold text-sm sm:text-[15px] text-foreground tracking-tight leading-snug line-clamp-2 wrap-break-word">
+          {/* Two lines of the full column fit any real product name; one
+              line beside the badges cut "Whole Wheat Bread" to "Whole ...". */}
+          <h3 title={name} className="font-bold text-[15px] sm:text-base text-foreground tracking-tight leading-snug line-clamp-2 wrap-break-word">
             {name}
           </h3>
-          {/* An expiry tracker that never printed an expiry date. The
-              purchase date was the only date on the card — the one that
-              doesn't matter — leaving the user to hold the shelf life in
-              their head. */}
-          <p className="text-[11px] text-foreground/60 uppercase tracking-wider font-medium">
+          {/* The expiry date, not just the purchase date: an expiry tracker
+              that never printed one left people holding it in their head. */}
+          <p className="mt-0.5 text-[11px] text-foreground/60 font-medium">
             {daysLeft > 0 ? `Use by ${expiryLabel}` : `Was due ${expiryLabel}`}
-            <span className="text-foreground/40 normal-case tracking-normal"> · bought {formatDayMonth(purchaseDate)}</span>
+            <span className="text-foreground/40"> · bought {formatDayMonth(purchaseDate)}</span>
           </p>
         </div>
+        <div className="text-right shrink-0 -mt-1">
+          <p className={`${config.color} font-extrabold text-4xl leading-none tracking-tight tabular-nums`}>{daysLeft}</p>
+          <p className="mt-1 text-[10px] uppercase tracking-widest font-semibold text-foreground/55">{daysLeft === 1 ? "day left" : "days left"}</p>
+        </div>
+      </div>
 
-        <div className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border ${
-          risk === "high"
-            ? "bg-danger/15 border-danger/30 text-danger-strong"
-            : risk === "medium"
-              ? "bg-warning/15 border-warning/30 text-warning-strong"
-              : "bg-safe/15 border-safe/30 text-safe-strong"
-        }`}>
+      {/* Same thresholds as the chip, so bar and words can never disagree. */}
+      <div className="mt-3 h-2 w-full rounded-full bg-foreground/10 overflow-hidden" aria-hidden>
+        <div className={`h-full rounded-full transition-all duration-500 ${freshnessWidthClass} ${config.bar}`} />
+      </div>
+
+      {daysLeft === 0 && (
+        // Says what we know — our estimate ran out — not what we don't:
+        // whether the food is actually off. Only the person holding it can
+        // tell, and telling them it has spoiled bins food that is still good.
+        <p className="mt-3 text-[11px] leading-relaxed font-semibold text-danger">
+          {pastDateNote ?? `Our estimate for ${name} has run out. Look at it and smell it before you use it.`}
+        </p>
+      )}
+
+      <div className="mt-3 flex flex-wrap items-center gap-1.5">
+        <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-widest ${chipTone}`}>
           {riskLabel ?? config.label}
-        </div>
-      </div>
-
-      <div className="rounded-xl border border-border/70 bg-background p-3 mb-3">
-        <div className="flex items-end justify-between gap-2 mb-2">
-          <p className="text-[10px] uppercase tracking-widest font-semibold text-foreground/60">Time left</p>
-          <p className="text-xs font-semibold text-foreground/60">Freshness</p>
-        </div>
-        <div className="flex items-end justify-between gap-3">
-          <p className="text-sm text-foreground font-medium">
-            <span className={`${config.color} font-extrabold text-3xl tracking-tight`}>{daysLeft}</span>
-            <span className="ml-1 text-xs text-foreground/60 font-semibold">{daysLeft === 1 ? "day" : "days"} left</span>
-          </p>
-          <div className="w-24 h-2.5 rounded-full bg-foreground/10 overflow-hidden">
-            <div className={`h-full rounded-full transition-all duration-500 ${freshnessWidthClass} ${config.bar}`} />
-          </div>
-        </div>
-
-        {trackingTags && trackingTags.length > 0 && (
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {trackingTags.map((tag) => (
-              <span key={tag} className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-foreground/8 text-foreground/70">
-                {tag}
-              </span>
-            ))}
-          </div>
-        )}
-
-        {/* Provenance for the number above it. "Sourced" and "Rough guess"
-            must not look alike — the same reason the allergen badge says
-            "unknown" instead of "safe". */}
-        {shelfLifeCitation && (
-          <div className="mt-2 pt-2 border-t border-border/50">
-            {/* Low confidence gets a dashed underline rather than a colour —
-                the same "guess, not a label" convention VegMark uses for an
-                unverified diet reading, so the two don't invent two visual
-                languages for the same idea. */}
-            <p
-              className={`text-[10px] leading-relaxed text-foreground/50 ${
-                shelfLifeConfidence === "low" ? "underline decoration-dashed decoration-foreground/30 underline-offset-2" : ""
-              }`}
-            >
-              {shelfLifeCitation}
-            </p>
-          </div>
-        )}
-
-        {/* The disclaimer used to render bare here as a second paragraph.
-            StoragePanel carries it now, alongside the numbers it actually
-            describes, so it reads as "here's what these figures assume"
-            rather than a stray legal line. */}
-        {ifStoredDifferently && <StoragePanel data={ifStoredDifferently} currentStorage={currentStorage} />}
-        {!ifStoredDifferently && storageDisclaimer && (
-          <p className="mt-2 pt-2 border-t border-border/50 text-[10px] leading-relaxed text-foreground/40">
-            {storageDisclaimer}
-          </p>
-        )}
-
-        {daysLeft === 0 && (
-          // Says what we know — our estimate ran out — not what we don't:
-          // whether the food is actually off. Only the person holding it can
-          // tell, and telling them it has spoiled bins food that is still good.
-          <p className="mt-2 text-[11px] leading-relaxed font-semibold text-danger">
-            {pastDateNote ?? `Our estimate for ${name} has run out. Look at it and smell it before you use it.`}
-          </p>
-        )}
-      </div>
-
-      <div className="flex flex-wrap gap-2">
+        </span>
         {/* Tone comes from lib/colour-semantics. A "Non-Veg" chip rendered
             green with a tick, which collides with the mandated Indian
             vegetarian mark. */}
-        <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-bold ${dietChipClasses(itemDiet, !dietMatch)}`}>
-          {dietMatch ? <ShieldCheck size={12} /> : <ShieldAlert size={12} />}
+        <span className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold ${dietChipClasses(itemDiet, !dietMatch)}`}>
+          <VegMark diet={itemDiet} unverified={dietUnverified} size={11} />
           {dietLabel ?? (dietMatch ? "Matches Diet" : "Diet Warning")}
-        </div>
-
+        </span>
+        {/* Allergen state stays on the face of the card: "unknown" must be
+            as visible as "safe" would have been. */}
         {detectedAllergens == null ? (
-          <div
+          <span
             title="No ingredient data was available for this item, so allergen content couldn't be checked"
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-bold bg-foreground/8 text-foreground/70"
+            className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold bg-foreground/8 text-foreground/70"
           >
-            <Info size={12} />
+            <Info size={11} />
             Allergens Unknown
-          </div>
+          </span>
         ) : detectedAllergens.length > 0 ? (
-          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-bold bg-warning/15 text-warning-strong">
-            <ShieldAlert size={12} />
+          <span className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold bg-warning/15 text-warning-strong">
+            <ShieldAlert size={11} />
             Contains {detectedAllergens.map((tag) => ALLERGEN_LABELS[tag]).join(", ")}
-          </div>
+          </span>
         ) : (
-          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-bold bg-foreground/8 text-foreground/70">
-            <ShieldCheck size={12} />
+          <span className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold bg-foreground/8 text-foreground/70">
+            <ShieldCheck size={11} />
             No Common Allergens
-          </div>
+          </span>
         )}
-
+        <span
+          title={hasScore ? `NutriTrust score ${score.toFixed(1)} out of 5` : "Not scanned — no NutriTrust score"}
+          className={`px-2 py-1 rounded-lg text-[10px] font-bold tabular-nums ${scoreTone}`}
+        >
+          {hasScore ? `Score ${score.toFixed(1)}` : "Not scanned"}
+        </span>
+        {trackingTags?.map((tag) => (
+          <span key={tag} className="px-2 py-1 rounded-lg text-[10px] font-semibold bg-foreground/6 text-foreground/70">
+            {tag}
+          </span>
+        ))}
       </div>
 
-      {healthierAlternative && (
-        <div className="mt-3 bg-foreground/5 rounded-xl p-3 border border-border/50 flex flex-col gap-1.5">
-          <div className="flex items-center gap-1 text-[10px] uppercase font-bold text-foreground/50 tracking-wider">
-            <Leaf size={10} /> Better Alternative
+      {hasDetails && (
+        <details className="group/details mt-2">
+          <summary className="min-h-11 flex items-center justify-between gap-2 cursor-pointer list-none text-[11px] font-semibold text-foreground/60 hover:text-foreground [&::-webkit-details-marker]:hidden">
+            <span>
+              Where this number comes from
+              {shelfLifeConfidence === "low" && <span className="ml-1.5 font-normal text-foreground/45">· rough guess</span>}
+            </span>
+            <ChevronDown size={14} className="transition-transform group-open/details:rotate-180" />
+          </summary>
+          <div className="rounded-xl neu-inset p-3 space-y-2">
+            {/* "Sourced" and "Rough guess" must not look alike. Low confidence
+                gets a dashed underline rather than a colour — the same "guess,
+                not a label" convention VegMark uses for an unverified diet. */}
+            {shelfLifeCitation && (
+              <p
+                className={`text-[11px] leading-relaxed text-foreground/65 ${
+                  shelfLifeConfidence === "low" ? "underline decoration-dashed decoration-foreground/30 underline-offset-2" : ""
+                }`}
+              >
+                {shelfLifeCitation}
+              </p>
+            )}
+            {ifStoredDifferently && <StoragePanel data={ifStoredDifferently} currentStorage={currentStorage} />}
+            {!ifStoredDifferently && storageDisclaimer && (
+              <p className="text-[10px] leading-relaxed text-foreground/45">{storageDisclaimer}</p>
+            )}
+            {healthierAlternative && (
+              <p className="pt-2 border-t border-border/50 text-xs font-semibold flex items-center gap-1.5 text-foreground/80">
+                <Leaf size={12} className="text-foreground/50" /> Better alternative
+                <ArrowRight size={10} className="opacity-50" /> <span className="text-foreground">{healthierAlternative}</span>
+              </p>
+            )}
           </div>
-          <p className="text-xs font-semibold flex items-center gap-1.5 text-foreground/80">
-            Try <ArrowRight size={10} className="opacity-50" /> <span className="text-foreground">{healthierAlternative}</span>
-          </p>
-        </div>
+        </details>
       )}
 
-      {actions && <div className="mt-4 pt-3 border-t border-border/60">{actions}</div>}
+      {actions && <div className={`${hasDetails ? "mt-2" : "mt-4"} pt-3 border-t border-border/60`}>{actions}</div>}
     </motion.div>
   );
 }
