@@ -54,6 +54,9 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
+// Supabase re-announces the same session each time the tab becomes visible; an equal user keeps its old object.
+const sameUser = (a: User | null, b: User | null) => a === b || (!!a && !!b && JSON.stringify(a) === JSON.stringify(b));
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -107,17 +110,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user]);
 
   useEffect(() => {
+    const applySession = (next: Session | null) => {
+      setSession(next);
+      setUser((prev) => (sameUser(prev, next?.user ?? null) ? prev : next?.user ?? null));
+    };
+
     // Restore session on page load
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
+      applySession(session);
       setLoading(false);
     });
 
     // Listen for auth state changes (sign in, sign out, token refresh)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
+      applySession(session);
     });
 
     return () => subscription.unsubscribe();
