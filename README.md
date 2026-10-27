@@ -91,6 +91,19 @@ Run in the Supabase SQL editor, in order: `db/supabase-schema.sql`,
 idempotent. There is no migration ledger; the repo cannot tell you which have
 been applied to a given project.
 
+### Password reset
+
+"Forgot password?" emails a Supabase recovery link that returns to
+`/reset-password`. Two settings in the Supabase dashboard make it work for
+everyone:
+
+- **Authentication → URL Configuration → Redirect URLs**: add
+  `https://<your-domain>/reset-password`. Without it Supabase sends the link to
+  the Site URL instead; the app still forwards it to `/reset-password`.
+- **Authentication → SMTP Settings**: Supabase's built-in mailer only delivers
+  to members of the project's own team, about two emails an hour. Real users
+  get the email only once a custom SMTP server is set up.
+
 ### Tests
 
 ```bash
