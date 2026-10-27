@@ -33,9 +33,15 @@ export async function POST(req: Request) {
 
   try {
     const { barcode, productName } = (await req.json()) as { barcode?: string; productName?: string };
+    const code = String(barcode ?? "").trim();
+    const name = String(productName ?? "").trim();
 
-    if (!barcode || !productName?.trim()) {
+    if (!code || !name) {
       return NextResponse.json({ success: false, error: "Barcode and product name are required" }, { status: 400 });
+    }
+    // Written to Open Food Facts under this project's own account, so only a real barcode and a product-sized name.
+    if (!/^\d{8,14}$/.test(code) || name.length > 150) {
+      return NextResponse.json({ success: false, error: "That doesn't look like a product barcode and name." }, { status: 400 });
     }
 
     if (!OFF_USER_ID || !OFF_PASSWORD) {
@@ -47,16 +53,16 @@ export async function POST(req: Request) {
     }
 
     const params = new URLSearchParams({
-      code: barcode,
+      code,
       user_id: OFF_USER_ID,
       password: OFF_PASSWORD,
-      product_name: productName.trim(),
+      product_name: name,
       lang: "en",
       app_name: "Nutri-Trust",
       comment: "Added via Nutri-Trust: unknown barcode manually identified by a user",
     });
 
-    log.info("Submitting to Open Food Facts", { barcode, staging: OFF_WRITE_BASE_URL.includes(".net") });
+    log.info("Submitting to Open Food Facts", { barcode: code, staging: OFF_WRITE_BASE_URL.includes(".net") });
 
     const response = await fetch(`${OFF_WRITE_BASE_URL}/cgi/product_jqm2.pl`, {
       method: "POST",
