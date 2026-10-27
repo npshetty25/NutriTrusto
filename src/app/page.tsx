@@ -320,6 +320,10 @@ export default function Home() {
     accuracySchemaReady
       ? { quantity: t.quantity?.trim() || null, expiry_kind: t.expiryKind ?? null }
       : {};
+
+  // And for expiry_date (db/supabase-schema-printed-date.sql).
+  const printedDateField = (date: string | null | undefined): { expiry_date?: string | null } =>
+    printedDateSchemaReady ? { expiry_date: date ?? null } : {};
   const router = useRouter();
 
   const [items, setItems] = useState<Item[]>([]);
@@ -1949,6 +1953,8 @@ if (nutritionFieldsFilled < 2) {
       // claim; mark it so later storage changes never recompute it.
       ...trackingFields({ expirySource: shelfLife.source === "scanned" ? "printed" : null }),
       ...accuracyFields({ expiryKind: shelfLife.source === "scanned" ? scannedExpiry?.kind ?? null : null }),
+      // The date itself, so a pack scanned after its date can still say how long ago that was.
+      ...printedDateField(shelfLife.source === "scanned" ? scannedExpiry?.expiryDate : null),
       name: scannedResult.name,
       days_left: initialDaysLeft,
       risk: deriveRisk(initialDaysLeft, initialDaysLeft, scannedResult.name),
