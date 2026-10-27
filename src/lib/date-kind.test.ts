@@ -15,8 +15,18 @@ describe("resolveDateKind", () => {
     expect(resolveDateKind(undefined, "Expiry Date: 01/01/27")).toBe("use_by");
   });
 
+  it("reads FSSAI's abbreviations", () => {
+    expect(resolveDateKind(null, "BBD 05/2027")).toBe("best_before");
+    expect(resolveDateKind(null, "B.B. MAY 2027")).toBe("best_before");
+    expect(resolveDateKind(null, "UBD: 31/10/26")).toBe("use_by");
+    expect(resolveDateKind(null, "UB 31/10/26")).toBe("use_by");
+    expect(resolveDateKind(null, "EXD. 05/27")).toBe("use_by");
+    expect(resolveDateKind(null, "PKD 01/26 ED 12/26")).toBe("use_by");
+  });
+
   it("does not mistake BBQ for a best-before mark, and stays unknown when unsure", () => {
     expect(resolveDateKind(null, "BBQ sauce 12/03/27")).toBeNull();
+    expect(resolveDateKind(null, "Packed 12/03/27")).toBeNull();
     expect(resolveDateKind(null, "12/03/27")).toBeNull();
     expect(resolveDateKind("sometime", 42)).toBeNull();
   });

@@ -16,10 +16,11 @@ export type DateKind = "use_by" | "best_before";
 export function resolveDateKind(modelKind: unknown, rawText: unknown): DateKind | null {
   if (modelKind === "use_by" || modelKind === "best_before") return modelKind;
   const text = typeof rawText === "string" ? rawText.toLowerCase() : "";
-  // "BB" alone is checked with its own word boundaries via the leading space
-  // or start, so "BBQ" is not read as a best-before mark.
-  if (/best\s*before|(^|\s)b\.?b\.?e?(\s|:|$)/.test(text)) return "best_before";
-  if (/use\s*by|exp(iry|ires|\.|:|\s)/.test(text)) return "use_by";
+  // FSSAI's own abbreviations (FAQ on the 2020 regulations, Q19): BB, BBD for
+  // best before; UB, UBD, EXD, ED for use-by and expiry. Each is checked on
+  // its own word boundaries, so "BBQ" or the "ed" in "packed" is not a mark.
+  if (/best\s*before|(^|[^a-z])b\.?b\.?(e|d)?\.?(\s|:|$)/.test(text)) return "best_before";
+  if (/use\s*by|exp(iry|ires|\.|:|\s|$)|(^|[^a-z])(u\.?b\.?d?|ex\.?d|e\.?d)\.?(\s|:|$)/.test(text)) return "use_by";
   return null;
 }
 

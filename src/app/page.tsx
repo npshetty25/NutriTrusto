@@ -9,7 +9,7 @@ import {
   lockedDietScope,
 } from "@/lib/diet";
 
-import { calculateCurrentDaysLeft, calculateDaysPastEstimate, localDateISO } from "@/lib/item-age";
+import { calculateCurrentDaysLeft, calculateDaysPastEstimate, localDateISO, parsePurchaseDate } from "@/lib/item-age";
 import { parseGs1, gs1PrintedDate } from "@/lib/gs1";
 import { asDateKind, pastDateMessage, type DateKind } from "@/lib/date-kind";
 
@@ -1961,21 +1961,24 @@ if (nutritionFieldsFilled < 2) {
     source: "printed_expiry" | "mfd_plus_shelf_life" | "shelf_life_from_today" | "unknown";
     confidence: "high" | "medium" | "low";
     date_kind?: string | null;
+    notes?: string[];
   }) => {
     setShowExpiryScanner(false);
     if (expiry.days_left === null) return;
 
+    const kind = asDateKind(expiry.date_kind);
     setScannedExpiry({
       daysLeft: expiry.days_left,
       expiryDate: expiry.expiry_date,
       source: expiry.source,
       confidence: expiry.confidence,
-      kind: asDateKind(expiry.date_kind),
+      kind,
     });
+    const printed = expiry.expiry_date
+      ? ` (${kind === "best_before" ? "best before" : kind === "use_by" ? "use by" : "date"} ${parsePurchaseDate(expiry.expiry_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })})`
+      : "";
     toast("Expiry date detected", {
-      description: expiry.expiry_date
-        ? `${days(expiry.days_left)} left (expires ${expiry.expiry_date}).`
-        : `${days(expiry.days_left)} left.`,
+      description: [`${days(expiry.days_left)} left${printed}.`, ...(expiry.notes ?? [])].join(" "),
     });
   };
 

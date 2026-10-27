@@ -3,6 +3,8 @@
 import { useRef, useState } from "react";
 import { Camera, Upload, Loader2, CheckCircle2, X } from "lucide-react";
 import { apiFetch } from "@/lib/api-client";
+import { localDateISO } from "@/lib/item-age";
+import { daysUntilDate } from "@/lib/item-tracking";
 
 interface ExpiryResult {
   days_left: number | null;
@@ -11,6 +13,8 @@ interface ExpiryResult {
   confidence: "high" | "medium" | "low";
   raw_text_found: string | null;
   date_kind?: "use_by" | "best_before" | null;
+  /** How the date was worked out, when that is not obvious ("runs to the end of May"). */
+  notes?: string[];
 }
 
 interface ExpiryDateScannerProps {
@@ -41,6 +45,7 @@ export default function ExpiryDateScanner({ onResult, onClose }: ExpiryDateScann
     try {
       const formData = new FormData();
       formData.append("label", file);
+      formData.append("today", localDateISO());
 
       const res = await apiFetch("/api/scan-expiry-date", {
         method: "POST",
@@ -55,7 +60,11 @@ export default function ExpiryDateScanner({ onResult, onClose }: ExpiryDateScann
         return;
       }
 
-      const expiry = data.expiry as ExpiryResult;
+      const raw = data.expiry as ExpiryResult;
+      // Counted here, in this phone's calendar, from the date itself.
+      const expiry: ExpiryResult = raw.expiry_date
+        ? { ...raw, days_left: daysUntilDate(raw.expiry_date) ?? raw.days_left }
+        : raw;
 
       if (expiry.confidence === "low" || expiry.days_left === null) {
         setError("No printed expiry date found. Try a photo of the cap, seal, or pack edge, or skip and enter it manually.");
@@ -63,14 +72,20 @@ export default function ExpiryDateScanner({ onResult, onClose }: ExpiryDateScann
         return;
       }
 
-      if (expiry.confidence === "medium") {
-        setWarning("Date format was partially unclear — double-check against the physical package.");
+      const warnings = [...(expiry.notes ?? [])];
+      if (expiry.expiry_date && expiry.expiry_date < localDateISO()) {
+        warnings.unshift("This pack's date has already passed. Check it before you use it.");
       }
+      if (expiry.confidence === "medium" && warnings.length === 0) {
+        warnings.push("Date format was partially unclear — double-check against the physical package.");
+      }
+      if (warnings.length > 0) setWarning(warnings.join(" "));
 
       setSuccess(true);
+      // Long enough to read a warning before the dialog closes.
       setTimeout(() => {
         onResult(expiry);
-      }, 800);
+      }, warnings.length > 0 ? 2600 : 800);
     } catch {
       setError("Something went wrong. Please try again.");
     } finally {
