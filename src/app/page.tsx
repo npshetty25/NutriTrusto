@@ -242,6 +242,9 @@ interface ScannedResultEntry {
   // shelf-life estimate use the product database when the name alone matches
   // nothing in our table (tier 2 in lib/shelf-life.ts).
   categories?: string | null;
+  // Kept so a nutrition-label rescan scores the same product, not a bare name.
+  additivesCount?: number;
+  nutriScoreGrade?: string;
 }
 
 /** A printed date (from a GS1 barcode) as the scan result's expiry entry. */
@@ -1828,7 +1831,10 @@ if (nutritionFieldsFilled < 2) {
       });
       const analysis = await aiRes.json();
 
-      if (!analysis.is_food) {
+      // A failed or rate-limited analysis has no is_food at all; it is not a verdict on the product.
+      if (!aiRes.ok || typeof analysis?.is_food !== "boolean") {
+        setInlineError(analysis?.error || "Couldn't analyse this product right now. Please try again in a moment.");
+      } else if (!analysis.is_food) {
         setInlineError("This barcode appears to be a non-food item, so it wasn't added.");
       } else {
         logScanHistory(productName, "barcode", analysis.health_score);
@@ -1839,6 +1845,8 @@ if (nutritionFieldsFilled < 2) {
           itemDiet: detectedItemDiet,
           ingredients: productIngredients !== PLACEHOLDER_INGREDIENTS_TEXT ? productIngredients : null,
           categories: productCategories !== "Unknown" ? productCategories : null,
+          additivesCount,
+          nutriScoreGrade: (data?.product?.nutriscore_grade as string | undefined) || undefined,
         });
       }
     } catch (e) {
@@ -1878,7 +1886,9 @@ if (nutritionFieldsFilled < 2) {
 
       const analysis = await aiRes.json();
 
-      if (!analysis.is_food) {
+      if (!aiRes.ok || typeof analysis?.is_food !== "boolean") {
+        setInlineError(analysis?.error || "Couldn't analyse this product right now. Please try again in a moment.");
+      } else if (!analysis.is_food) {
         setInlineError("This barcode appears to be a non-food item, so it wasn't added.");
       } else {
         const detectedItemDiet = getItemDietType(`${typedName} ${manualBarcodeEntry.ingredients} ${manualBarcodeEntry.categories}`);
@@ -1890,6 +1900,8 @@ if (nutritionFieldsFilled < 2) {
           itemDiet: detectedItemDiet,
           ingredients: manualBarcodeEntry.ingredients !== PLACEHOLDER_INGREDIENTS_TEXT ? manualBarcodeEntry.ingredients : null,
           categories: manualBarcodeEntry.categories !== "Unknown" ? manualBarcodeEntry.categories : null,
+          additivesCount: manualBarcodeEntry.additivesCount,
+          nutriScoreGrade: manualBarcodeEntry.nutriScoreGrade,
         });
 
         if (contributeToOFF) {
@@ -2013,18 +2025,24 @@ if (nutritionFieldsFilled < 2) {
       const aiRes = await apiFetch("/api/analyze-food", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        // Only the nutrition numbers are new; the ingredients, additives and grade are the same product's.
         body: JSON.stringify({
           name: scannedResult.name,
-          ingredients: "",
-          categories: "",
+          ingredients: scannedResult.ingredients ?? "",
+          categories: scannedResult.categories ?? "",
           nutritionData,
-          additivesCount: 0,
+          additivesCount: scannedResult.additivesCount ?? 0,
           additiveColors: [],
+          nutriScoreGrade: scannedResult.nutriScoreGrade,
           isEstimated: false,
         }),
       });
 
       const analysis = await aiRes.json();
+      if (!aiRes.ok || typeof analysis?.is_food !== "boolean") {
+        toast("Couldn't update the rating", { description: analysis?.error || "The earlier rating is still shown. Try again in a moment." });
+        return;
+      }
       setScannedResult((prev) => (prev ? { ...prev, analysis } : null));
       toast("Label scanned!", {
         description: "Rating updated with real nutrition data from the label.",
