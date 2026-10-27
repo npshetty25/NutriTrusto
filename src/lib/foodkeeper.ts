@@ -1,5 +1,5 @@
 import { FOODKEEPER, type FoodKeeperEntry } from "@/lib/foodkeeper-data";
-import { matchesTerm } from "@/lib/text-match";
+import { isExcluded, matchesTerm } from "@/lib/text-match";
 import { ASSUMED_STORAGE_C, adjustDays, type StorageLocation } from "@/lib/temperature";
 
 /**
@@ -86,6 +86,32 @@ const PREPARED_DISH_WORDS = [
 ];
 
 const FROZEN_CATEGORY = "Food Purchased Frozen";
+
+/**
+ * Indian names for products USDA lists under another name. Each is the same
+ * product, not a look-alike: green chillies are hot peppers, soya chunks are
+ * textured soy protein. Checked before the ordinary match, longest name first.
+ */
+const INDIAN_NAMES: { terms: string[]; exclude?: string[]; name: string; subtitle?: string }[] = [
+  {
+    terms: ["green chilli", "green chili", "hari mirch", "hari mirchi", "mirchi"],
+    // Dried red chillies and chilli products keep for months, not days.
+    exclude: ["powder", "sauce", "pickle", "achar", "paste", "flakes", "lal mirch", "lal mirchi", "laal mirch",
+              "red chilli", "kashmiri", "dried", "sukhi", "bajji", "pakoda"],
+    name: "Hot peppers",
+  },
+  { terms: ["cornflakes", "corn flakes", "wheat flakes", "chocos", "muesli", "breakfast cereal"], name: "Cereal", subtitle: "ready-to-eat" },
+  { terms: ["soya chunks", "soya chunk", "soya granules", "soy chunks", "soya badi", "nutrela", "meal maker"], name: "Textured soy protein", subtitle: "(TSP)" },
+];
+
+const INDIAN_NAME_INDEX = INDIAN_NAMES
+  .flatMap((alias) => {
+    const entry = FOODKEEPER.find(
+      (e) => e.name.trim() === alias.name && (alias.subtitle === undefined || (e.subtitle ?? "").trim() === alias.subtitle)
+    );
+    return entry ? alias.terms.map((term) => ({ term, exclude: alias.exclude, entry })) : [];
+  })
+  .sort((a, b) => b.term.length - a.term.length);
 
 interface Indexed {
   entry: FoodKeeperEntry;
@@ -196,6 +222,11 @@ export function foodKeeperFigures(entry: FoodKeeperEntry): FoodKeeperFigures | n
 export function findFoodKeeperEntry(name: string): FoodKeeperFigures | null {
   const text = (name || "").toLowerCase().trim();
   if (!text) return null;
+  const alias = INDIAN_NAME_INDEX.find((a) => matchesTerm(text, a.term) && !isExcluded(text, a.exclude));
+  if (alias) {
+    const figures = foodKeeperFigures(alias.entry);
+    if (figures) return figures;
+  }
   const itemWordList = words(text);
   const itemWords = new Set(itemWordList);
   const wantsFrozen = itemWords.has("frozen");

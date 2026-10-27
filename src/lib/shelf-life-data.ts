@@ -367,4 +367,7 @@ if (DUPLICATE_IDS.length > 0) {
  */
 export const ROWS_BY_KEY_LENGTH: { key: string; row: ShelfLifeRow }[] = SHELF_LIFE_ROWS
   .flatMap((row) => row.keys.map((key) => ({ key: key.toLowerCase(), row })))
+    // Fresh green chillies, not chilli powder. "Hari Mirch" matched "mirch"
+    // and was given a spice's 365 days; it now reaches USDA's hot peppers.
+    exclude: ["hari mirch", "green mirch"],
   .sort((a, b) => b.key.length - a.key.length);

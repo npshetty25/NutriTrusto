@@ -20,6 +20,19 @@ describe("FoodKeeper matching", () => {
     expect(label("Avocado")).toBe("avocados");
   });
 
+  it("knows Indian names for the same USDA products", () => {
+    expect(label("Green Chillies")).toBe("hot peppers");
+    expect(label("Hari Mirch")).toBe("hot peppers");
+    expect(label("Kellogg's Corn Flakes")).toBe("cereal (ready-to-eat)");
+    expect(label("Soya Chunks")).toBe("textured soy protein ((TSP))");
+  });
+
+  it("does not give dried red chillies or chilli products a fresh chilli's days", () => {
+    for (const name of ["Lal Mirchi", "Kashmiri Mirchi", "Red Chilli Powder", "Green Chilli Sauce", "Mirchi Pickle"]) {
+      expect(label(name), name).not.toBe("hot peppers");
+    }
+  });
+
   it("never matches through a loose keyword", () => {
     // Eggplant lists "egg" as a keyword; an egg is not an eggplant.
     expect(label("Eggs")).not.toBe("eggplant");
