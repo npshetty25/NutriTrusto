@@ -287,7 +287,7 @@ let realtimeSeq = 0;
 // No fallback items — real users start with an empty pantry.
 
 export default function Home() {
-  const { user, loading: authLoading, household, householdLoading, householdMembers, sharedShoppingReady, householdSchemaReady, ingredientsSchemaReady, healthScoreSchemaReady, trackingSchemaReady, accuracySchemaReady } = useAuth();
+  const { user, loading: authLoading, household, householdLoading, householdMembers, sharedShoppingReady, householdSchemaReady, ingredientsSchemaReady, healthScoreSchemaReady, trackingSchemaReady, accuracySchemaReady, printedDateSchemaReady } = useAuth();
   // UI-only gate, not a security one — see lib/admin.ts. Hides "Add Demo
   // Data" from everyone but the project owner, so a real user never sees a
   // button that fills their pantry with sample groceries.
@@ -2078,7 +2078,7 @@ if (nutritionFieldsFilled < 2) {
   // omitting those fields from the very first insert (confirmed
   // reproducible: the probes are still in flight for a beat after a fresh
   // signup, before the dashboard would otherwise already be interactive).
-  const schemaProbesPending = !!user && (householdSchemaReady === null || ingredientsSchemaReady === null || healthScoreSchemaReady === null || trackingSchemaReady === null || accuracySchemaReady === null);
+  const schemaProbesPending = !!user && (householdSchemaReady === null || ingredientsSchemaReady === null || healthScoreSchemaReady === null || trackingSchemaReady === null || accuracySchemaReady === null || printedDateSchemaReady === null);
   if (authLoading || (!user && !authLoading) || schemaProbesPending) {
     return (
       <div className="flex flex-col items-center justify-center gap-5 min-h-screen">
