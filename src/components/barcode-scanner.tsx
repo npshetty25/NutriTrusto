@@ -17,6 +17,13 @@ export default function BarcodeScanner({ onScan, onError, onClose }: BarcodeScan
   const [debugError, setDebugError] = useState<string | null>(null);
   const [manualCode, setManualCode] = useState("");
   const [facingMode, setFacingMode] = useState<"environment" | "user">("environment");
+  // Read at call time: as effect dependencies, the parent's new callbacks on every render restarted the camera mid-scan.
+  const onScanRef = useRef(onScan);
+  const onErrorRef = useRef(onError);
+  useEffect(() => {
+    onScanRef.current = onScan;
+    onErrorRef.current = onError;
+  });
 
   useEffect(() => {
     isComponentMounted.current = true;
@@ -27,7 +34,7 @@ export default function BarcodeScanner({ onScan, onError, onClose }: BarcodeScan
       if (isComponentMounted.current) {
         html5QrCodeRef.current?.stop().then(() => {
            html5QrCodeRef.current?.clear();
-           onScan(decodedText);
+           onScanRef.current(decodedText);
         }).catch(console.error);
       }
     };
@@ -57,7 +64,7 @@ export default function BarcodeScanner({ onScan, onError, onClose }: BarcodeScan
               aspectRatio: 1.777,
             },
             onScanSuccess,
-            (error) => { if (onError) onError(error); }
+            (error) => { onErrorRef.current?.(error); }
           );
         } catch (err: unknown) {
           // Fallback to opposite camera when selected camera fails
@@ -71,7 +78,7 @@ export default function BarcodeScanner({ onScan, onError, onClose }: BarcodeScan
                 aspectRatio: 1.777,
               },
               onScanSuccess,
-              (error) => { if (onError) onError(error); }
+              (error) => { onErrorRef.current?.(error); }
             );
           } catch {
             const errMessage = err instanceof Error ? err.message : String(err);
@@ -94,7 +101,7 @@ export default function BarcodeScanner({ onScan, onError, onClose }: BarcodeScan
         }
       }
     };
-  }, [onScan, onError, facingMode]);
+  }, [facingMode]);
 
   return (
     <div className="fixed inset-0 z-50 bg-background/90 backdrop-blur-sm flex flex-col justify-center items-center p-4 animate-in fade-in duration-200">
