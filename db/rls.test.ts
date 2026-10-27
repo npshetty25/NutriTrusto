@@ -298,6 +298,126 @@ describe("household isolation", () => {
 });
 
 /**
+ * supabase-schema-household-v2.sql, applied on top of the earlier
+ * migrations. Run in production by the owner on 2026-10-27.
+ */
+describe("households v2", () => {
+  let db: PGlite;
+  let hid: string;
+  let code: string;
+  const names = async (user: string, table = "pantry_items") =>
+    (await as(db, user, () => db.query<{ name: string }>(`select name from public.${table} order by name`))).rows.map((r) => r.name);
+
+  beforeAll(async () => {
+    db = await freshDatabase(["supabase-schema-household-v2.sql"]);
+    const r = await as(db, ALICE, () =>
+      db.query<{ id: string; invite_code: string }>(`select * from public.create_household('Rao family')`)
+    );
+    hid = r.rows[0].id;
+    code = r.rows[0].invite_code;
+    // Bob has private items from before he joins.
+    await as(db, BOB, () =>
+      db.query(`insert into public.pantry_items (user_id, name, days_left) values ('${BOB}', 'Bob atta', 90), ('${BOB}', 'Bob milk', 2)`)
+    );
+    await as(db, BOB, () => db.query(`select public.join_household_by_code('${code}')`));
+  }, 60_000);
+  afterAll(async () => db.close());
+
+  it("a member's items from before they joined stay private until they share them", async () => {
+    expect(await names(ALICE)).toEqual([]);
+    const shared = await as(db, BOB, () =>
+      db.query<{ share_my_items_with_household: number }>(`select public.share_my_items_with_household()`)
+    );
+    expect(shared.rows[0].share_my_items_with_household).toBe(2);
+    expect(await names(ALICE)).toEqual(["Bob atta", "Bob milk"]);
+  });
+
+  it("lists members by name, never by email, and marks the creator", async () => {
+    const { rows } = await as(db, BOB, () =>
+      db.query<{ display_name: string; is_creator: boolean }>(`select display_name, is_creator from public.household_members_list()`)
+    );
+    expect(rows).toEqual([
+      { display_name: "Alice", is_creator: true },
+      { display_name: "Bob", is_creator: false },
+    ]);
+    const stranger = await as(db, CAROL, () => db.query(`select * from public.household_members_list()`));
+    expect(stranger.rows).toHaveLength(0);
+  });
+
+  it("allows one household per person, but re-joining your own is harmless", async () => {
+    await as(db, BOB, async () => {
+      await expect(db.query(`select * from public.create_household('Second home')`)).rejects.toThrow(/already in a household/);
+      await expect(db.query(`select public.join_household_by_code('${code}')`)).resolves.toBeDefined();
+    });
+    const other = await as(db, CAROL, () =>
+      db.query<{ invite_code: string }>(`select * from public.create_household('Carol home')`)
+    );
+    await as(db, BOB, async () => {
+      await expect(
+        db.query(`select public.join_household_by_code('${other.rows[0].invite_code}')`)
+      ).rejects.toThrow(/already in a household/);
+    });
+  });
+
+  it("shares a shopping list within the household, and not outside it", async () => {
+    await as(db, ALICE, () =>
+      db.query(`insert into public.shopping_list_items (user_id, household_id, name) values ('${ALICE}', '${hid}', 'Onions')`)
+    );
+    expect(await names(BOB, "shopping_list_items")).toEqual(["Onions"]);
+    expect(await names(CAROL, "shopping_list_items")).toEqual([]);
+    await as(db, CAROL, async () => {
+      await expect(
+        db.query(`insert into public.shopping_list_items (user_id, household_id, name) values ('${CAROL}', '${hid}', 'Injected')`)
+      ).rejects.toMatchObject({ code: "42501" });
+    });
+  });
+
+  it("only the creator can replace the invite code, and the old one stops working", async () => {
+    await as(db, BOB, async () => {
+      await expect(db.query(`select public.new_household_invite_code()`)).rejects.toMatchObject({ code: "42501" });
+    });
+    const fresh = await as(db, ALICE, () =>
+      db.query<{ new_household_invite_code: string }>(`select public.new_household_invite_code()`)
+    );
+    expect(fresh.rows[0].new_household_invite_code).toMatch(/^[0-9a-f]{12}$/);
+    expect(fresh.rows[0].new_household_invite_code).not.toBe(code);
+    await db.query(`delete from public.household_members where user_id = '${CAROL}'`);
+    await as(db, CAROL, async () => {
+      await expect(db.query(`select public.join_household_by_code('${code}')`)).rejects.toThrow(/Invalid invite code/);
+    });
+    code = fresh.rows[0].new_household_invite_code;
+  });
+
+  it("only the creator can remove a member, whose items go back to them", async () => {
+    await as(db, BOB, async () => {
+      await expect(db.query(`select public.remove_household_member('${ALICE}')`)).rejects.toMatchObject({ code: "42501" });
+    });
+    await as(db, ALICE, () => db.query(`select public.remove_household_member('${BOB}')`));
+    expect(await names(ALICE)).toEqual([]);
+    expect(await names(BOB)).toEqual(["Bob atta", "Bob milk"]);
+    const { rows } = await db.query(`select * from public.household_members where user_id = '${BOB}'`);
+    expect(rows).toHaveLength(0);
+  });
+
+  it("leaving takes your items with you; the last one out deletes the household", async () => {
+    await as(db, BOB, () => db.query(`select public.join_household_by_code('${code}')`));
+    await as(db, BOB, () => db.query(`select public.share_my_items_with_household()`));
+    await as(db, ALICE, () =>
+      db.query(`insert into public.pantry_items (user_id, household_id, name, days_left) values ('${ALICE}', '${hid}', 'Alice paneer', 3)`)
+    );
+    expect(await names(BOB)).toEqual(["Alice paneer", "Bob atta", "Bob milk"]);
+
+    await as(db, BOB, () => db.query(`select public.leave_household()`));
+    expect(await names(BOB)).toEqual(["Bob atta", "Bob milk"]);
+    expect(await names(ALICE)).toEqual(["Alice paneer"]);
+
+    await as(db, ALICE, () => db.query(`select public.leave_household()`));
+    expect((await db.query(`select * from public.households where id = '${hid}'`)).rows).toHaveLength(0);
+    expect(await names(ALICE)).toEqual(["Alice paneer"]);
+  });
+});
+
+/**
  * The pantry_items policy accepts `auth.uid() = user_id` in WITH CHECK without
  * looking at household_id, so on its own it would let a non-member write into
  * someone else's household. supabase-schema-household-guard.sql closes that

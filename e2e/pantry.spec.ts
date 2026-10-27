@@ -13,6 +13,22 @@ test.describe("pantry", () => {
     expect(names.slice(0, 3)).toEqual(["Paneer", "Spinach", "Basmati Rice"]);
   });
 
+  test("offers a recipe even when nothing in the pantry is close to expiring", async ({ backend, page }) => {
+    backend.seedPantry([
+      { name: "Basmati Rice", days_left: 300 },
+      { name: "Potatoes", days_left: 20 },
+      { name: "Onions", days_left: 25 },
+    ]);
+    backend.api["find-recipe"] = { body: { success: false, error: "No recipe in this test." } };
+    await openDashboard(page);
+
+    await expect(page.getByRole("heading", { name: "What can I cook?" })).toBeVisible();
+    await page.getByRole("button", { name: "Find a Recipe" }).click();
+    await expect.poll(() => backend.requests.filter((r) => r.path === "/api/find-recipe").length).toBe(1);
+    const sent = JSON.parse(String(backend.requests.find((r) => r.path === "/api/find-recipe")!.body));
+    expect(sent.items.map((i: { name: string }) => i.name)).toEqual(["Potatoes", "Onions", "Basmati Rice"]);
+  });
+
   test("scans a barcode by hand and adds the product to the pantry", async ({ backend, page }) => {
     await openDashboard(page);
 

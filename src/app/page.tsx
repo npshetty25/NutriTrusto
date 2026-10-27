@@ -113,9 +113,11 @@ import {
 import type { StorageLocation } from "@/lib/temperature";
 import {
   Camera, BrainCircuit, Loader2, TrendingUp, ScanLine,
-  Clock, X, Trash2, Info, Activity, Zap, AlertTriangle, CheckCircle2, Search, CircleAlert, Bell, Carrot, Apple, Milk, Drumstick, Wheat, CupSoda, Croissant, Snowflake, Candy, Package, ChevronLeft, ChevronRight, CalendarClock, Pencil, Sparkles, Plus, RefreshCw, SlidersHorizontal, Leaf, UtensilsCrossed, Check, Egg as EggIcon, Images, FileText
+  Clock, X, Trash2, Info, Activity, Zap, AlertTriangle, CheckCircle2, Search, CircleAlert, Bell, Carrot, Apple, Milk, Drumstick, Wheat, CupSoda, Croissant, Snowflake, Candy, Package, ChevronLeft, ChevronRight, CalendarClock, Pencil, Sparkles, Plus, RefreshCw, SlidersHorizontal, Leaf, UtensilsCrossed, Check, Egg as EggIcon, Images, FileText, Users
 } from "lucide-react";
 import ShoppingListModal from "@/components/shopping-list-modal";
+import { HouseholdModal } from "@/components/household-modal";
+import { looksLikeInviteCode, PENDING_JOIN_KEY } from "@/lib/household";
 import { CountUp } from "@/components/count-up";
 import { motion, AnimatePresence, MotionConfig } from "framer-motion";
 import { toast } from "sonner";
@@ -151,10 +153,15 @@ interface Item {
   // db/supabase-schema-accuracy.sql — undefined until it has run.
   expiryKind?: DateKind | null;
   quantity?: string | null;
+  // Who added it, and whether it is in a household (null = private).
+  ownerId?: string | null;
+  householdId?: string | null;
 }
 
 type PantryRow = {
   id: string;
+  user_id?: string | null;
+  household_id?: string | null;
   name: string;
   days_left: number;
   purchase_date: string;
@@ -188,6 +195,8 @@ function rowToItem(row: PantryRow): Item {
     expirySource: asExpirySource(row.expiry_source),
     expiryKind: asDateKind(row.expiry_kind),
     quantity: row.quantity ?? null,
+    ownerId: row.user_id ?? null,
+    householdId: row.household_id ?? null,
   };
 }
 
@@ -267,7 +276,7 @@ const INVENTORY_PAGE_SIZE = 6;
 // No fallback items — real users start with an empty pantry.
 
 export default function Home() {
-  const { user, loading: authLoading, household, householdSchemaReady, ingredientsSchemaReady, healthScoreSchemaReady, trackingSchemaReady, accuracySchemaReady } = useAuth();
+  const { user, loading: authLoading, household, householdLoading, householdMembers, sharedShoppingReady, householdSchemaReady, ingredientsSchemaReady, healthScoreSchemaReady, trackingSchemaReady, accuracySchemaReady } = useAuth();
   // UI-only gate, not a security one — see lib/admin.ts. Hides "Add Demo
   // Data" from everyone but the project owner, so a real user never sees a
   // button that fills their pantry with sample groceries.
@@ -390,6 +399,11 @@ export default function Home() {
   }, [user]);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [showShoppingList, setShowShoppingList] = useState(false);
+  const [showHousehold, setShowHousehold] = useState(false);
+  // A code from an invite link (?join=CODE), waiting for the dialog.
+  const [inviteJoinCode, setInviteJoinCode] = useState("");
+  // In a household: everyone's items, or only the ones I added.
+  const [ownerFilter, setOwnerFilter] = useState<"all" | "mine">("all");
   const [showPantryChat, setShowPantryChat] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
 
@@ -427,8 +441,18 @@ export default function Home() {
   const inventoryFilteredItems = displayedItems.filter((item) => {
     const matchesSearch = item.name.toLowerCase().includes(searchQuery.trim().toLowerCase());
     const matchesRisk = riskFilter === "all" ? true : item.risk === riskFilter;
-    return matchesSearch && matchesRisk;
+    const matchesOwner = ownerFilter === "all" || !household || item.ownerId === user?.id;
+    return matchesSearch && matchesRisk && matchesOwner;
   });
+
+  // Who added an item, said on its card while in a household. Names come
+  // from household_members_list() (the v2 migration); without it, "a member".
+  const ownerTagFor = (item: Item): string[] => {
+    if (!household) return [];
+    if (item.ownerId === user?.id) return [item.householdId ? "Added by you" : "Private to you"];
+    const name = householdMembers.find((m) => m.userId === item.ownerId)?.displayName;
+    return [name ? `Added by ${name}` : "Added by a member"];
+  };
   const sortedInventoryItems = [...inventoryFilteredItems].sort((a, b) => {
     if (inventorySortBy === "name") return a.name.localeCompare(b.name);
     if (inventorySortBy === "freshest") return b.daysLeft - a.daysLeft;
@@ -437,6 +461,9 @@ export default function Home() {
   const totalPages = Math.max(1, Math.ceil(sortedInventoryItems.length / INVENTORY_PAGE_SIZE));
   const paginatedItems = sortedInventoryItems.slice((currentPage - 1) * INVENTORY_PAGE_SIZE, currentPage * INVENTORY_PAGE_SIZE);
   const highRiskItems = displayedItems.filter(i => i.risk === "high");
+  // Items a recipe may use: anything not already past our estimate (the same
+  // rule generateRecipe applies before sending the pantry).
+  const cookableCount = displayedItems.filter(i => i.daysPastEstimate === 0).length;
   // Share of items that are not expiring soon. The old formula divided every
   // item's days-left by a fixed 14, so a 6-day staple bought that morning
   // contributed 43% and a perishable-heavy pantry could never score well —
@@ -802,7 +829,32 @@ export default function Home() {
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [user]);
+    // household?.id: creating, joining or leaving a household changes which
+    // rows this user can see. Without it a new member saw an empty pantry
+    // until they reloaded the page.
+  }, [user, household?.id]);
+
+  // ─── Invite links (?join=CODE) ──────────────────────────────────
+  // Kept in localStorage first, so the code survives a trip through the
+  // login page for someone who was not signed in yet.
+  useEffect(() => {
+    const code = new URLSearchParams(window.location.search).get("join");
+    if (!code) return;
+    try { localStorage.setItem(PENDING_JOIN_KEY, code.trim()); } catch { /* storage unavailable */ }
+    const url = new URL(window.location.href);
+    url.searchParams.delete("join");
+    window.history.replaceState(null, "", url.pathname + url.search + url.hash);
+  }, []);
+  useEffect(() => {
+    if (!user || householdLoading) return;
+    let code: string | null = null;
+    try { code = localStorage.getItem(PENDING_JOIN_KEY); localStorage.removeItem(PENDING_JOIN_KEY); } catch { /* storage unavailable */ }
+    if (!code || !looksLikeInviteCode(code)) return;
+    // Opening a dialog in response to a one-time URL value is a sync with
+    // the outside world, which is what effects are for.
+    setInviteJoinCode(code);
+    setShowHousehold(true);
+  }, [user, householdLoading]);
 
   // ─── Expiry nudge ───────────────────────────────────────────────
   // Both read straight from user_metadata — see NotificationPreferencesModal,
@@ -1306,6 +1358,8 @@ export default function Home() {
       user_id: user.id,
       name: row.quantity ? `${row.item} — ${row.quantity}` : row.item,
       source_recipe: generatedRecipe.title,
+      // On the household's shared list once that column exists (v2 migration).
+      ...(sharedShoppingReady && household ? { household_id: household.id } : {}),
     }));
 
     const { error } = await supabase.from("shopping_list_items").insert(rows);
@@ -1921,7 +1975,7 @@ if (nutritionFieldsFilled < 2) {
           initial={{ opacity: 0, y: -14 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ type: "spring", stiffness: 300, damping: 26 }}
-          className="flex justify-between items-center mb-8"
+          className="flex justify-between items-center mb-5"
         >
           {/* min-w-0 has to live on the flex CHILD, not two levels deep on a
               grandchild — a nested min-w-0 zeroes out that branch's own
@@ -1943,13 +1997,18 @@ if (nutritionFieldsFilled < 2) {
               />
             </motion.div>
             <div className="min-w-0 flex-1">
-              <h1 className="text-xl font-bold tracking-tight leading-none">Nutri-Trust</h1>
-              {/* A greeting and one plain sentence. The header was a logo and
-                  two icons: it identified the app but told the user nothing,
-                  so the first thing they read was an uppercase metric label. */}
-              <p className="text-[11px] text-foreground/60 mt-1 truncate">
-                {greeting}{firstName ? `, ${firstName}` : ""} · {pantrySummary}
-              </p>
+              <h1 className="text-base font-bold tracking-tight leading-none">Nutri-Trust</h1>
+              {household && (
+                <button
+                  type="button"
+                  onClick={() => { setInviteJoinCode(""); setShowHousehold(true); }}
+                  className="mt-1 text-[11px] font-semibold text-foreground/60 hover:text-foreground inline-flex items-center gap-1 max-w-full"
+                  title="Household settings"
+                >
+                  <Users size={11} className="shrink-0" />
+                  <span className="truncate">{household.name}{householdMembers.length > 1 ? ` · ${householdMembers.length} people` : ""}</span>
+                </button>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -1978,9 +2037,52 @@ if (nutritionFieldsFilled < 2) {
                 </motion.span>
               )}
             </motion.button>
-            <ProfileDropdown onOpenShoppingList={() => setShowShoppingList(true)} onReplayTour={() => setShowOnboarding(true)} />
+            <ProfileDropdown
+              onOpenShoppingList={() => setShowShoppingList(true)}
+              onReplayTour={() => setShowOnboarding(true)}
+              onOpenHousehold={() => { setInviteJoinCode(""); setShowHousehold(true); }}
+            />
           </div>
         </motion.div>
+
+        {/* The greeting, then what to do about it. The header used to fit the
+            whole state of the pantry into one 11px line; the items that need
+            eating are the first thing a person opening this app wants, so
+            they get named, at size, and each one goes straight to its card. */}
+        <div className="mb-5">
+          <p className="text-[28px] sm:text-3xl font-bold tracking-tight leading-tight text-balance">
+            {greeting}{firstName ? `, ${firstName}` : ""}
+          </p>
+          <p className="text-sm text-foreground/65 mt-1">
+            {highRiskItems.length > 0
+              ? `${highRiskItems.length} ${highRiskItems.length === 1 ? "item needs" : "items need"} eating soon.`
+              : visibleItems.length === 0
+                ? "Your pantry is empty. Add what you bought to start tracking it."
+                : `${pantrySummary.charAt(0).toUpperCase()}${pantrySummary.slice(1)}.`}
+          </p>
+          {highRiskItems.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-2" aria-label="Eat soon">
+              {[...highRiskItems].sort((a, b) => a.daysLeft - b.daysLeft).slice(0, 5).map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => {
+                    setRiskFilter("high");
+                    setSearchQuery(item.name);
+                    document.getElementById("inventory-log")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                  }}
+                  className="neu-pressable min-h-11 pl-3 pr-3.5 rounded-xl inline-flex items-center gap-2 text-sm font-semibold"
+                >
+                  <span className="tabular-nums font-extrabold text-danger-strong">{item.daysLeft === 0 ? "!" : `${item.daysLeft}d`}</span>
+                  <span className="max-w-[10rem] truncate">{item.name}</span>
+                </button>
+              ))}
+              {highRiskItems.length > 5 && (
+                <span className="min-h-11 inline-flex items-center px-2 text-xs font-semibold text-foreground/55">+{highRiskItems.length - 5} more</span>
+              )}
+            </div>
+          )}
+        </div>
 
         {/* KPI Widgets */}
         <motion.div
@@ -2007,7 +2109,9 @@ if (nutritionFieldsFilled < 2) {
               <TrendingUp size={14} className="text-safe" />
               <span className="text-[10px] uppercase font-semibold tracking-widest text-foreground/70">Pantry Freshness</span>
             </div>
-            <p className="text-3xl font-semibold tracking-tighter">
+            <p className={`text-4xl font-extrabold tracking-tight tabular-nums ${
+              displayedItems.length === 0 ? "" : freshnessScore >= 66 ? "text-safe-strong" : freshnessScore >= 33 ? "text-warning-strong" : "text-danger-strong"
+            }`}>
               <CountUp value={freshnessScore} suffix="%" />
             </p>
             <div className="mt-2 h-1.5 w-full rounded-full bg-foreground/10 overflow-hidden">
@@ -2040,7 +2144,7 @@ if (nutritionFieldsFilled < 2) {
               <span className={`inline-flex w-2 h-2 rounded-full ${highRiskItems.length > 0 ? "bg-danger" : "bg-safe"}`} />
               <span className="text-[10px] uppercase font-semibold tracking-widest text-foreground/70">Critical Items</span>
             </div>
-            <p className="text-3xl font-semibold tracking-tighter">
+            <p className={`text-4xl font-extrabold tracking-tight tabular-nums ${highRiskItems.length > 0 ? "text-danger-strong" : "text-safe-strong"}`}>
               <CountUp value={highRiskItems.length} />
             </p>
             <p className="text-xs text-foreground/60 mt-1">
@@ -2057,13 +2161,23 @@ if (nutritionFieldsFilled < 2) {
             part of the site banner, and it sat above the section holding the
             actual data. It carries its own padding now that it no longer
             inherits the header's. */}
-        {highRiskItems.length > 0 && (
+        {/* Shown whenever there is something to cook with. It used to need a
+            critical item, so a pantry that was all green had no way to ask
+            for a recipe at all — the moment it is most pleasant to cook. The
+            route already ranks dishes by whatever expires soonest. */}
+        {cookableCount > 0 && (
           <div className="mx-4 mt-5 neu-raised rounded-2xl overflow-hidden">
             {!generatedRecipe ? (
               <div className="p-4 flex flex-col gap-4">
                 <div>
-                  <h2 className="font-semibold text-sm flex items-center gap-2"><BrainCircuit size={14} /> Use up what&apos;s expiring</h2>
-                  <p className="text-xs text-foreground/60 mt-1">Cook something using what expires first.</p>
+                  <h2 className="font-semibold text-sm flex items-center gap-2">
+                    <BrainCircuit size={14} /> {highRiskItems.length > 0 ? "Use up what's expiring" : "What can I cook?"}
+                  </h2>
+                  <p className="text-xs text-foreground/60 mt-1">
+                    {highRiskItems.length > 0
+                      ? "Cook something using what expires first."
+                      : "Nothing is close to expiring. Get a dish that uses what you have, soonest-to-go first."}
+                  </p>
                 </div>
                 <motion.button
                   whileHover={{ scale: isGeneratingRecipe ? 1 : 1.04 }}
@@ -2403,6 +2517,26 @@ if (nutritionFieldsFilled < 2) {
                   </div>
                 )}
 
+                {household && (
+                  <div role="group" aria-label="Whose items" className="grid grid-cols-2 gap-2">
+                    {([
+                      { id: "all", label: `Everyone's` },
+                      { id: "mine", label: "Only mine" },
+                    ] as const).map(({ id, label }) => (
+                      <button
+                        key={id}
+                        onClick={() => setOwnerFilter(id)}
+                        aria-pressed={ownerFilter === id}
+                        className={`h-11 rounded-xl text-xs font-bold transition-all ${
+                          ownerFilter === id ? "bg-foreground text-background" : "neu-raised-sm text-foreground/70 hover:text-foreground"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
                 <div className="grid grid-cols-2 gap-2">
                   <div className="flex flex-col gap-1.5">
                     <label htmlFor="risk-filter" className="text-[10px] font-semibold uppercase tracking-widest text-foreground/60">Show</label>
@@ -2537,7 +2671,7 @@ if (nutritionFieldsFilled < 2) {
                   storageDisclaimer={item.expirySource ? undefined : shelfEstimate.disclaimer}
                   ifStoredDifferently={item.expirySource ? undefined : shelfEstimate.ifStoredDifferently}
                   currentStorage={item.storage ?? shelfRow?.storage}
-                  trackingTags={trackingTagsFor(item)}
+                  trackingTags={[...ownerTagFor(item), ...trackingTagsFor(item)]}
                   pastDateNote={item.expirySource ? pastDateMessage(item.expiryKind ?? null) : null}
                   healthierAlternative={healthierAlternative}
                   detectedAllergens={detectedAllergens}
@@ -3365,6 +3499,9 @@ if (nutritionFieldsFilled < 2) {
         />
       )}
 
+      {showHousehold && (
+        <HouseholdModal initialJoinCode={inviteJoinCode} onClose={() => { setShowHousehold(false); setInviteJoinCode(""); }} />
+      )}
       {showShoppingList && (
         <ShoppingListModal onClose={() => setShowShoppingList(false)} />
       )}

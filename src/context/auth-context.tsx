@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
+import { fetchMembers, type HouseholdMember } from "@/lib/household";
 import type { User, Session } from "@supabase/supabase-js";
 
 export interface HouseholdInfo {
@@ -23,6 +24,12 @@ interface AuthContextType {
   household: HouseholdInfo | null;
   householdLoading: boolean;
   refreshHousehold: () => Promise<void>;
+  /** Members of my household, by name. Empty until db/supabase-schema-household-v2.sql has run. */
+  householdMembers: HouseholdMember[];
+  /** True once the v2 household functions exist; null while unknown or with no household. */
+  householdV2Ready: boolean | null;
+  /** shopping_list_items.household_id exists (v2), so the list can be shared. */
+  sharedShoppingReady: boolean | null;
   // True once we've confirmed pantry_items.household_id actually exists
   // (i.e. db/supabase-schema-additions.sql has been run). Null while unknown.
   // Callers must gate on this before including household_id in an insert —
@@ -58,12 +65,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [healthScoreSchemaReady, setHealthScoreSchemaReady] = useState<boolean | null>(null);
   const [trackingSchemaReady, setTrackingSchemaReady] = useState<boolean | null>(null);
   const [accuracySchemaReady, setAccuracySchemaReady] = useState<boolean | null>(null);
+  const [householdMembers, setHouseholdMembers] = useState<HouseholdMember[]>([]);
+  const [householdV2Ready, setHouseholdV2Ready] = useState<boolean | null>(null);
+  const [sharedShoppingReady, setSharedShoppingReady] = useState<boolean | null>(null);
 
   const refreshHousehold = useCallback(async () => {
     if (!user) {
       setHousehold(null);
+      setHouseholdMembers([]);
       return;
     }
+    const loadMembers = async () => {
+      const members = await fetchMembers();
+      setHouseholdV2Ready(members !== "unavailable");
+      setHouseholdMembers(Array.isArray(members) ? members : []);
+    };
     setHouseholdLoading(true);
     const { data, error } = await supabase
       .from("household_members")
@@ -74,6 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (error || !data || data.length === 0) {
       setHousehold(null);
+      setHouseholdMembers([]);
       setHouseholdLoading(false);
       return;
     }
@@ -81,8 +98,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const row = data[0] as unknown as { households: { id: string; name: string; invite_code: string } | null };
     if (row.households) {
       setHousehold({ id: row.households.id, name: row.households.name, inviteCode: row.households.invite_code });
+      await loadMembers();
     } else {
       setHousehold(null);
+      setHouseholdMembers([]);
     }
     setHouseholdLoading(false);
   }, [user]);
@@ -119,6 +138,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       supabase.from("pantry_items").select("household_id").limit(1).then(({ error }) => {
         setHouseholdSchemaReady(!error);
       });
+      supabase.from("shopping_list_items").select("household_id").limit(1).then(({ error }) => {
+        setSharedShoppingReady(!error);
+      });
       supabase.from("pantry_items").select("health_score").limit(1).then(({ error }) => {
         setHealthScoreSchemaReady(!error);
       });
@@ -137,6 +159,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
     } else {
       setHousehold(null);
+      setHouseholdMembers([]);
+      setHouseholdV2Ready(null);
+      setSharedShoppingReady(null);
       setHouseholdSchemaReady(null);
       setIngredientsSchemaReady(null);
       setHealthScoreSchemaReady(null);
@@ -175,7 +200,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, signIn, signUp, signOut, signInWithGoogle, household, householdLoading, refreshHousehold, householdSchemaReady, ingredientsSchemaReady, healthScoreSchemaReady, trackingSchemaReady, accuracySchemaReady }}>
+    <AuthContext.Provider value={{ user, session, loading, signIn, signUp, signOut, signInWithGoogle, household, householdLoading, refreshHousehold, householdMembers, householdV2Ready, sharedShoppingReady, householdSchemaReady, ingredientsSchemaReady, healthScoreSchemaReady, trackingSchemaReady, accuracySchemaReady }}>
       {children}
     </AuthContext.Provider>
   );

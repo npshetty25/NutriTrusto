@@ -55,7 +55,9 @@ test.describe("household", () => {
     await openMenuItem(page, /Household Settings/);
 
     await page.getByRole("button", { name: /Create a Household/ }).click();
-    await expect(page.getByText("Asha Rao's Household")).toBeVisible();
+    // In the dialog; the header names the household too once you're in one.
+    await expect(page.getByRole("dialog").getByText("Asha Rao's Household")).toBeVisible();
+    await expect(page.getByRole("button", { name: /Asha Rao's Household/ })).toBeVisible();
     const code = backend.tables.households[0].invite_code as string;
     await expect(page.getByText(code)).toBeVisible();
     expect(backend.tables.household_members).toHaveLength(1);
@@ -68,7 +70,46 @@ test.describe("household", () => {
 
     await page.getByPlaceholder("Enter invite code").fill("abc123def456");
     await page.getByRole("button", { name: "Join" }).click();
-    await expect(page.getByText("Rao family")).toBeVisible();
+    await expect(page.getByRole("dialog").getByText("Rao family")).toBeVisible();
+  });
+
+  test("after joining, offers to share the items you already had, and shares them", async ({ backend, page }) => {
+    backend.seedPantry([{ name: "Paneer", days_left: 3 }]);
+    backend.tables.households.push({ id: "h-rao", name: "Rao family", invite_code: "abc123def456", created_by: "u-ravi" });
+    backend.tables.household_members.push({ household_id: "h-rao", user_id: "u-ravi", display_name: "Ravi", joined_at: "2026-10-01T00:00:00Z" });
+    await openDashboard(page);
+    await openMenuItem(page, /Household Settings/);
+
+    await page.getByPlaceholder("Enter invite code").fill("abc123def456");
+    await page.getByRole("button", { name: "Join" }).click();
+    await expect(page.getByText("1 item of yours is private")).toBeVisible();
+    await expect(page.getByText("Ravi", { exact: true })).toBeVisible();
+
+    await page.getByRole("button", { name: /Share it with the household/ }).click();
+    await expect.poll(() => backend.tables.pantry_items[0].household_id).toBe("h-rao");
+    await expect(page.getByText(/of yours (is|are) private/)).toHaveCount(0);
+  });
+
+  test("an invite link opens the join dialog with the code filled in", async ({ backend, page }) => {
+    void backend;
+    await page.goto("/?join=abc123def456");
+    await expect(page.getByPlaceholder("Enter invite code")).toHaveValue("abc123def456");
+    await expect(page).not.toHaveURL(/join=/);
+  });
+
+  test("leaving asks first, then takes your items back to your private pantry", async ({ backend, page }) => {
+    backend.tables.households.push({ id: "h-rao", name: "Rao family", invite_code: "abc123def456", created_by: backend.user.id });
+    backend.tables.household_members.push({ household_id: "h-rao", user_id: backend.user.id, joined_at: "2026-10-01T00:00:00Z" });
+    backend.seedPantry([{ name: "Paneer", days_left: 3 }]);
+    backend.tables.pantry_items[0].household_id = "h-rao";
+    await openDashboard(page);
+    await openMenuItem(page, /Household Settings/);
+
+    await page.getByRole("button", { name: /Leave Household/ }).click();
+    await page.getByRole("button", { name: /Yes, leave/ }).click();
+    await expect.poll(() => backend.tables.household_members.length).toBe(0);
+    expect(backend.tables.pantry_items[0].household_id).toBeNull();
+    await expect(page.getByRole("button", { name: /Create a Household/ })).toBeVisible();
   });
 
   test("an unknown invite code is rejected with a clear message", async ({ backend, page }) => {
