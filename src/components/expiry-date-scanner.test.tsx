@@ -63,8 +63,55 @@ describe("ExpiryDateScanner — reading a date", () => {
     expect(init.body.get("label")).toBeInstanceOf(File);
   });
 
+  it("sends the phone's own date, so the server counts from the same today", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date(2026, 9, 28, 1, 0)); // 1 am here; still the 27th in UTC
+    respond({ success: false });
+    setup();
+    await userEvent.setup({ advanceTimers: vi.advanceTimersByTime }).upload(screen.getByLabelText("Capture expiry date"), photo());
+    await waitFor(() => expect(apiFetch).toHaveBeenCalledOnce());
+    const [, init] = apiFetch.mock.calls[0] as [string, { body: FormData }];
+    expect(init.body.get("today")).toBe("2026-10-28");
+  });
+
+  it("counts the days from the date itself, in this phone's calendar", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date(2026, 9, 10, 23, 30));
+    // The server's count is a day out (its today is UTC); the date is what counts.
+    respond({ success: true, expiry: { days_left: 43, expiry_date: "2026-11-21", source: "printed_expiry", confidence: "high", raw_text_found: null } });
+    const { onResult } = setup();
+    await userEvent.setup({ advanceTimers: vi.advanceTimersByTime }).upload(screen.getByLabelText("Capture expiry date"), photo());
+    await screen.findByText("Expiry date found!");
+    await act(async () => {
+      vi.advanceTimersByTime(800);
+    });
+    expect(onResult).toHaveBeenCalledWith(expect.objectContaining({ days_left: 42 }));
+  });
+
+  it("shows how the date was worked out, and warns when it has already passed", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date(2026, 9, 10, 12, 0));
+    respond({
+      success: true,
+      expiry: { days_left: 0, expiry_date: "2026-09-30", source: "printed_expiry", confidence: "high", raw_text_found: "EXP SEP 2026", notes: ["The pack gives only the month, so this runs to the end of September 2026."] },
+    });
+    const { onResult } = setup();
+    await userEvent.setup({ advanceTimers: vi.advanceTimersByTime }).upload(screen.getByLabelText("Capture expiry date"), photo());
+    expect(await screen.findByText(/already passed.*end of September 2026/)).toBeInTheDocument();
+    // Held long enough to read, not whisked away after the usual 0.8 s.
+    await act(async () => {
+      vi.advanceTimersByTime(800);
+    });
+    expect(onResult).not.toHaveBeenCalled();
+    await act(async () => {
+      vi.advanceTimersByTime(1800);
+    });
+    expect(onResult).toHaveBeenCalledOnce();
+  });
+
   it("hands a confident result to the parent after the success flash", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date(2026, 9, 10, 12, 0));
     const expiry = { days_left: 42, expiry_date: "2026-11-21", source: "printed_expiry", confidence: "high", raw_text_found: "EXP 21/11/2026" };
     respond({ success: true, expiry });
     const { onResult } = setup();
@@ -81,6 +128,7 @@ describe("ExpiryDateScanner — reading a date", () => {
 
   it("warns, but still accepts, a medium-confidence date", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date(2026, 9, 10, 12, 0));
     const expiry = { days_left: 10, expiry_date: "2026-10-20", source: "printed_expiry", confidence: "medium", raw_text_found: null };
     respond({ success: true, expiry });
     const { onResult } = setup();
@@ -88,7 +136,7 @@ describe("ExpiryDateScanner — reading a date", () => {
     await userEvent.setup({ advanceTimers: vi.advanceTimersByTime }).upload(screen.getByLabelText("Capture expiry date"), photo());
     expect(await screen.findByText(/double-check against the physical package/)).toBeInTheDocument();
     await act(async () => {
-      vi.advanceTimersByTime(800);
+      vi.advanceTimersByTime(2600);
     });
     expect(onResult).toHaveBeenCalledWith(expiry);
   });

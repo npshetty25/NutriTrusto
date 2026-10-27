@@ -19,7 +19,8 @@ vi.mock("@/lib/api-auth", async (importOriginal) => ({
 let POST: (req: Request) => Promise<Response>;
 let userSeq = 0;
 
-// "Today" for every test. The route measures from UTC midnight of this date.
+// "Today" for every test. Without a date from the phone, the route counts
+// from this instant's UTC date.
 const NOW = new Date("2026-10-10T15:30:00Z");
 
 beforeAll(async () => {
@@ -60,7 +61,35 @@ describe("POST /api/scan-expiry-date — resolving a date", () => {
       raw_text_found: "EXP 20/10/2026",
       // "EXP" on the pack is a use-by (safety) date, read from the excerpt.
       date_kind: "use_by",
+      notes: [],
     });
+  });
+
+  it("reads a month-only date to the end of that month, as Codex's 'best before end' does", async () => {
+    const { body } = await scan({ expiry_date_iso: "2027-05", confidence: "high", raw_text_found: "BB MAY 2027" });
+    expect(body.expiry).toMatchObject({ expiry_date: "2027-05-31", source: "printed_expiry", date_kind: "best_before" });
+    expect((body.expiry.notes as string[])[0]).toMatch(/end of May 2027/);
+  });
+
+  it("counts from the phone's today when it is within a day of the server's", async () => {
+    const withToday = (today: string) => {
+      const form = new FormData();
+      form.append("label", fileWithHeader());
+      form.append("today", today);
+      return new Request("http://localhost/api/test", { method: "POST", body: form });
+    };
+    generateContent.mockResolvedValue(geminiText(JSON.stringify({ expiry_date_iso: "2026-10-20", confidence: "high" })));
+    // Already the 11th on the phone; still the 10th in UTC.
+    const ahead = await (await POST(withToday("2026-10-11"))).json();
+    expect(ahead.expiry.days_left).toBe(9);
+    // A clock months out is not trusted.
+    const wrongClock = await (await POST(withToday("2026-12-25"))).json();
+    expect(wrongClock.expiry.days_left).toBe(10);
+  });
+
+  it("does not report a date that needs checking as high confidence", async () => {
+    const { body } = await scan({ expiry_date_iso: "2019-01-01", mfd_date_iso: "2026-09-01", shelf_life_value: 6, shelf_life_unit: "months", confidence: "high" });
+    expect(body.expiry).toMatchObject({ source: "mfd_plus_shelf_life", expiry_date: "2027-03-01", confidence: "medium" });
   });
 
   it("says when the printed date is a best-before rather than a use-by", async () => {
@@ -71,9 +100,10 @@ describe("POST /api/scan-expiry-date — resolving a date", () => {
   });
 
   it("adds a printed shelf life to the manufacture date when there is no expiry date", async () => {
-    // 1 Sep 2026 + 6 months (180 days) = 28 Feb 2027, which is 141 days after 10 Oct 2026.
+    // 1 Sep 2026 + 6 calendar months = 1 Mar 2027, 142 days after 10 Oct 2026.
+    // (Six 30-day blocks used to land on 28 Feb.)
     const { body } = await scan({ mfd_date_iso: "2026-09-01", shelf_life_value: 6, shelf_life_unit: "months", confidence: "medium" });
-    expect(body.expiry).toMatchObject({ source: "mfd_plus_shelf_life", expiry_date: "2027-02-28", days_left: 141, confidence: "medium" });
+    expect(body.expiry).toMatchObject({ source: "mfd_plus_shelf_life", expiry_date: "2027-03-01", days_left: 142, confidence: "medium" });
   });
 
   it("counts a bare shelf life from today", async () => {
@@ -102,18 +132,19 @@ describe("POST /api/scan-expiry-date — resolving a date", () => {
     expect(body.expiry).toMatchObject({ source: "shelf_life_from_today", days_left: 3650 });
   });
 
-  it("converts years and months with 365- and 30-day approximations", async () => {
+  it("converts years and months as calendar months, not 365- and 30-day blocks", async () => {
     const years = await scan({ shelf_life_value: 1, shelf_life_unit: "years" });
-    expect(years.body.expiry).toMatchObject({ days_left: 365 });
+    expect(years.body.expiry).toMatchObject({ expiry_date: "2027-10-10", days_left: 365 });
+    // 10 Oct → 10 Jan is 92 days; 3 × 30 said 90.
     const months = await scan({ shelf_life_value: 3, shelf_life_unit: "months" });
-    expect(months.body.expiry).toMatchObject({ days_left: 90 });
+    expect(months.body.expiry).toMatchObject({ expiry_date: "2027-01-10", days_left: 92 });
   });
 });
 
 describe("POST /api/scan-expiry-date — refusing to invent a date", () => {
   it("reports unknown when the model found nothing", async () => {
     const { body } = await scan({ expiry_date_iso: null, mfd_date_iso: null, shelf_life_value: null, shelf_life_unit: null, confidence: "low" });
-    expect(body.expiry).toEqual({ days_left: null, expiry_date: null, source: "unknown", confidence: "low", raw_text_found: null, date_kind: null });
+    expect(body.expiry).toEqual({ days_left: null, expiry_date: null, source: "unknown", confidence: "low", raw_text_found: null, date_kind: null, notes: [] });
   });
 
   it("ignores a date that is not valid ISO", async () => {
