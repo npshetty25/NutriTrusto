@@ -22,7 +22,7 @@ export const PROJECT_REF = new URL(SUPABASE_URL).hostname.split(".")[0];
 export const SESSION_KEY = `sb-${PROJECT_REF}-auth-token`;
 
 type Row = Record<string, unknown>;
-export type RecordedRequest = { method: string; path: string; query: string; body: unknown };
+export type RecordedRequest = { method: string; path: string; query: string; body: unknown; authorization?: string | null };
 
 const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString("base64url");
 const uuid = () => crypto.randomUUID();
@@ -217,6 +217,8 @@ export class FakeBackend {
       path: url.pathname,
       query: url.search,
       body: route.request().postData() ?? null,
+      // The real routes answer 401 without it; this fake does not check, so tests assert it was sent.
+      authorization: route.request().headers()["authorization"] ?? null,
     });
     const canned = this.api[name];
     if (!canned) return this.json(route, { error: `no fake for /api/${name}` }, 501);
