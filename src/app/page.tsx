@@ -3757,6 +3757,7 @@ if (nutritionFieldsFilled < 2) {
         <MealPlanModal
           items={displayedItems.map((i) => ({ name: i.name, daysLeft: i.daysLeft, daysPastEstimate: i.daysPastEstimate }))}
           dietaryPreference={String(user?.user_metadata?.dietary_preference || "none")}
+          profile={foodProfile}
           onAddToShopping={addNamesToShoppingList}
           onClose={() => setShowMealPlan(false)}
         />

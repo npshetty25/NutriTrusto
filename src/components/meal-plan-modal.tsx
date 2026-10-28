@@ -4,10 +4,12 @@ import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { X, CalendarDays, ShoppingCart, Loader2, Check } from "lucide-react";
 import { planWeek, shoppingForPlan, type PlanItem } from "@/lib/meal-plan";
+import type { FoodProfile } from "@/lib/food-profile";
 
 interface MealPlanModalProps {
   items: PlanItem[];
   dietaryPreference: string;
+  profile: FoodProfile;
   /** Adds the names to the shopping list; resolves true when saved. */
   onAddToShopping: (names: string[], source: string) => Promise<boolean>;
   onClose: () => void;
@@ -21,8 +23,8 @@ const dayLabel = (offset: number) => {
   return d.toLocaleDateString("en-IN", { weekday: "long" });
 };
 
-export function MealPlanModal({ items, dietaryPreference, onAddToShopping, onClose }: MealPlanModalProps) {
-  const plan = useMemo(() => planWeek(items, dietaryPreference), [items, dietaryPreference]);
+export function MealPlanModal({ items, dietaryPreference, profile, onAddToShopping, onClose }: MealPlanModalProps) {
+  const plan = useMemo(() => planWeek(items, dietaryPreference, 7, { profile }), [items, dietaryPreference, profile]);
   const toBuy = useMemo(() => shoppingForPlan(plan), [plan]);
   const [adding, setAdding] = useState(false);
   const [added, setAdded] = useState(false);
@@ -61,9 +63,15 @@ export function MealPlanModal({ items, dietaryPreference, onAddToShopping, onClo
                 {plan.map((m) => (
                   <li key={m.day} className="rounded-xl bg-foreground/5 border border-border/50 px-4 py-3">
                     <p className="text-[10px] font-semibold uppercase tracking-widest text-foreground/50">{dayLabel(m.day)}</p>
-                    <p className="font-semibold text-sm mt-0.5">{m.dish}</p>
-                    <p className="text-[11px] text-foreground/60 mt-0.5">Uses {m.uses.join(", ")}</p>
-                    {m.toBuy.length > 0 && <p className="text-[11px] text-foreground/60">Buy: {m.toBuy.join(", ")}</p>}
+                    {m.fasting ? (
+                      <p className="font-semibold text-sm mt-0.5 text-foreground/60">Fasting day</p>
+                    ) : (
+                      <>
+                        <p className="font-semibold text-sm mt-0.5">{m.dish}</p>
+                        <p className="text-[11px] text-foreground/60 mt-0.5">Uses {m.uses.join(", ")}</p>
+                        {m.toBuy.length > 0 && <p className="text-[11px] text-foreground/60">Buy: {m.toBuy.join(", ")}</p>}
+                      </>
+                    )}
                   </li>
                 ))}
               </ul>
