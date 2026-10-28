@@ -9,7 +9,11 @@ export const ADMIN_TEST_EMAIL = "admin@example.test";
  * the default account (vegetarian); a string sets it (`test.use({ diet: "non-veg" })`);
  * `""` leaves the account with no diet at all, as a fresh Google sign-in is.
  */
-type Options = { diet: string | undefined };
+type Options = {
+  diet: string | undefined;
+  /** `test.use({ liveRealtime: true })` answers the realtime socket (fake-backend liveRealtime) instead of leaving it silent. */
+  liveRealtime: boolean;
+};
 
 function applyDiet(backend: FakeBackend, diet: string | undefined) {
   if (diet === undefined) return;
@@ -35,17 +39,19 @@ type Fixtures = {
 
 export const test = base.extend<Fixtures & Options>({
   diet: [undefined, { option: true }],
+  liveRealtime: [false, { option: true }],
   anonymous: async ({ context, page }, provide) => {
     const backend = new FakeBackend();
     await backend.install(context);
     await backend.quietRealtime(page);
     await provide(backend);
   },
-  backend: async ({ context, page, diet }, provide) => {
+  backend: async ({ context, page, diet, liveRealtime }, provide) => {
     const backend = new FakeBackend();
     applyDiet(backend, diet);
     await backend.install(context, { signedIn: true });
-    await backend.quietRealtime(page);
+    if (liveRealtime) await backend.liveRealtime(page);
+    else await backend.quietRealtime(page);
     await provide(backend);
   },
   adminBackend: async ({ context, page }, provide) => {
