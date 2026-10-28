@@ -6,6 +6,30 @@ reason. Nothing changes silently.
 
 ---
 
+## 2026-10-29 — a kitchen setting, and a date rule for leftovers
+
+**No row in `shelf-life-data.ts` changed, and nobody's numbers move until they choose.**
+
+**Kitchen temperature** (profile menu → Kitchen). The counter was fixed at 29 °C
+all year. It is now 26, 29 (the default, so nothing changes) or 34 °C by a
+Cool / Normal / Hot choice on the account, run through the same model as before
+(`lib/temperature.ts`). Only the counter moves; the fridge (7 °C) and freezer do
+not follow the room. Cool is capped at 26 °C because it lengthens estimates, and a
+too-long estimate is the unsafe way to be wrong. It applies to items added after
+the choice: stored items keep the estimate they were given, and a receipt is
+estimated on the server at the default.
+
+**Leftovers** are a new kind of item with a rule of their own, not a table row:
+
+| Where it is | Days | Source |
+|---|---|---|
+| Fridge | **3** | USDA FSIS, Leftovers and Food Safety: 3 to 4 days (rounded down) |
+| Freezer | **90** | the same: 3 to 4 months (rounded down) |
+| Counter | **0**, eat today | the 2-hour limit is already the limit |
+| Out more than 2 hours | not added | refused, with the reason |
+
+---
+
 ## 2026-10-28 — a pack's own date is kept as a date
 
 **No row in `shelf-life-data.ts` changed.** What changed is how an item with a
