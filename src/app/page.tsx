@@ -104,6 +104,7 @@ import {
   STORAGE_OPTIONS,
   OPENED_DAYS_OPTIONS,
   afterOpening,
+  dateInDays,
   daysLeftAfterMove,
   daysUntilDate,
   defaultStorageFor,
@@ -1047,6 +1048,8 @@ export default function Home() {
     // Signed: negative while past its date, so an edit that leaves the date alone keeps it past.
     let remaining = editingItem.daysLeft - editingItem.daysPastEstimate;
     let source: ExpirySource = editingItem.expirySource ?? null;
+    // The person's own date as a date; a day count they type becomes one too.
+    let expiryDate: string | null = editingItem.expiryDate ?? null;
     if (editDate) {
       const fromDate = daysUntilDate(editDate);
       if (fromDate === null) {
@@ -1055,6 +1058,7 @@ export default function Home() {
       }
       remaining = fromDate;
       source = "user";
+      expiryDate = editDate;
     } else if (editDaysLeft.trim() !== String(editingItem.daysLeft)) {
       const parsedDaysLeft = Math.round(Number(editDaysLeft));
       if (!editDaysLeft.trim() || !Number.isFinite(parsedDaysLeft) || parsedDaysLeft < 0) {
@@ -1063,6 +1067,7 @@ export default function Home() {
       }
       remaining = Math.min(3650, parsedDaysLeft);
       source = "user";
+      expiryDate = dateInDays(remaining);
     }
 
     let note = "";
@@ -1083,6 +1088,7 @@ export default function Home() {
       const opened = afterOpening({ daysLeft: remaining, expirySource: source, expiryKind: editingItem.expiryKind ?? null }, useWithin);
       remaining = opened.daysLeft;
       source = opened.expirySource;
+      if (opened.shortened) expiryDate = null;
     }
     const openedAt = editOpened ? (editingItem.openedAt ?? new Date().toISOString()) : null;
     const storage = editStorage ?? editingItem.storage ?? null;
@@ -1108,6 +1114,7 @@ export default function Home() {
         risk,
         ...trackingFields({ storage, openedAt, expirySource: source }),
         ...accuracyFields({ quantity, expiryKind }),
+        ...printedDateField(expiryDate),
       })
       .eq("id", editingItem.id);
 
@@ -1118,15 +1125,18 @@ export default function Home() {
       return;
     }
 
+    // Counted the way the next fetch will count the saved row, so the card does not change on refresh.
+    const shown = remainingFor({ days_left: storedDays, purchase_date: editingItem.purchaseDate, expiry_date: printedDateSchemaReady ? expiryDate : null });
     setItems(prev => prev.map(i => i.id === editingItem.id
       ? {
           ...i,
           name: trimmedName,
-          daysLeft: Math.max(0, remaining),
-          daysPastEstimate: calculateDaysPastEstimate(storedDays, editingItem.purchaseDate),
+          daysLeft: shown.daysLeft,
+          daysPastEstimate: shown.daysPast,
           risk,
           ...(trackingSchemaReady ? { storage, openedAt, expirySource: source } : {}),
           ...(accuracySchemaReady ? { quantity, expiryKind } : {}),
+          ...(printedDateSchemaReady ? { expiryDate } : {}),
         }
       : i));
     toast("Item updated", note ? { description: note } : undefined);
