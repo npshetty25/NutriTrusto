@@ -120,6 +120,7 @@ import ShoppingListModal from "@/components/shopping-list-modal";
 import { HouseholdModal } from "@/components/household-modal";
 import { MealPlanModal } from "@/components/meal-plan-modal";
 import { LeftoverModal } from "@/components/leftover-modal";
+import { ProducePhotoModal } from "@/components/produce-photo-modal";
 import { isLeftover } from "@/lib/leftovers";
 import { looksLikeInviteCode, PENDING_JOIN_KEY } from "@/lib/household";
 import { OFF_NAME_FIELDS, offProductName, ownLanguageNameFields, suggestNameFromCategories } from "@/lib/off-product";
@@ -426,6 +427,7 @@ export default function Home() {
   const [showShoppingList, setShowShoppingList] = useState(false);
   const [showHousehold, setShowHousehold] = useState(false);
   const [showMealPlan, setShowMealPlan] = useState(false);
+  const [showProducePhoto, setShowProducePhoto] = useState(false);
   // null = closed; a string (maybe empty) = open with that dish name filled in.
   const [leftoverDish, setLeftoverDish] = useState<string | null>(null);
   // A code from an invite link (?join=CODE), waiting for the dialog.
@@ -1212,7 +1214,7 @@ export default function Home() {
   };
 
   // ─── Add by hand ────────────────────────────────────────────────
-  const addManualItem = async (entry: NewItem): Promise<boolean> => {
+  const addManualItem = async (entry: NewItem, quiet = false): Promise<boolean> => {
     if (!user) return false;
     const risk = deriveRisk(entry.daysLeft, entry.daysLeft, entry.name);
     const { data, error } = await supabase
@@ -1233,7 +1235,7 @@ export default function Home() {
     if (error || !data) return false;
     const added = rowToItem(data as PantryRow);
     setItems((prev) => (prev.some((i) => i.id === data.id) ? prev : [added, ...prev]));
-    toast(`${entry.name} added`, {
+    if (!quiet) toast(`${entry.name} added`, {
       description: added.daysPastEstimate > 0 ? `Its date passed ${days(added.daysPastEstimate)} ago.` : `${days(entry.daysLeft)} left.`,
     });
     return true;
@@ -3037,6 +3039,19 @@ if (nutritionFieldsFilled < 2) {
             </button>
             <div className="h-px w-full bg-border" />
             <button
+              onClick={() => { setShowReceiptMenu(false); setShowProducePhoto(true); }}
+              className="flex items-center gap-3 p-3 rounded-xl hover:bg-foreground/5 text-foreground text-left transition-colors"
+            >
+              <div className="w-9 h-9 rounded-xl neu-raised-sm text-foreground/70 flex items-center justify-center shrink-0">
+                <Carrot size={16} />
+              </div>
+              <div>
+                <p className="font-semibold text-sm leading-tight">Photo of produce</p>
+                <p className="text-[11px] text-foreground/50 leading-tight mt-0.5">Loose vegetables and fruit, no barcode</p>
+              </div>
+            </button>
+            <div className="h-px w-full bg-border" />
+            <button
               onClick={() => { setShowReceiptMenu(false); setLeftoverDish(""); }}
               className="flex items-center gap-3 p-3 rounded-xl hover:bg-foreground/5 text-foreground text-left transition-colors"
             >
@@ -3712,6 +3727,20 @@ if (nutritionFieldsFilled < 2) {
 
       {showHousehold && (
         <HouseholdModal initialJoinCode={inviteJoinCode} onClose={() => { setShowHousehold(false); setInviteJoinCode(""); }} />
+      )}
+      {showProducePhoto && (
+        <ProducePhotoModal
+          userDiet={userDietPreference}
+          trackingAvailable={!!trackingSchemaReady}
+          adjustEstimate={(name, d) => adjustEstimate(name, d, learned)}
+          onAdd={addManualItem}
+          onDone={(added, failed) =>
+            toast(added > 0 ? `${added} ${added === 1 ? "item" : "items"} added` : "Nothing was added", {
+              description: failed > 0 ? `${failed} couldn't be saved. Add ${failed === 1 ? "it" : "them"} by hand.` : "Check the days on each card; they are estimates.",
+            })
+          }
+          onClose={() => setShowProducePhoto(false)}
+        />
       )}
       {leftoverDish !== null && (
         <LeftoverModal
