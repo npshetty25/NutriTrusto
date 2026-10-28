@@ -3743,6 +3743,7 @@ if (nutritionFieldsFilled < 2) {
           onAddMissing={() => { void addMissingIngredientsToShoppingList(); }}
           isAddingToShoppingList={isAddingToShoppingList}
           onFeedback={accuracySchemaReady ? sendRecipeFeedback : undefined}
+          onSaveLeftovers={(dish) => { setShowRecipe(false); setLeftoverDish(dish); }}
         />
       )}
 
