@@ -119,6 +119,8 @@ import {
 import ShoppingListModal from "@/components/shopping-list-modal";
 import { HouseholdModal } from "@/components/household-modal";
 import { MealPlanModal } from "@/components/meal-plan-modal";
+import { LeftoverModal } from "@/components/leftover-modal";
+import { isLeftover } from "@/lib/leftovers";
 import { looksLikeInviteCode, PENDING_JOIN_KEY } from "@/lib/household";
 import { OFF_NAME_FIELDS, offProductName, ownLanguageNameFields, suggestNameFromCategories } from "@/lib/off-product";
 import { CountUp } from "@/components/count-up";
@@ -424,6 +426,8 @@ export default function Home() {
   const [showShoppingList, setShowShoppingList] = useState(false);
   const [showHousehold, setShowHousehold] = useState(false);
   const [showMealPlan, setShowMealPlan] = useState(false);
+  // null = closed; a string (maybe empty) = open with that dish name filled in.
+  const [leftoverDish, setLeftoverDish] = useState<string | null>(null);
   // A code from an invite link (?join=CODE), waiting for the dialog.
   const [inviteJoinCode, setInviteJoinCode] = useState("");
   // In a household: everyone's items, or only the ones I added.
@@ -2817,7 +2821,7 @@ if (nutritionFieldsFilled < 2) {
               const openedLimit = item.openedAt ? null : openedDaysFor(item.name, item.storage ?? shelfEstimate.storage);
               // Offered for anything that comes in a pack: a printed date, or a
               // USDA use-within figure. Fresh produce is not "opened".
-              const canMarkOpened = !!trackingSchemaReady && !item.openedAt && (item.expirySource === "printed" || !!openedLimit);
+              const canMarkOpened = !!trackingSchemaReady && !item.openedAt && !isLeftover(item.name) && (item.expirySource === "printed" || !!openedLimit);
               // Once opening has replaced the date, the unopened estimate's
               // source and storage figures no longer describe it.
               const openedOwnsDate = !!item.openedAt && !item.expirySource;
@@ -3029,6 +3033,19 @@ if (nutritionFieldsFilled < 2) {
               <div>
                 <p className="font-semibold text-sm leading-tight">Add product</p>
                 <p className="text-[11px] text-foreground/50 leading-tight mt-0.5">Scan a barcode, or type it in with its use-by date</p>
+              </div>
+            </button>
+            <div className="h-px w-full bg-border" />
+            <button
+              onClick={() => { setShowReceiptMenu(false); setLeftoverDish(""); }}
+              className="flex items-center gap-3 p-3 rounded-xl hover:bg-foreground/5 text-foreground text-left transition-colors"
+            >
+              <div className="w-9 h-9 rounded-xl neu-raised-sm text-foreground/70 flex items-center justify-center shrink-0">
+                <UtensilsCrossed size={16} />
+              </div>
+              <div>
+                <p className="font-semibold text-sm leading-tight">Leftovers</p>
+                <p className="text-[11px] text-foreground/50 leading-tight mt-0.5">Cooked food you want to finish in time</p>
               </div>
             </button>
           </div>
@@ -3695,6 +3712,14 @@ if (nutritionFieldsFilled < 2) {
 
       {showHousehold && (
         <HouseholdModal initialJoinCode={inviteJoinCode} onClose={() => { setShowHousehold(false); setInviteJoinCode(""); }} />
+      )}
+      {leftoverDish !== null && (
+        <LeftoverModal
+          initialName={leftoverDish}
+          userDiet={userDietPreference}
+          onAdd={addManualItem}
+          onClose={() => setLeftoverDish(null)}
+        />
       )}
       {showMealPlan && (
         <MealPlanModal
