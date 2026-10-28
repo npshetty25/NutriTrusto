@@ -1,4 +1,5 @@
 import { selectDishCandidates } from "@/lib/dish-catalog";
+import { dishesToAvoid, EMPTY_PROFILE, isJainConflict, type FoodProfile } from "@/lib/food-profile";
 
 export interface PlanItem {
   name: string;
@@ -13,6 +14,8 @@ export interface PlannedMeal {
   dish: string;
   uses: string[];
   toBuy: string[];
+  /** A fasting day: nothing is planned for it. */
+  fasting?: boolean;
 }
 
 /**
@@ -24,12 +27,26 @@ export interface PlannedMeal {
  * else, rather than padding the week with dishes that use nothing the person has.
  * Items that expire before their day come around are used on the days they last.
  */
-export function planWeek(items: PlanItem[], dietaryPreference: string | undefined, days = 7): PlannedMeal[] {
-  let pool = items.filter((i) => i.daysPastEstimate === 0);
-  const shown: string[] = [];
+export function planWeek(
+  items: PlanItem[],
+  dietaryPreference: string | undefined,
+  days = 7,
+  options: { profile?: FoodProfile; today?: Date } = {}
+): PlannedMeal[] {
+  const profile = options.profile ?? EMPTY_PROFILE;
+  const start = options.today ?? new Date();
+  // Past its date, or forbidden to this profile: not something the plan may build a dish around.
+  let pool = items.filter((i) => i.daysPastEstimate === 0 && !(profile.jain && isJainConflict(i.name)));
+  // Dishes this profile must never be offered are treated as already shown.
+  const shown: string[] = dishesToAvoid(profile);
+  const fasting = new Set(profile.fastingDays);
   const plan: PlannedMeal[] = [];
 
   for (let day = 0; day < days; day++) {
+    if (fasting.has((start.getDay() + day) % 7)) {
+      plan.push({ day, dish: "", uses: [], toBuy: [], fasting: true });
+      continue;
+    }
     // An item that will be gone before this day cannot be planned for it.
     const fresh = pool.filter((i) => i.daysLeft >= day);
     const best = selectDishCandidates(fresh, dietaryPreference, shown, 1)[0];
