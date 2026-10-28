@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { X, Bell, Check } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/auth-context";
+import { ClosedAppReminders } from "@/components/closed-app-reminders";
 
 interface NotificationPreferencesModalProps {
   onClose: () => void;
@@ -15,11 +16,10 @@ export const DAYS_BEFORE_OPTIONS = [1, 2, 3, 5, 7] as const;
 export const DEFAULT_NOTIFY_DAYS_BEFORE = 3;
 
 /**
- * What these actually control: the in-app "Expiry Reminder" toast fired from
- * the expiry-nudge effect in page.tsx. There is no email or push channel in
- * this app, so this does not pretend to offer one — it is honestly scoped to
- * the one real notification the app sends, and lets the user turn it off or
- * change how many days of warning it gives.
+ * What these control: the in-app "Expiry Reminder" toast fired from the
+ * expiry-nudge effect in page.tsx, and the morning push message sent by
+ * app/api/cron/push-reminders to devices that opted in. The same two choices
+ * (on or off, days of warning) govern both. There is no email.
  *
  * Stored on the auth user (same place dietary_preference already lives),
  * not a profile table — page.tsx reads it straight off `user.user_metadata`.
@@ -141,9 +141,10 @@ export function NotificationPreferencesModal({ onClose }: NotificationPreference
             </div>
           </div>
 
+          <ClosedAppReminders />
+
           <p className="text-[11px] text-foreground/45 leading-relaxed">
-            This app only ever reminds you inside the app itself — there is no email or push
-            notification to turn on.
+            Reminders also appear inside the app. There is no email.
           </p>
         </div>
       </div>
