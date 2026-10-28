@@ -28,6 +28,7 @@ export const LIMITS: Record<string, { max: number; windowMs: number }> = {
   "extract": { max: 10, windowMs: 60_000 },
   "scan-nutrition-label": { max: 15, windowMs: 60_000 },
   "scan-expiry-date": { max: 15, windowMs: 60_000 },
+  "scan-produce": { max: 10, windowMs: 60_000 },
   "lookup-upc": { max: 40, windowMs: 60_000 },
   "contribute-product": { max: 10, windowMs: 60_000 },
 };
