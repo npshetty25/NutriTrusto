@@ -1,4 +1,4 @@
-import { expect, openDashboard, test } from "./fixtures";
+import { expect, jpeg, openDashboard, test } from "./fixtures";
 import type { Page } from "@playwright/test";
 
 /** A purchase date `n` days back, in this machine's own calendar, as Postgres returns it. */
@@ -60,5 +60,30 @@ test.describe("dates on a card", () => {
     backend.seedPantry([{ name: "Tomatoes", days_left: 5 }]);
     await openDashboard(page);
     await expect(card(page, "Tomatoes").getByRole("button", { name: /as opened/ })).toHaveCount(0);
+  });
+
+  test("a pack scanned after its printed date keeps that date and says how long ago it was", async ({ backend, page }) => {
+    backend.api["scan-expiry-date"] = {
+      body: {
+        success: true,
+        expiry: { days_left: 0, expiry_date: daysAgo(10), source: "printed_expiry", confidence: "high", raw_text_found: "BEST BEFORE", date_kind: "best_before", notes: [] },
+      },
+    };
+    await openDashboard(page);
+    await page.getByRole("button", { name: /Barcode/ }).first().click();
+    await page.getByPlaceholder("e.g., 8901234567890").fill("8901262010023");
+    await page.getByRole("button", { name: "Use", exact: true }).click();
+
+    const result = page.getByRole("dialog");
+    await result.getByRole("button", { name: "Scan the date on the pack" }).click();
+    await page.getByLabel("Upload expiry date photo").setInputFiles(jpeg("date.jpg"));
+    await expect(result.getByText("Its date has passed")).toBeVisible();
+    await result.getByRole("button", { name: "Add to My Pantry" }).click();
+
+    // days_left cannot go below 0; the date itself is what keeps it past.
+    await expect.poll(() => backend.tables.pantry_items[0]?.expiry_date).toBe(daysAgo(10));
+    const c = card(page, "Amul Salted Butter 100 g");
+    await expect(c.getByText(/Best before .+, 10 days ago/)).toBeVisible();
+    await expect(c.getByText("days past", { exact: true })).toBeVisible();
   });
 });
