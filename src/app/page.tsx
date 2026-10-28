@@ -1981,7 +1981,7 @@ if (nutritionFieldsFilled < 2) {
            healthScore: inserted.healthScore ?? scannedResult.analysis?.health_score ?? null,
          }, ...prev];
        });
-       toast(`Added — ${days(initialDaysLeft)} left`, {
+       toast(inserted.daysPastEstimate > 0 ? `Added — its date passed ${days(inserted.daysPastEstimate)} ago` : `Added — ${days(initialDaysLeft)} left`, {
          description: learnedAdjustment.note ? `${shelfLife.explanation} ${learnedAdjustment.note}` : shelfLife.explanation,
          // An estimate the app is unsure about gets a way to correct it
          // right there, rather than a note telling the user to go and find
@@ -3099,7 +3099,9 @@ if (nutritionFieldsFilled < 2) {
                   <span className="text-xs font-bold uppercase tracking-widest text-foreground/60 mb-1">Expiry Date</span>
                   {scannedExpiry ? (
                     <>
-                      <span className="text-lg font-black">{days(scannedExpiry.daysLeft)} left</span>
+                      <span className="text-lg font-black">
+                        {scannedExpiry.expiryDate && scannedExpiry.expiryDate < localDateISO() ? "Its date has passed" : `${days(scannedExpiry.daysLeft)} left`}
+                      </span>
                       <span className="text-[11px] text-foreground/60 truncate">
                         {scannedExpiry.expiryDate
                           ? `${scannedExpiry.kind === "best_before" ? "Best before" : scannedExpiry.kind === "use_by" ? "Use by" : "Expires"} ${scannedExpiry.expiryDate}`
