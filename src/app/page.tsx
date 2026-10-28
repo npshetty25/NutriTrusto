@@ -2237,7 +2237,7 @@ if (nutritionFieldsFilled < 2) {
                   }}
                   className="neu-pressable min-h-11 pl-3 pr-3.5 rounded-xl inline-flex items-center gap-2 text-sm font-semibold"
                 >
-                  <span className="tabular-nums font-extrabold text-danger-strong">{item.daysLeft === 0 ? "!" : `${item.daysLeft}d`}</span>
+                  <span className="tabular-nums font-extrabold text-danger-strong">{item.daysPastEstimate > 0 ? `${item.daysPastEstimate}d past` : item.daysLeft === 0 ? "today" : `${item.daysLeft}d`}</span>
                   <span className="max-w-[10rem] truncate">{item.name}</span>
                 </button>
               ))}
