@@ -65,12 +65,17 @@ async function controlledPage(page: Page) {
   await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
   await page.evaluate(() => { (window as unknown as { marker?: number }).marker = 1; });
 }
-const marker = (page: Page) => page.evaluate(() => (window as unknown as { marker?: number }).marker);
-const setVisibility = (page: Page, state: "hidden" | "visible") =>
-  page.evaluate((s) => {
+// "reloading" while the page is mid-navigation, so a poll waits instead of failing.
+const marker = (page: Page) =>
+  page.evaluate(() => (window as unknown as { marker?: number }).marker).catch(() => "reloading");
+// Fired at once, so an unexpected reload fails the call; `later` defers it a tick for the one expected to reload.
+const setVisibility = (page: Page, state: "hidden" | "visible", later = false) =>
+  page.evaluate(([s, deferred]) => {
     Object.defineProperty(document, "visibilityState", { configurable: true, get: () => s });
-    document.dispatchEvent(new Event("visibilitychange"));
-  }, state);
+    const fire = () => document.dispatchEvent(new Event("visibilitychange"));
+    if (deferred) setTimeout(fire, 0);
+    else fire();
+  }, [state, later] as const);
 
 test.describe("a new version", () => {
   test("waits instead of reloading the page in use, and offers a Reload", async ({ page }) => {
@@ -96,7 +101,7 @@ test.describe("a new version", () => {
 
     await setVisibility(page, "hidden");
     await page.clock.fastForward("01:05");
-    await setVisibility(page, "visible");
+    await setVisibility(page, "visible", true);
     await expect.poll(() => marker(page)).toBeUndefined();
   });
 });
