@@ -66,9 +66,11 @@ export function dishesToAvoid(profile: FoodProfile): string[] {
   if (profile.allergies.length === 0 && !profile.jain) return [];
   const mine = new Set(profile.allergies);
   return DISH_CATALOG.filter((dish) => {
-    const text = [...dish.core.flat(), ...dish.extras].join(", ");
-    if (profile.jain && isJainConflict(text)) return true;
-    return detectAllergens(text).some((t) => mine.has(t));
+    // A dish whose DEFINING ingredient is forbidden cannot be cooked Jain; its optional extras (onion,
+    // ginger) are simply left out, which the recipe route is told to do and then checks.
+    if (profile.jain && isJainConflict(dish.core.flat().join(", "))) return true;
+    // Allergens are stricter: a trace in an extra is still in the pot.
+    return detectAllergens([...dish.core.flat(), ...dish.extras].join(", ")).some((t) => mine.has(t));
   }).map((d) => d.name);
 }
 
