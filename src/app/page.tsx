@@ -2224,28 +2224,6 @@ if (nutritionFieldsFilled < 2) {
                 ? "Your pantry is empty. Add what you bought to start tracking it."
                 : `${pantrySummary.charAt(0).toUpperCase()}${pantrySummary.slice(1)}.`}
           </p>
-          {highRiskItems.length > 0 && (
-            <div className="mt-3 flex flex-wrap gap-2" aria-label="Eat soon">
-              {[...highRiskItems].sort((a, b) => a.daysLeft - b.daysLeft).slice(0, 5).map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => {
-                    setRiskFilter("high");
-                    setSearchQuery(item.name);
-                    document.getElementById("inventory-log")?.scrollIntoView({ behavior: "smooth", block: "start" });
-                  }}
-                  className="neu-pressable min-h-11 pl-3 pr-3.5 rounded-xl inline-flex items-center gap-2 text-sm font-semibold"
-                >
-                  <span className="tabular-nums font-extrabold text-danger-strong">{item.daysPastEstimate > 0 ? `${item.daysPastEstimate}d past` : item.daysLeft === 0 ? "today" : `${item.daysLeft}d`}</span>
-                  <span className="max-w-[10rem] truncate">{item.name}</span>
-                </button>
-              ))}
-              {highRiskItems.length > 5 && (
-                <span className="min-h-11 inline-flex items-center px-2 text-xs font-semibold text-foreground/55">+{highRiskItems.length - 5} more</span>
-              )}
-            </div>
-          )}
         </div>
 
         {/* KPI Widgets */}
