@@ -992,6 +992,7 @@ export default function Home() {
                 ...healthScoreField(itemToUndo.healthScore),
                 ...trackingFields(itemToUndo),
                 ...accuracyFields(itemToUndo),
+                ...printedDateField(itemToUndo.expiryDate),
                 name: itemToUndo.name,
                 days_left: storedDaysLeftFor(itemToUndo.daysLeft - itemToUndo.daysPastEstimate, itemToUndo.purchaseDate),
                 risk: itemToUndo.risk,
