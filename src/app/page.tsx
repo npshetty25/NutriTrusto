@@ -1434,6 +1434,7 @@ export default function Home() {
           })),
           dietaryPreference: String(user?.user_metadata?.dietary_preference || "none"),
           avoidTitles,
+          foodProfile,
         }),
       });
       const data = await res.json();
