@@ -65,6 +65,8 @@ interface PantryCardProps {
   currentStorage?: "fridge" | "counter" | "freezer";
   /** Short facts the person told us: "In the fridge", "Opened 3 Oct", "Date from pack". */
   trackingTags?: string[];
+  /** What this account avoids that the item contains ("You avoid: nuts", "Not Jain"), shown as warnings. */
+  profileWarnings?: string[];
   /** Where the date came from: the pack, the person, or (null) our estimate. */
   expirySource?: DateOrigin;
   /** Use-by (safety) or best-before (quality), when known. */
@@ -95,7 +97,7 @@ const riskConfig = {
 const formatDayMonth = (iso: string) =>
   parsePurchaseDate(iso).toLocaleDateString("en-IN", { day: "2-digit", month: "short" });
 
-export function PantryCard({ name, daysLeft, daysPastEstimate = 0, risk, purchaseDate, healthScore, dietMatch = true, dietLabel, itemDiet = "veg", dietUnverified = false, riskLabel, shelfLifeCitation, shelfLifeConfidence, storageDisclaimer, ifStoredDifferently, currentStorage, trackingTags, expirySource = null, expiryKind = null, detectedAllergens, healthierAlternative, actions }: PantryCardProps) {
+export function PantryCard({ name, daysLeft, daysPastEstimate = 0, risk, purchaseDate, healthScore, dietMatch = true, dietLabel, itemDiet = "veg", dietUnverified = false, riskLabel, shelfLifeCitation, shelfLifeConfidence, storageDisclaimer, ifStoredDifferently, currentStorage, trackingTags, profileWarnings, expirySource = null, expiryKind = null, detectedAllergens, healthierAlternative, actions }: PantryCardProps) {
   const score = healthScore != null ? Number.parseFloat(healthScore) : NaN;
   const hasScore = Number.isFinite(score);
   // Same thresholds the nutrition trend chart uses, so one score reads the
@@ -254,6 +256,12 @@ export function PantryCard({ name, daysLeft, daysPastEstimate = 0, risk, purchas
         >
           {hasScore ? `Score ${score.toFixed(1)}` : "Not scanned"}
         </span>
+        {profileWarnings?.map((w) => (
+          <span key={w} className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold bg-danger/15 text-danger-strong">
+            <ShieldAlert size={11} />
+            {w}
+          </span>
+        ))}
         {trackingTags?.map((tag) => (
           <span key={tag} className="px-2 py-1 rounded-lg text-[10px] font-semibold bg-foreground/6 text-foreground/70">
             {tag}
