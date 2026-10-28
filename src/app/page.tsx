@@ -637,12 +637,14 @@ export default function Home() {
     days_left: number;
     purchase_date: string;
     created_at?: string | null;
+    expiry_date?: string | null;
   }): NotificationEntry => {
-    const currentDays = calculateCurrentDaysLeft(row.days_left, row.purchase_date);
+    // The same count the card uses, from the item's own date when it has one.
+    const { daysLeft: currentDays, daysPast } = remainingFor(row);
     const createdAt = row.created_at || new Date().toISOString();
     const category = inferItemCategory(String(row.name || ""));
 
-    if (calculateDaysPastEstimate(row.days_left, row.purchase_date) > 0) {
+    if (daysPast > 0) {
       return {
         id: `${row.id}-${createdAt}`,
         // Not "expired" / "has spoiled". Nobody has looked at this food; the
@@ -707,9 +709,11 @@ export default function Home() {
     setNotificationsLoading(true);
     // ingredients_text only once the migration that adds it is known to have
     // run — PostgREST rejects a select naming an unknown column outright.
-    const columns = ingredientsSchemaReady
-      ? "id, name, days_left, purchase_date, created_at, ingredients_text"
-      : "id, name, days_left, purchase_date, created_at";
+    const columns = [
+      "id, name, days_left, purchase_date, created_at",
+      ingredientsSchemaReady ? "ingredients_text" : "",
+      printedDateSchemaReady ? "expiry_date" : "",
+    ].filter(Boolean).join(", ");
 
     // Pages are cut from the stored rows, but a vegetarian's notifications
     // must not mention the eggs in them. Filtering after the cut can leave a
