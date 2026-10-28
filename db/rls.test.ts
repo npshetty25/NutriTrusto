@@ -538,6 +538,52 @@ describe("printed date", () => {
   });
 });
 
+/** supabase-schema-push.sql: reminder subscriptions, each person's own. Not yet applied to production. */
+describe("push subscriptions", () => {
+  let db: PGlite;
+  const sub = (user: string, endpoint: string) =>
+    `insert into public.push_subscriptions (user_id, endpoint, p256dh, auth) values ('${user}', '${endpoint}', 'k', 'a')`;
+  beforeAll(async () => {
+    db = await freshDatabase(["supabase-schema-push.sql"]);
+  }, 60_000);
+  afterAll(async () => db.close());
+
+  it("a person can add and see their own subscription", async () => {
+    await as(db, ALICE, () => db.query(sub(ALICE, "https://push.example/alice")));
+    const { rows } = await as(db, ALICE, () => db.query<{ endpoint: string }>(`select endpoint from public.push_subscriptions`));
+    expect(rows.map((r) => r.endpoint)).toEqual(["https://push.example/alice"]);
+  });
+
+  it("nobody else can see it", async () => {
+    const { rows } = await as(db, BOB, () => db.query(`select * from public.push_subscriptions`));
+    expect(rows).toEqual([]);
+  });
+
+  it("nobody can add one in someone else's name", async () => {
+    await as(db, BOB, async () => {
+      await expect(db.query(sub(ALICE, "https://push.example/forged"))).rejects.toThrow(/row-level security/);
+    });
+  });
+
+  it("nobody can remove someone else's", async () => {
+    await as(db, BOB, () => db.query(`delete from public.push_subscriptions`));
+    const { rows } = await db.query(`select * from public.push_subscriptions`);
+    expect(rows).toHaveLength(1);
+  });
+
+  it("one browser is one row, however many times it subscribes", async () => {
+    await as(db, ALICE, async () => {
+      await expect(db.query(sub(ALICE, "https://push.example/alice"))).rejects.toThrow(/unique|duplicate/);
+    });
+  });
+
+  it("is safe to run a second time", async () => {
+    await db.exec(readFileSync(resolve(DB_DIR, "supabase-schema-push.sql"), "utf8"));
+    const { rows } = await db.query<{ n: number }>(`select count(*)::int as n from public.push_subscriptions`);
+    expect(rows[0].n).toBe(1);
+  });
+});
+
 /**
  * The pantry_items policy accepts `auth.uid() = user_id` in WITH CHECK without
  * looking at household_id, so on its own it would let a non-member write into
