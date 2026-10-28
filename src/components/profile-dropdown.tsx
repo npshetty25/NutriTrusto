@@ -8,6 +8,7 @@ import { LogOut, Settings, Users, ChevronDown, Bell, Loader2, ShoppingCart, Hist
 import { ThemeToggle } from "@/components/theme-toggle";
 import { DietPreferenceToggle } from "@/components/diet-preference-toggle";
 import { KitchenTempToggle } from "@/components/kitchen-temp-toggle";
+import { FoodProfileModal } from "@/components/food-profile-modal";
 import { HouseholdModal } from "@/components/household-modal";
 import { ScanHistoryModal } from "@/components/scan-history-modal";
 import { ImpactDashboardModal } from "@/components/impact-dashboard-modal";
@@ -35,6 +36,7 @@ export function ProfileDropdown({ onOpenShoppingList, onReplayTour, onOpenHouseh
   const [showImpactDashboard, setShowImpactDashboard] = useState(false);
   const [showNotificationPreferences, setShowNotificationPreferences] = useState(false);
   const [showAccountSettings, setShowAccountSettings] = useState(false);
+  const [showFoodProfile, setShowFoodProfile] = useState(false);
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -148,6 +150,9 @@ export function ProfileDropdown({ onOpenShoppingList, onReplayTour, onOpenHouseh
       <ThemeToggle />
 
       <div className="p-1.5 border-t border-border">
+        <button onClick={() => { setOpen(false); setShowFoodProfile(true); }} role="menuitem" className={itemClass}>
+          <Leaf size={15} className="text-foreground/50" /> Food preferences
+        </button>
         <button onClick={() => { setOpen(false); openHousehold(); }} role="menuitem" className={itemClass}>
           <Users size={15} className="text-foreground/50" /> Household Settings
         </button>
@@ -216,6 +221,7 @@ export function ProfileDropdown({ onOpenShoppingList, onReplayTour, onOpenHouseh
       {showImpactDashboard && <ImpactDashboardModal onClose={() => setShowImpactDashboard(false)} />}
       {showNotificationPreferences && <NotificationPreferencesModal onClose={() => setShowNotificationPreferences(false)} />}
       {showAccountSettings && <AccountSettingsModal onClose={() => setShowAccountSettings(false)} />}
+      {showFoodProfile && <FoodProfileModal onClose={() => setShowFoodProfile(false)} />}
     </div>
   );
 }
