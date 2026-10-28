@@ -122,6 +122,7 @@ import { MealPlanModal } from "@/components/meal-plan-modal";
 import { LeftoverModal } from "@/components/leftover-modal";
 import { ProducePhotoModal } from "@/components/produce-photo-modal";
 import { isLeftover } from "@/lib/leftovers";
+import { readProfile, profileWarnings } from "@/lib/food-profile";
 import { looksLikeInviteCode, PENDING_JOIN_KEY } from "@/lib/household";
 import { OFF_NAME_FIELDS, offProductName, ownLanguageNameFields, suggestNameFromCategories } from "@/lib/off-product";
 import { CountUp } from "@/components/count-up";
@@ -444,6 +445,7 @@ export default function Home() {
   const invoiceInputRef = useRef<HTMLInputElement>(null);
   const userDietPreference = normalizeDietPreference(String(user?.user_metadata?.dietary_preference || "none"));
   const dietLocked = lockedDietScope(userDietPreference) !== null;
+  const foodProfile = readProfile(user?.user_metadata);
   // What this account's diet allows it to see — the single source for the
   // count in the header, the tiles, the list, the nudges and the AI chat.
   // `items` is everything stored; a vegetarian never sees the eggs in it.
@@ -2856,6 +2858,7 @@ if (nutritionFieldsFilled < 2) {
                   ifStoredDifferently={item.expirySource || openedOwnsDate ? undefined : shelfEstimate.ifStoredDifferently}
                   currentStorage={item.storage ?? shelfRow?.storage}
                   trackingTags={[...ownerTagFor(item), ...trackingTagsFor(item)]}
+                  profileWarnings={profileWarnings(foodProfile, item.name, item.ingredientsText)}
                   healthierAlternative={healthierAlternative}
                   detectedAllergens={detectedAllergens}
                   actions={
