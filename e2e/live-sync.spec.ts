@@ -32,7 +32,7 @@ test.describe("live updates", () => {
     await openDashboard(page);
     await settled(page, backend, 1);
 
-    // Creating a household restarts the pantry's subscription; on the old shared topic the second join never happened.
+    // Creating a household changes which rows this person can see, so the pantry's subscription restarts.
     await openProfileMenu(page);
     await page.getByRole("menuitem", { name: "Household Settings" }).click();
     await page.getByRole("button", { name: "Create a Household" }).click();
