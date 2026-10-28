@@ -114,10 +114,11 @@ import {
 import type { StorageLocation } from "@/lib/temperature";
 import {
   Camera, BrainCircuit, Loader2, TrendingUp, ScanLine,
-  Clock, X, Trash2, Info, Activity, Zap, AlertTriangle, CheckCircle2, Search, CircleAlert, Bell, Carrot, Apple, Milk, Drumstick, Wheat, CupSoda, Croissant, Snowflake, Candy, Package, ChevronLeft, ChevronRight, CalendarClock, Pencil, Sparkles, Plus, RefreshCw, SlidersHorizontal, Leaf, UtensilsCrossed, Check, Egg as EggIcon, Images, FileText, Users, PackageOpen
+  Clock, X, Trash2, Info, Activity, Zap, AlertTriangle, CheckCircle2, Search, CircleAlert, Bell, Carrot, Apple, Milk, Drumstick, Wheat, CupSoda, Croissant, Snowflake, Candy, Package, ChevronLeft, ChevronRight, CalendarClock, Pencil, Sparkles, Plus, RefreshCw, SlidersHorizontal, Leaf, UtensilsCrossed, Check, Egg as EggIcon, Images, FileText, Users, PackageOpen, CalendarDays
 } from "lucide-react";
 import ShoppingListModal from "@/components/shopping-list-modal";
 import { HouseholdModal } from "@/components/household-modal";
+import { MealPlanModal } from "@/components/meal-plan-modal";
 import { looksLikeInviteCode, PENDING_JOIN_KEY } from "@/lib/household";
 import { OFF_NAME_FIELDS, offProductName, ownLanguageNameFields, suggestNameFromCategories } from "@/lib/off-product";
 import { CountUp } from "@/components/count-up";
@@ -422,6 +423,7 @@ export default function Home() {
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [showShoppingList, setShowShoppingList] = useState(false);
   const [showHousehold, setShowHousehold] = useState(false);
+  const [showMealPlan, setShowMealPlan] = useState(false);
   // A code from an invite link (?join=CODE), waiting for the dialog.
   const [inviteJoinCode, setInviteJoinCode] = useState("");
   // In a household: everyone's items, or only the ones I added.
@@ -1475,6 +1477,25 @@ export default function Home() {
   };
 
 
+  // The household's shared list once that column exists (v2), the person's own before.
+  const addNamesToShoppingList = async (names: string[], sourceRecipe: string): Promise<boolean> => {
+    if (!user || names.length === 0) return false;
+    const { error } = await supabase.from("shopping_list_items").insert(
+      names.map((name) => ({
+        user_id: user.id,
+        name,
+        source_recipe: sourceRecipe,
+        ...(sharedShoppingReady && household ? { household_id: household.id } : {}),
+      }))
+    );
+    if (error) {
+      toast("Couldn't update shopping list", { description: "Please try again." });
+      return false;
+    }
+    toast("Added to shopping list", { description: `${names.length} item(s) from "${sourceRecipe}" added.` });
+    return true;
+  };
+
   const addMissingIngredientsToShoppingList = async () => {
     if (!user || !generatedRecipe || isAddingToShoppingList) return;
 
@@ -2392,6 +2413,14 @@ if (nutritionFieldsFilled < 2) {
                 </div>
               </div>
             )}
+            <div className="px-4 pb-4">
+              <button
+                onClick={() => setShowMealPlan(true)}
+                className="neu-raised-sm w-full min-h-11 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 text-foreground/80"
+              >
+                <CalendarDays size={14} /> Plan my week
+              </button>
+            </div>
           </div>
         )}
 
@@ -3666,6 +3695,14 @@ if (nutritionFieldsFilled < 2) {
 
       {showHousehold && (
         <HouseholdModal initialJoinCode={inviteJoinCode} onClose={() => { setShowHousehold(false); setInviteJoinCode(""); }} />
+      )}
+      {showMealPlan && (
+        <MealPlanModal
+          items={displayedItems.map((i) => ({ name: i.name, daysLeft: i.daysLeft, daysPastEstimate: i.daysPastEstimate }))}
+          dietaryPreference={String(user?.user_metadata?.dietary_preference || "none")}
+          onAddToShopping={addNamesToShoppingList}
+          onClose={() => setShowMealPlan(false)}
+        />
       )}
       {showShoppingList && (
         <ShoppingListModal onClose={() => setShowShoppingList(false)} />
