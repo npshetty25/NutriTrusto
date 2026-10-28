@@ -27,6 +27,8 @@ export interface NewItem {
   expirySource: ExpirySource;
   /** Use-by (safety) or best-before (quality), when a date was typed. */
   expiryKind: DateKind | null;
+  /** The date typed from the pack, YYYY-MM-DD, kept as a date so a past one stays past. */
+  expiryDate: string | null;
   /** How much there is, as typed ("500 g"). */
   quantity: string | null;
   storage: StorageLocation | null;
@@ -151,12 +153,15 @@ export function AddItemModal({ userDiet, trackingAvailable, accuracyAvailable, o
     if (trackingAvailable && opened && !effectiveOpenedDays) return setError("Pick how soon it should be used once opened.");
     if (dietBlocked || !preview) return;
 
+    // Opening that cuts the pack's date short replaces it: the date then belongs to the use-within limit, not the pack.
+    const packDateHolds = dateDays !== null && preview.daysLeft >= dateDays;
     setSaving(true);
     const ok = await onAdd({
       name: trimmed,
       daysLeft: preview.daysLeft,
-      expirySource,
-      expiryKind: accuracyAvailable && dateDays !== null ? dateKind : null,
+      expirySource: packDateHolds ? expirySource : null,
+      expiryKind: accuracyAvailable && packDateHolds ? dateKind : null,
+      expiryDate: packDateHolds ? packDate : null,
       quantity: accuracyAvailable && quantity.trim() ? quantity.trim().slice(0, 40) : null,
       storage: trackingAvailable ? effectiveStorage : null,
       openedAt: trackingAvailable && opened ? new Date().toISOString() : null,

@@ -1203,6 +1203,7 @@ export default function Home() {
         purchase_date: localDateISO(),
         ...trackingFields(entry),
         ...accuracyFields(entry),
+        ...printedDateField(entry.expiryDate),
       }])
       .select("*")
       .single();
