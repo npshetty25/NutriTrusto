@@ -6,6 +6,30 @@ reason. Nothing changes silently.
 
 ---
 
+## 2026-10-28 — a pack's own date is kept as a date
+
+**No row in `shelf-life-data.ts` changed.** What changed is how an item with a
+date from the pack, or typed by the person, is counted.
+
+`days_left` holds an item's life counted from `purchase_date` and is limited to
+0–3650 (`supabase-schema-hardening.sql`), so a date that had already passed
+when the pack was added could only be stored as 0. The card then showed today
+as the pack's date. `db/supabase-schema-printed-date.sql` adds
+`pantry_items.expiry_date`, and once it has run:
+
+| Item | Before | After |
+|---|---|---|
+| Pack scanned on 28 Oct, printed best before 18 Oct | "Best before 28 Oct", Today, last day | "Best before 18 Oct, 10 days ago", 10 days past |
+| Date typed from the pack, 5 days back | Today, last day | "Your date …, 5 days ago", 5 days past |
+| Pack added already opened, 3-day use-within, 60 days on the pack | 3 days, labelled as the person's date | 3 days, counted from opening |
+| Any item with no date of its own | unchanged | unchanged |
+
+Estimates are untouched: an item without `expiry_date` is still counted from
+`days_left` and `purchase_date` (`remainingFor` in `lib/item-age.ts`). Until the
+migration runs, the app keeps the old behaviour.
+
+---
+
 ## 2026-10-27 — three sourced rows, Indian names for three USDA products, and `Hari Mirch`
 
 **New rows** (no existing row's figure moved; `DATA_VERSION` 2026-09-07 → 2026-10-27):
