@@ -19,10 +19,13 @@ test.describe("forgotten password: asking for a link", () => {
   test("checks the email before sending anything", async ({ anonymous, page }) => {
     await page.goto("/login");
     await page.getByRole("button", { name: "Forgot password?" }).click();
-    await page.getByPlaceholder("name@example.com").fill("asha");
+    const email = page.getByPlaceholder("name@example.com");
+    await email.fill("asha");
     await page.getByRole("button", { name: "Send reset link" }).click();
 
-    await expect(page.getByText(/doesn't look like a valid email/)).toBeVisible();
+    // A type="email" field: the browser itself refuses "asha" before the form submits.
+    expect(await email.evaluate((el: HTMLInputElement) => el.validity.valid)).toBe(false);
+    await expect(page.getByRole("heading", { name: "Reset your password" })).toBeVisible();
     expect(anonymous.requests.some((r) => r.path === "/auth/v1/recover")).toBe(false);
   });
 
