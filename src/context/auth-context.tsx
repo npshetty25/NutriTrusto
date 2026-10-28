@@ -4,6 +4,7 @@ import { createContext, useContext, useState, useEffect, ReactNode, useCallback 
 import { useRouter } from "next/navigation";
 import { openedFromPasswordResetLink, supabase } from "@/lib/supabase";
 import { fetchMembers, type HouseholdMember } from "@/lib/household";
+import { setKitchenTemp } from "@/lib/temperature";
 import type { User, Session } from "@supabase/supabase-js";
 
 export interface HouseholdInfo {
@@ -123,6 +124,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const applySession = (next: Session | null) => {
+      // Before the state update, so the render it causes already estimates with this kitchen.
+      setKitchenTemp(next?.user?.user_metadata?.kitchen_temp);
       setSession(next);
       setUser((prev) => (sameUser(prev, next?.user ?? null) ? prev : next?.user ?? null));
     };
