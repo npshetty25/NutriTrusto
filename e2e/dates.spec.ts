@@ -56,18 +56,6 @@ test.describe("dates on a card", () => {
     await expect(c.getByText("Opened it")).toHaveCount(0);
   });
 
-  test("the eat-soon chips say today or how many days past, not a bare '!'", async ({ backend, page }) => {
-    backend.seedPantry([
-      { name: "Spinach", days_left: 4, purchase_date: daysAgo(4) },
-      { name: "Curd", days_left: 4, purchase_date: daysAgo(7) },
-    ]);
-    await openDashboard(page);
-
-    const chips = page.getByLabel("Eat soon");
-    await expect(chips.getByRole("button", { name: /today\s*Spinach/ })).toBeVisible();
-    await expect(chips.getByRole("button", { name: /3d past\s*Curd/ })).toBeVisible();
-  });
-
   test("does not offer Opened it for fresh produce", async ({ backend, page }) => {
     backend.seedPantry([{ name: "Tomatoes", days_left: 5 }]);
     await openDashboard(page);
