@@ -36,9 +36,27 @@ const R = 8.314;
  */
 export const ASSUMED_STORAGE_C = {
   fridge: 7,
-  counter: 29,
+  /** 29 °C unless this account's kitchen setting says otherwise (see kitchenCounterC). */
+  get counter() {
+    return counterC;
+  },
   freezer: -18,
-} as const;
+};
+
+/** How warm the counter is, as the person sets it. "normal" is the 29 °C every figure was built for. */
+export type KitchenTemp = "cool" | "normal" | "hot";
+
+/** Cooler is capped at 26 °C: it lengthens estimates, and a too-long estimate is the unsafe way to be wrong. */
+export const KITCHEN_COUNTER_C: Record<KitchenTemp, number> = { cool: 26, normal: 29, hot: 34 };
+
+let counterC: number = KITCHEN_COUNTER_C.normal;
+
+export const asKitchenTemp = (v: unknown): KitchenTemp => (v === "cool" || v === "hot" ? v : "normal");
+
+/** Set once per session from the account; every estimate made afterwards uses it. */
+export function setKitchenTemp(value: unknown) {
+  counterC = KITCHEN_COUNTER_C[asKitchenTemp(value)];
+}
 
 export type StorageLocation = keyof typeof ASSUMED_STORAGE_C;
 

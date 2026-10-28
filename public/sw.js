@@ -65,6 +65,40 @@ self.addEventListener("message", (event) => {
   if (event.data === "SKIP_WAITING") self.skipWaiting();
 });
 
+// A reminder sent by the daily job (app/api/cron/push-reminders). The payload is
+// JSON { title, body, url }; anything else is ignored rather than shown.
+self.addEventListener("push", (event) => {
+  let data = null;
+  try {
+    data = event.data ? event.data.json() : null;
+  } catch {
+    data = null;
+  }
+  if (!data || typeof data.title !== "string") return;
+  event.waitUntil(
+    self.registration.showNotification(data.title, {
+      body: typeof data.body === "string" ? data.body : "",
+      icon: "/icons/icon-192.png",
+      badge: "/icons/icon-192.png",
+      tag: "pantry-reminder",
+      data: { url: typeof data.url === "string" && data.url.startsWith("/") ? data.url : "/" },
+    })
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = (event.notification.data && event.notification.data.url) || "/";
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((windows) => {
+      for (const w of windows) {
+        if ("focus" in w) return w.focus();
+      }
+      return self.clients.openWindow(url);
+    })
+  );
+});
+
 self.addEventListener("fetch", (event) => {
   const request = event.request;
   if (request.method !== "GET") return;

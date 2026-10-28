@@ -8,6 +8,7 @@ import { detectAllergens } from "@/lib/allergens";
 import { getRequestUser, unauthorized } from "@/lib/api-auth";
 import { checkRateLimit, rateLimited } from "@/lib/rate-limit";
 import { selectDishCandidates, findDish, missingCoreIngredients } from "@/lib/dish-catalog";
+import { dishesToAvoid, profileWarnings, readProfile, recipeProblems } from "@/lib/food-profile";
 
 const apiKey = process.env.GEMINI_API_KEY;
 const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null;
@@ -120,11 +121,14 @@ export async function POST(req: Request) {
   log.info("Request received");
 
   try {
-    const { items, dietaryPreference, avoidTitles } = (await req.json()) as {
+    const { items, dietaryPreference, avoidTitles, foodProfile } = (await req.json()) as {
       items?: PantryItem[];
       dietaryPreference?: string;
       avoidTitles?: string[];
+      foodProfile?: unknown;
     };
+    // Allergies and Jain food: read defensively, like everything else in the body.
+    const profile = readProfile({ food_profile: foodProfile });
 
     const accepted = (Array.isArray(items) ? items : [])
       .filter((i) => i && typeof i.name === "string" && i.name.trim());
@@ -135,7 +139,11 @@ export async function POST(req: Request) {
     // demoted to a gentler bucket: anything that reaches the prompt can reach
     // the recipe, and the recipe tells someone to cook and eat it.
     const withinEstimate = accepted.filter(
-      (i) => (i.daysPastEstimate ?? 0) <= 0 && (i.daysLeft ?? 0) >= 0
+      (i) =>
+        (i.daysPastEstimate ?? 0) <= 0 &&
+        (i.daysLeft ?? 0) >= 0 &&
+        // Something this cook cannot eat is not an ingredient they have.
+        profileWarnings(profile, i.name).length === 0
     );
     // Counted before the slice below, which also removes items — otherwise a
     // pantry of 20 fresh things would report 8 as "past estimate".
@@ -206,7 +214,10 @@ export async function POST(req: Request) {
 
     // The dishes this pantry can actually make, from a known list. The model
     // chooses among these; it does not invent one.
-    const candidates = selectDishCandidates(pantry, dietaryPreference, Array.isArray(avoidTitles) ? avoidTitles : []);
+    const candidates = selectDishCandidates(pantry, dietaryPreference, [
+      ...(Array.isArray(avoidTitles) ? avoidTitles : []),
+      ...dishesToAvoid(profile),
+    ]);
     if (candidates.length === 0) {
       log.info("No known dish fits this pantry", { itemCount: pantry.length });
       return NextResponse.json(
@@ -226,11 +237,23 @@ export async function POST(req: Request) {
     // invented a dish nobody cooks — unappetising, and with curd and chicken
     // thrown together, not obviously safe. A real dish that uses two items
     // beats an invented one that "uses" five.
+    const profileRules = [
+      profile.jain
+        ? "This cook eats Jain food: no onion, garlic, potato, carrot, radish, beetroot, ginger, mushroom or any other root vegetable, anywhere in the dish, including the tadka. Leave them out; do not replace them with another root vegetable."
+        : "",
+      profile.allergies.length
+        ? `This cook is allergic to: ${profile.allergies.join(", ")}. None of it may appear in any ingredient.`
+        : "",
+    ]
+      .filter(Boolean)
+      .map((line) => `\n${line}`)
+      .join("");
+
     const prompt = `You are an experienced Indian home cook. Suggest ONE real, everyday Indian dish — ghar ka khana — that uses up some of the food below before it spoils.
 
 ${sections}
 ${avoid}
-Dietary preference: ${dietaryPreference || "none"}.
+Dietary preference: ${dietaryPreference || "none"}.${profileRules}
 
 Choose ONE dish from this list. These are real dishes that the pantry can make, best first (most food that is about to go off, least to buy):
 ${dishList}
@@ -327,11 +350,14 @@ ${corrections.join("\n")}`;
         ...(Array.isArray(parsed?.staples) ? parsed.staples : []).map(String),
       ];
       const missing = dish ? missingCoreIngredients(dish, ingredientLines) : [];
+      const profileBreaks = recipeProblems(profile, ingredientLines);
       const groundingProblem = !dish
         ? `"${named || "(no name)"}" is not one of the listed dishes`
         : missing.length
           ? `${dish.name} needs ${missing.join(" and ")}, which the ingredients left out`
-          : null;
+          : profileBreaks.length
+            ? `it contains ${profileBreaks.join(" and ")}, which this cook cannot eat. Remove it completely`
+            : null;
 
       if (violations.length === 0 && !groundingProblem) {
         recipe = parsed;

@@ -109,6 +109,22 @@ everyone:
   to members of the project's own team, about two emails an hour. Real users
   get the email only once a custom SMTP server is set up.
 
+### Reminders while the app is closed
+
+A morning push message ("Use these today: Curd, Spinach") for devices that opted
+in under Notification Preferences. It is off until you set it up, and nothing
+else changes in the meantime:
+
+1. Run `db/supabase-schema-push.sql` in the Supabase SQL editor.
+2. `npx web-push generate-vapid-keys` prints a public and a private key.
+3. In Vercel, add `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`,
+   `VAPID_SUBJECT` (a `mailto:` address), `SUPABASE_SERVICE_ROLE_KEY` and
+   `CRON_SECRET`, then redeploy. The service role key bypasses row-level
+   security: it belongs in Vercel only, never in git or a `NEXT_PUBLIC_` name.
+
+`vercel.json` calls `/api/cron/push-reminders` once a day at 8:00 am India time.
+On an iPhone, push works only for the app added to the Home Screen (iOS 16.4+).
+
 ### Tests
 
 ```bash

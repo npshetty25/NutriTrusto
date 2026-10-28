@@ -114,10 +114,15 @@ import {
 import type { StorageLocation } from "@/lib/temperature";
 import {
   Camera, BrainCircuit, Loader2, TrendingUp, ScanLine,
-  Clock, X, Trash2, Info, Activity, Zap, AlertTriangle, CheckCircle2, Search, CircleAlert, Bell, Carrot, Apple, Milk, Drumstick, Wheat, CupSoda, Croissant, Snowflake, Candy, Package, ChevronLeft, ChevronRight, CalendarClock, Pencil, Sparkles, Plus, RefreshCw, SlidersHorizontal, Leaf, UtensilsCrossed, Check, Egg as EggIcon, Images, FileText, Users, PackageOpen
+  Clock, X, Trash2, Info, Activity, Zap, AlertTriangle, CheckCircle2, Search, CircleAlert, Bell, Carrot, Apple, Milk, Drumstick, Wheat, CupSoda, Croissant, Snowflake, Candy, Package, ChevronLeft, ChevronRight, CalendarClock, Pencil, Sparkles, Plus, RefreshCw, SlidersHorizontal, Leaf, UtensilsCrossed, Check, Egg as EggIcon, Images, FileText, Users, PackageOpen, CalendarDays
 } from "lucide-react";
 import ShoppingListModal from "@/components/shopping-list-modal";
 import { HouseholdModal } from "@/components/household-modal";
+import { MealPlanModal } from "@/components/meal-plan-modal";
+import { LeftoverModal } from "@/components/leftover-modal";
+import { ProducePhotoModal } from "@/components/produce-photo-modal";
+import { isLeftover } from "@/lib/leftovers";
+import { readProfile, profileWarnings } from "@/lib/food-profile";
 import { looksLikeInviteCode, PENDING_JOIN_KEY } from "@/lib/household";
 import { OFF_NAME_FIELDS, offProductName, ownLanguageNameFields, suggestNameFromCategories } from "@/lib/off-product";
 import { CountUp } from "@/components/count-up";
@@ -422,6 +427,10 @@ export default function Home() {
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [showShoppingList, setShowShoppingList] = useState(false);
   const [showHousehold, setShowHousehold] = useState(false);
+  const [showMealPlan, setShowMealPlan] = useState(false);
+  const [showProducePhoto, setShowProducePhoto] = useState(false);
+  // null = closed; a string (maybe empty) = open with that dish name filled in.
+  const [leftoverDish, setLeftoverDish] = useState<string | null>(null);
   // A code from an invite link (?join=CODE), waiting for the dialog.
   const [inviteJoinCode, setInviteJoinCode] = useState("");
   // In a household: everyone's items, or only the ones I added.
@@ -436,6 +445,7 @@ export default function Home() {
   const invoiceInputRef = useRef<HTMLInputElement>(null);
   const userDietPreference = normalizeDietPreference(String(user?.user_metadata?.dietary_preference || "none"));
   const dietLocked = lockedDietScope(userDietPreference) !== null;
+  const foodProfile = readProfile(user?.user_metadata);
   // What this account's diet allows it to see — the single source for the
   // count in the header, the tiles, the list, the nudges and the AI chat.
   // `items` is everything stored; a vegetarian never sees the eggs in it.
@@ -1206,7 +1216,7 @@ export default function Home() {
   };
 
   // ─── Add by hand ────────────────────────────────────────────────
-  const addManualItem = async (entry: NewItem): Promise<boolean> => {
+  const addManualItem = async (entry: NewItem, quiet = false): Promise<boolean> => {
     if (!user) return false;
     const risk = deriveRisk(entry.daysLeft, entry.daysLeft, entry.name);
     const { data, error } = await supabase
@@ -1227,7 +1237,7 @@ export default function Home() {
     if (error || !data) return false;
     const added = rowToItem(data as PantryRow);
     setItems((prev) => (prev.some((i) => i.id === data.id) ? prev : [added, ...prev]));
-    toast(`${entry.name} added`, {
+    if (!quiet) toast(`${entry.name} added`, {
       description: added.daysPastEstimate > 0 ? `Its date passed ${days(added.daysPastEstimate)} ago.` : `${days(entry.daysLeft)} left.`,
     });
     return true;
@@ -1424,6 +1434,7 @@ export default function Home() {
           })),
           dietaryPreference: String(user?.user_metadata?.dietary_preference || "none"),
           avoidTitles,
+          foodProfile,
         }),
       });
       const data = await res.json();
@@ -1474,6 +1485,25 @@ export default function Home() {
     await generateRecipe(generatedRecipe ? [generatedRecipe.title] : []);
   };
 
+
+  // The household's shared list once that column exists (v2), the person's own before.
+  const addNamesToShoppingList = async (names: string[], sourceRecipe: string): Promise<boolean> => {
+    if (!user || names.length === 0) return false;
+    const { error } = await supabase.from("shopping_list_items").insert(
+      names.map((name) => ({
+        user_id: user.id,
+        name,
+        source_recipe: sourceRecipe,
+        ...(sharedShoppingReady && household ? { household_id: household.id } : {}),
+      }))
+    );
+    if (error) {
+      toast("Couldn't update shopping list", { description: "Please try again." });
+      return false;
+    }
+    toast("Added to shopping list", { description: `${names.length} item(s) from "${sourceRecipe}" added.` });
+    return true;
+  };
 
   const addMissingIngredientsToShoppingList = async () => {
     if (!user || !generatedRecipe || isAddingToShoppingList) return;
@@ -2392,6 +2422,14 @@ if (nutritionFieldsFilled < 2) {
                 </div>
               </div>
             )}
+            <div className="px-4 pb-4">
+              <button
+                onClick={() => setShowMealPlan(true)}
+                className="neu-raised-sm w-full min-h-11 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 text-foreground/80"
+              >
+                <CalendarDays size={14} /> Plan my week
+              </button>
+            </div>
           </div>
         )}
 
@@ -2788,7 +2826,7 @@ if (nutritionFieldsFilled < 2) {
               const openedLimit = item.openedAt ? null : openedDaysFor(item.name, item.storage ?? shelfEstimate.storage);
               // Offered for anything that comes in a pack: a printed date, or a
               // USDA use-within figure. Fresh produce is not "opened".
-              const canMarkOpened = !!trackingSchemaReady && !item.openedAt && (item.expirySource === "printed" || !!openedLimit);
+              const canMarkOpened = !!trackingSchemaReady && !item.openedAt && !isLeftover(item.name) && (item.expirySource === "printed" || !!openedLimit);
               // Once opening has replaced the date, the unopened estimate's
               // source and storage figures no longer describe it.
               const openedOwnsDate = !!item.openedAt && !item.expirySource;
@@ -2821,6 +2859,7 @@ if (nutritionFieldsFilled < 2) {
                   ifStoredDifferently={item.expirySource || openedOwnsDate ? undefined : shelfEstimate.ifStoredDifferently}
                   currentStorage={item.storage ?? shelfRow?.storage}
                   trackingTags={[...ownerTagFor(item), ...trackingTagsFor(item)]}
+                  profileWarnings={profileWarnings(foodProfile, item.name, item.ingredientsText)}
                   healthierAlternative={healthierAlternative}
                   detectedAllergens={detectedAllergens}
                   actions={
@@ -3000,6 +3039,32 @@ if (nutritionFieldsFilled < 2) {
               <div>
                 <p className="font-semibold text-sm leading-tight">Add product</p>
                 <p className="text-[11px] text-foreground/50 leading-tight mt-0.5">Scan a barcode, or type it in with its use-by date</p>
+              </div>
+            </button>
+            <div className="h-px w-full bg-border" />
+            <button
+              onClick={() => { setShowReceiptMenu(false); setShowProducePhoto(true); }}
+              className="flex items-center gap-3 p-3 rounded-xl hover:bg-foreground/5 text-foreground text-left transition-colors"
+            >
+              <div className="w-9 h-9 rounded-xl neu-raised-sm text-foreground/70 flex items-center justify-center shrink-0">
+                <Carrot size={16} />
+              </div>
+              <div>
+                <p className="font-semibold text-sm leading-tight">Photo of produce</p>
+                <p className="text-[11px] text-foreground/50 leading-tight mt-0.5">Loose vegetables and fruit, no barcode</p>
+              </div>
+            </button>
+            <div className="h-px w-full bg-border" />
+            <button
+              onClick={() => { setShowReceiptMenu(false); setLeftoverDish(""); }}
+              className="flex items-center gap-3 p-3 rounded-xl hover:bg-foreground/5 text-foreground text-left transition-colors"
+            >
+              <div className="w-9 h-9 rounded-xl neu-raised-sm text-foreground/70 flex items-center justify-center shrink-0">
+                <UtensilsCrossed size={16} />
+              </div>
+              <div>
+                <p className="font-semibold text-sm leading-tight">Leftovers</p>
+                <p className="text-[11px] text-foreground/50 leading-tight mt-0.5">Cooked food you want to finish in time</p>
               </div>
             </button>
           </div>
@@ -3667,6 +3732,37 @@ if (nutritionFieldsFilled < 2) {
       {showHousehold && (
         <HouseholdModal initialJoinCode={inviteJoinCode} onClose={() => { setShowHousehold(false); setInviteJoinCode(""); }} />
       )}
+      {showProducePhoto && (
+        <ProducePhotoModal
+          userDiet={userDietPreference}
+          trackingAvailable={!!trackingSchemaReady}
+          adjustEstimate={(name, d) => adjustEstimate(name, d, learned)}
+          onAdd={addManualItem}
+          onDone={(added, failed) =>
+            toast(added > 0 ? `${added} ${added === 1 ? "item" : "items"} added` : "Nothing was added", {
+              description: failed > 0 ? `${failed} couldn't be saved. Add ${failed === 1 ? "it" : "them"} by hand.` : "Check the days on each card; they are estimates.",
+            })
+          }
+          onClose={() => setShowProducePhoto(false)}
+        />
+      )}
+      {leftoverDish !== null && (
+        <LeftoverModal
+          initialName={leftoverDish}
+          userDiet={userDietPreference}
+          onAdd={addManualItem}
+          onClose={() => setLeftoverDish(null)}
+        />
+      )}
+      {showMealPlan && (
+        <MealPlanModal
+          items={displayedItems.map((i) => ({ name: i.name, daysLeft: i.daysLeft, daysPastEstimate: i.daysPastEstimate }))}
+          dietaryPreference={String(user?.user_metadata?.dietary_preference || "none")}
+          profile={foodProfile}
+          onAddToShopping={addNamesToShoppingList}
+          onClose={() => setShowMealPlan(false)}
+        />
+      )}
       {showShoppingList && (
         <ShoppingListModal onClose={() => setShowShoppingList(false)} />
       )}
@@ -3681,6 +3777,7 @@ if (nutritionFieldsFilled < 2) {
           onAddMissing={() => { void addMissingIngredientsToShoppingList(); }}
           isAddingToShoppingList={isAddingToShoppingList}
           onFeedback={accuracySchemaReady ? sendRecipeFeedback : undefined}
+          onSaveLeftovers={(dish) => { setShowRecipe(false); setLeftoverDish(dish); }}
         />
       )}
 

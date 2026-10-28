@@ -77,6 +77,7 @@ const ALLOWED: Allow[] = [
   { file: "lib/shelf-life-data.ts", match: "all.indexOf(id) !== i", reason: "duplicate-id detection over row ids" },
   { file: "components/shopping-list-modal.tsx", match: 'name.indexOf(" — ")', reason: "splits a display label into name and quantity" },
   { file: "lib/api-auth.ts", match: 'header.toLowerCase().startsWith("bearer ")', reason: "HTTP Authorization scheme" },
+  { file: "app/api/cron/push-reminders/route.ts", match: 'header.toLowerCase().startsWith("bearer ")', reason: "HTTP Authorization scheme (Vercel Cron sends the secret as a bearer token)" },
   { file: "app/page.tsx", match: 'id.startsWith("seed-")', reason: "identifier prefix on a demo row id" },
   { file: "app/page.tsx", match: '!decodedText.startsWith("0")', reason: "barcode digit normalisation" },
   { file: "lib/auth-validation.ts", match: 'm.includes("email not confirmed")', reason: "Supabase auth error string (moved here from login/page.tsx)" },

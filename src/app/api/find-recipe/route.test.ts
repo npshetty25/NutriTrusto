@@ -408,3 +408,42 @@ describe("POST /api/find-recipe — gatekeeping", () => {
     expect((await call({ items: PANTRY, dietaryPreference: "Veg" })).res.status).toBe(429);
   });
 });
+
+describe("POST /api/find-recipe — a food profile", () => {
+  it("never sends an item this cook cannot eat, and tells the model the rules", async () => {
+    generateContent.mockResolvedValue(geminiText(recipeJson({ fromPantry: [{ item: "Paneer", quantity: "200 g" }], toBuy: [], staples: ["salt"] })));
+    await call({ items: [...PANTRY, { name: "Onions", daysLeft: 20 }], foodProfile: { jain: true, allergies: ["nuts"] } });
+    expect(promptOf()).not.toContain("Onions");
+    expect(promptOf()).toContain("eats Jain food");
+    expect(promptOf()).toContain("allergic to: nuts");
+  });
+
+  it("does not offer a dish whose defining ingredient is forbidden", async () => {
+    generateContent.mockResolvedValue(geminiText(recipeJson()));
+    await call({ items: [{ name: "Paneer", daysLeft: 1 }, { name: "Spinach", daysLeft: 3 }, { name: "Cauliflower", daysLeft: 4 }, { name: "Potatoes", daysLeft: 9 }], foodProfile: { jain: true } });
+    expect(promptOf()).not.toMatch(/- Aloo/i);
+  });
+
+  it("retries once, naming the problem, when the recipe breaks the profile, and never serves it", async () => {
+    generateContent
+      .mockResolvedValueOnce(geminiText(recipeJson({ staples: ["salt", "2 onions, sliced"] })))
+      .mockResolvedValueOnce(geminiText(recipeJson({ toBuy: [] })));
+    const { res, body } = await call({ items: PANTRY, foodProfile: { jain: true } });
+    expect(res.status).toBe(200);
+    expect(promptOf(1)).toContain("which this cook cannot eat");
+    expect(JSON.stringify(body)).not.toMatch(/onion/i);
+  });
+
+  it("502 when both attempts break it", async () => {
+    generateContent.mockResolvedValue(geminiText(recipeJson({ staples: ["salt", "2 onions, sliced"] })));
+    const { res } = await call({ items: PANTRY, foodProfile: { jain: true } });
+    expect(res.status).toBe(502);
+  });
+
+  it("ignores a profile that is not what the app writes", async () => {
+    generateContent.mockResolvedValue(geminiText(recipeJson()));
+    const { res } = await call({ items: PANTRY, foodProfile: "jain" });
+    expect(res.status).toBe(200);
+    expect(promptOf()).not.toContain("Jain");
+  });
+});
