@@ -1170,21 +1170,26 @@ export default function Home() {
         risk,
         ...trackingFields({ storage: item.storage ?? null, openedAt, expirySource: opened.expirySource }),
         ...(accuracySchemaReady ? { expiry_kind: opened.expiryKind } : {}),
+        // The use-within limit replaced the pack's date, so the pack's date must not be counted from any more.
+        ...(opened.shortened ? printedDateField(null) : {}),
       })
       .eq("id", item.id);
     if (error) {
       toast("Couldn't save that", { description: "Please try again." });
       return;
     }
+    const keptDate = opened.shortened ? null : item.expiryDate ?? null;
+    const shown = remainingFor({ days_left: storedDays, purchase_date: item.purchaseDate, expiry_date: printedDateSchemaReady ? keptDate : null });
     setItems((prev) => prev.map((i) => i.id === item.id
       ? {
           ...i,
-          daysLeft: Math.max(0, opened.daysLeft),
-          daysPastEstimate: calculateDaysPastEstimate(storedDays, item.purchaseDate),
+          daysLeft: shown.daysLeft,
+          daysPastEstimate: shown.daysPast,
           risk,
           openedAt,
           expirySource: opened.expirySource,
           ...(accuracySchemaReady ? { expiryKind: opened.expiryKind } : {}),
+          ...(printedDateSchemaReady ? { expiryDate: keptDate } : {}),
         }
       : i));
     toast(`${item.name} opened`, {
