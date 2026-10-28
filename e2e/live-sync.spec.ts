@@ -42,4 +42,24 @@ test.describe("live updates", () => {
     housemateAdds(backend, "Bob's Curd");
     await expect(page.getByRole("heading", { level: 3, name: "Bob's Curd" })).toBeVisible();
   });
+
+  test("coming back to the app neither reloads the pantry nor restarts the subscription", async ({ backend, page }) => {
+    await openDashboard(page);
+    await settled(page, backend, 1);
+    const pantryReads = () => backend.requests.filter((r) => r.method === "GET" && r.path === "/rest/v1/pantry_items").length;
+    const before = pantryReads();
+
+    // A quick switch to another app and back. The event bubbles, as a real one does, to supabase-js's window listener.
+    for (const state of ["hidden", "visible"] as const) {
+      await page.evaluate((s) => {
+        Object.defineProperty(document, "visibilityState", { configurable: true, get: () => s });
+        document.dispatchEvent(new Event("visibilitychange", { bubbles: true }));
+      }, state);
+    }
+    // supabase-js now re-announces the stored session; give a re-render the time it would need to show up.
+    await page.waitForTimeout(1500);
+
+    expect(pantryReads()).toBe(before);
+    expect(backend.realtimeJoins).toHaveLength(1);
+  });
 });
