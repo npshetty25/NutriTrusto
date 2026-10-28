@@ -1208,8 +1208,11 @@ export default function Home() {
       .select("*")
       .single();
     if (error || !data) return false;
-    setItems((prev) => (prev.some((i) => i.id === data.id) ? prev : [rowToItem(data as PantryRow), ...prev]));
-    toast(`${entry.name} added`, { description: `${days(entry.daysLeft)} left.` });
+    const added = rowToItem(data as PantryRow);
+    setItems((prev) => (prev.some((i) => i.id === data.id) ? prev : [added, ...prev]));
+    toast(`${entry.name} added`, {
+      description: added.daysPastEstimate > 0 ? `Its date passed ${days(added.daysPastEstimate)} ago.` : `${days(entry.daysLeft)} left.`,
+    });
     return true;
   };
 
