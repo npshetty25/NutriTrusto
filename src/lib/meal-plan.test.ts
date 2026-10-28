@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { planWeek, shoppingForPlan } from "./meal-plan";
+import { EMPTY_PROFILE } from "./food-profile";
 
 const item = (name: string, daysLeft: number, daysPastEstimate = 0) => ({ name, daysLeft, daysPastEstimate });
 
@@ -35,6 +36,30 @@ describe("planWeek", () => {
 
   it("stops at the number of days asked for", () => {
     expect(planWeek(pantry, "none", 2).length).toBeLessThanOrEqual(2);
+  });
+});
+
+describe("planWeek with a food profile", () => {
+  const monday = new Date(2026, 9, 26); // a Monday
+  const pantry = [item("Paneer", 5), item("Spinach", 5), item("Potatoes", 20), item("Onions", 20), item("Cauliflower", 5)];
+
+  it("leaves a fasting weekday empty and plans the others", () => {
+    const plan = planWeek(pantry, "none", 3, { profile: { ...EMPTY_PROFILE, fastingDays: [2] }, today: monday });
+    expect(plan[1]).toMatchObject({ day: 1, fasting: true, dish: "" });
+    expect(plan[0].fasting).toBeUndefined();
+    expect(plan[2].fasting).toBeUndefined();
+  });
+
+  it("a fasting day uses nothing up", () => {
+    const withFast = planWeek(pantry, "none", 3, { profile: { ...EMPTY_PROFILE, fastingDays: [1] }, today: monday });
+    expect(withFast[0]).toMatchObject({ fasting: true });
+    expect(withFast[1].dish).toBe(planWeek(pantry, "none", 1, { today: monday })[0].dish);
+  });
+
+  it("never plans a dish with a Jain-forbidden ingredient", () => {
+    const plan = planWeek(pantry, "none", 7, { profile: { ...EMPTY_PROFILE, jain: true }, today: monday });
+    expect(plan.length).toBeGreaterThan(0);
+    for (const m of plan) expect(m.uses.join(" ")).not.toMatch(/potato|onion/i);
   });
 });
 
