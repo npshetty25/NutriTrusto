@@ -53,12 +53,13 @@ test.describe("forgotten password: the reset page", () => {
     await page.getByLabel("New password", { exact: true }).fill("short");
     await page.getByLabel("Type it again").fill("short");
     await page.getByRole("button", { name: "Save new password" }).click();
-    await expect(page.getByRole("alert")).toHaveText(/at least 8 characters/);
+    // Filtered: Next.js's route announcer is a role="alert" too.
+    await expect(page.getByRole("alert").filter({ hasText: /at least 8 characters/ })).toBeVisible();
 
     await page.getByLabel("New password", { exact: true }).fill("NewPantry2026");
     await page.getByLabel("Type it again").fill("NewPantry2027");
     await page.getByRole("button", { name: "Save new password" }).click();
-    await expect(page.getByRole("alert")).toHaveText(/don't match/);
+    await expect(page.getByRole("alert").filter({ hasText: /don't match/ })).toBeVisible();
 
     expect(backend.requests.some((r) => r.method === "PUT" && r.path === "/auth/v1/user")).toBe(false);
   });
