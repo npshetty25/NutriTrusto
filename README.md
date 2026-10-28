@@ -91,6 +91,11 @@ Run in the Supabase SQL editor, in order: `db/supabase-schema.sql`,
 idempotent. There is no migration ledger; the repo cannot tell you which have
 been applied to a given project.
 
+Feature migrations follow; each says at its top what must run before it, and
+the app checks for each column and keeps working without it. The newest,
+`db/supabase-schema-printed-date.sql`, keeps the date printed on a pack, so one
+added after its date reads "10 days ago" rather than "today".
+
 ### Password reset
 
 "Forgot password?" emails a Supabase recovery link that returns to
