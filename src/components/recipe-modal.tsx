@@ -45,6 +45,8 @@ interface RecipeModalProps {
    * recipe_feedback table exists, in which case no buttons are shown.
    */
   onFeedback?: (rating: RecipeRating) => Promise<boolean>;
+  /** Opens Save leftovers with this dish's name, for what was not eaten. */
+  onSaveLeftovers?: (dishName: string) => void;
 }
 
 export type RecipeRating = "up" | "down" | "cooked";
@@ -58,6 +60,7 @@ export function RecipeModal({
   onAddMissing,
   isAddingToShoppingList,
   onFeedback,
+  onSaveLeftovers,
 }: RecipeModalProps) {
   // Keyed to the recipe's title so "Another idea" starts with fresh buttons.
   const [rated, setRated] = useState<{ title: string; rating: RecipeRating } | null>(null);
@@ -316,6 +319,17 @@ export function RecipeModal({
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {onSaveLeftovers && (
+          <div className="shrink-0 border-t border-border px-3 pt-3">
+            <button
+              onClick={() => onSaveLeftovers(recipe.title)}
+              className="w-full min-h-11 rounded-xl border border-border text-xs font-semibold hover:bg-foreground/5 transition-colors"
+            >
+              Cooked too much? Save the leftovers
+            </button>
           </div>
         )}
 
