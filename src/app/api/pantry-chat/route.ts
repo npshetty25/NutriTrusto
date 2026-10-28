@@ -11,6 +11,8 @@ const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null;
 interface PantryItemContext {
   name?: string;
   daysLeft?: number;
+  /** Days beyond the item's date; daysLeft is clamped at 0 and cannot say this. */
+  daysPastEstimate?: number;
   risk?: string;
   ingredientsText?: string | null;
 }
@@ -60,9 +62,11 @@ export async function POST(req: Request) {
           .map((item) => {
             const name = String(item?.name || "Unknown item");
             const daysLeft = Number.isFinite(item?.daysLeft) ? item?.daysLeft : "?";
+            const past = Number(item?.daysPastEstimate);
+            const when = Number.isFinite(past) && past > 0 ? `PAST ITS DATE by ${Math.round(past)} day(s)` : `${daysLeft} day(s) left`;
             const risk = item?.risk || "unknown";
             const ingredients = item?.ingredientsText ? ` | ingredients: ${item.ingredientsText}` : "";
-            return `- ${name}: ${daysLeft} day(s) left, ${risk} risk${ingredients}`;
+            return `- ${name}: ${when}, ${risk} risk${ingredients}`;
           })
           .join("\n")
       : "The pantry is currently empty.";
@@ -79,6 +83,7 @@ Dietary preference: ${dietaryPreference || "none specified"}.
 Rules:
 - Only reference items that are actually listed above. Never invent an item that isn't there.
 - If asked what to cook, prioritize items with fewer days left first, and respect the dietary preference.
+- Never suggest cooking or eating an item marked PAST ITS DATE, and never list it among things to use first. If it comes up, say its date has passed and that they should look at it and smell it before deciding. Do not say it has gone bad: nobody has checked it.
 - If asked about allergens/ingredients, only answer using the "ingredients:" text shown for that item — if no ingredients text is shown for it, say you don't have ingredient data for that item, don't guess.
 - If the pantry is empty, or doesn't contain what's needed to answer, say so plainly instead of making something up.
 - Keep the answer short and conversational (2-4 sentences) — like a text from a helpful friend, not a formal report. No markdown formatting.

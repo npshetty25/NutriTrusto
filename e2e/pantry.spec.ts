@@ -1,5 +1,12 @@
 import { expect, jpeg, openDashboard, test } from "./fixtures";
 
+/** A purchase date `n` days back, in this machine's own calendar, as Postgres returns it. */
+const daysAgo = (n: number) => {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+
 test.describe("pantry", () => {
   test("shows what is already in the pantry, most urgent first", async ({ backend, page }) => {
     backend.seedPantry([
@@ -205,5 +212,81 @@ test.describe("pantry", () => {
     await page.getByPlaceholder("Search your pantry…").fill("pan");
     await expect(page.getByRole("heading", { level: 3, name: "Paneer" })).toBeVisible();
     await expect(page.getByRole("heading", { level: 3, name: "Rice" })).toHaveCount(0);
+  });
+
+  test("Undo puts a removed item back exactly as it was, and takes the removal out of the record", async ({ backend, page }) => {
+    backend.seedPantry([{
+      name: "Amul Taaza Milk", days_left: 85, purchase_date: daysAgo(5),
+      expiry_source: "printed", expiry_kind: "best_before", storage: "fridge", quantity: "1 litre", ingredients_text: "Toned milk",
+    }]);
+    await openDashboard(page);
+
+    await page.getByRole("button", { name: "Remove Amul Taaza Milk" }).click();
+    await page.getByRole("button", { name: "Remove", exact: true }).click();
+    await expect.poll(() => backend.tables.item_outcomes.length).toBe(1);
+    await page.locator("[data-sonner-toast]").getByRole("button", { name: "Undo" }).click();
+
+    await expect.poll(() => backend.tables.pantry_items.length).toBe(1);
+    // days_left is the full life from purchase: 85, not the 80 that were left.
+    expect(backend.tables.pantry_items[0]).toMatchObject({
+      days_left: 85, purchase_date: daysAgo(5),
+      expiry_source: "printed", expiry_kind: "best_before", storage: "fridge", quantity: "1 litre", ingredients_text: "Toned milk",
+    });
+    await expect.poll(() => backend.tables.item_outcomes.length).toBe(0);
+  });
+
+  test("renaming an item that is past its date keeps it past", async ({ backend, page }) => {
+    backend.seedPantry([{ name: "Spinach", days_left: 4, purchase_date: daysAgo(7) }]);
+    await openDashboard(page);
+
+    await page.getByRole("button", { name: "Edit Spinach" }).click();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByRole("textbox").first().fill("Palak");
+    await dialog.getByRole("button", { name: "Save Changes" }).click();
+
+    await expect.poll(() => backend.tables.pantry_items[0].name).toBe("Palak");
+    expect(backend.tables.pantry_items[0].days_left).toBe(4);
+    await expect(page.getByText("days past", { exact: true })).toBeVisible();
+  });
+
+  test("the notifications panel reads the pantry again each time it opens", async ({ backend, page }) => {
+    backend.seedPantry([{ name: "Paneer", days_left: 2 }]);
+    await openDashboard(page);
+
+    await page.getByRole("button", { name: "Open notifications" }).click();
+    const panel = page.getByRole("dialog", { name: "Needs your attention" });
+    await expect(panel.getByText(/Paneer may spoil/)).toBeVisible();
+    await page.getByRole("button", { name: "Close notifications" }).click();
+
+    backend.tables.pantry_items = [];
+    await page.getByRole("button", { name: "Open notifications" }).click();
+    await expect(panel.getByText("All clear")).toBeVisible();
+  });
+
+  test("a product Open Food Facts doesn't know is looked up through the signed-in fallback", async ({ backend, page }) => {
+    backend.off = { status: 0 };
+    backend.api["lookup-upc"] = { body: { items: [{ title: "Parle-G Gold", brand: "Parle", size: "100 g", category: "Biscuits" }] } };
+    await openDashboard(page);
+
+    await page.getByRole("button", { name: /Barcode/ }).first().click();
+    await page.getByPlaceholder("e.g., 8901234567890").fill("8901719101200");
+    await page.getByRole("button", { name: "Use", exact: true }).click();
+
+    await expect(page.getByRole("dialog").getByRole("heading", { name: /Parle-G Gold/ })).toBeVisible();
+    // The real route answers 401 without a token; this fallback used to send none.
+    expect(backend.requests.find((r) => r.path === "/api/lookup-upc")?.authorization).toMatch(/^Bearer /);
+  });
+
+  test("the pantry chat is told which items are past their date", async ({ backend, page }) => {
+    backend.seedPantry([{ name: "Spinach", days_left: 4, purchase_date: daysAgo(7) }]);
+    backend.api["pantry-chat"] = { body: { success: true, answer: "Check the spinach before anything else." } };
+    await openDashboard(page);
+
+    await page.getByRole("button", { name: /Ask AI/ }).click();
+    await page.getByRole("button", { name: "What can I cook tonight?" }).click();
+    await expect(page.getByText("Check the spinach before anything else.")).toBeVisible();
+
+    const sent = JSON.parse(String(backend.requests.find((r) => r.path === "/api/pantry-chat")!.body));
+    expect(sent.items).toEqual([expect.objectContaining({ name: "Spinach", daysLeft: 0, daysPastEstimate: 3 })]);
   });
 });

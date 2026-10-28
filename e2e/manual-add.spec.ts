@@ -56,6 +56,38 @@ test.describe("add an item by hand", () => {
     expect(lastInsert(backend)?.opened_at).toBeTruthy();
   });
 
+  test("a typed date that has already passed is kept, and the card counts the days since", async ({ backend, page }) => {
+    await openDashboard(page);
+    await page.getByRole("button", { name: "Add an item by hand" }).click();
+
+    const dialog = page.getByRole("dialog", { name: "Add an item" });
+    await dialog.getByLabel("Name").fill("Mango Pickle");
+    await dialog.locator('input[type="date"]').fill(inDays(-5));
+    await expect(dialog.getByText("Its date has already passed")).toBeVisible();
+    await dialog.getByRole("button", { name: "Add to pantry" }).click();
+
+    await expect.poll(() => lastInsert(backend)?.expiry_date).toBe(inDays(-5));
+    await expect(page.getByText(/Your date .+, 5 days ago/)).toBeVisible();
+    await expect(page.locator("[data-sonner-toast]").first()).toContainText("Its date passed 5 days ago");
+  });
+
+  test("a pack opened before its date keeps the use-within limit, not the pack's date", async ({ backend, page }) => {
+    await openDashboard(page);
+    await page.getByRole("button", { name: "Add an item by hand" }).click();
+
+    const dialog = page.getByRole("dialog", { name: "Add an item" });
+    await dialog.getByLabel("Name").fill("Amul Taaza Milk");
+    await dialog.locator('input[type="date"]').fill(inDays(60));
+    await dialog.getByRole("button", { name: "Yes, opened" }).click();
+    await dialog.getByRole("button", { name: "3d", exact: true }).click();
+    await expect(dialog.getByText("Will show 3 days left")).toBeVisible();
+    await dialog.getByRole("button", { name: "Add to pantry" }).click();
+
+    // Stored with the pack's date, the next fetch would count 60 days again.
+    await expect.poll(() => lastInsert(backend)?.days_left).toBe(3);
+    expect(lastInsert(backend)).toMatchObject({ expiry_date: null, expiry_source: null, expiry_kind: null });
+  });
+
   test("refuses an item the account's diet would hide, and says why", async ({ backend, page }) => {
     void backend; // the default account is vegetarian
     await openDashboard(page);

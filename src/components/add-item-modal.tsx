@@ -20,6 +20,7 @@ import {
 } from "@/lib/item-tracking";
 import type { StorageLocation } from "@/lib/temperature";
 import type { DateKind } from "@/lib/date-kind";
+import { localDateISO } from "@/lib/item-age";
 
 export interface NewItem {
   name: string;
@@ -27,6 +28,8 @@ export interface NewItem {
   expirySource: ExpirySource;
   /** Use-by (safety) or best-before (quality), when a date was typed. */
   expiryKind: DateKind | null;
+  /** The date typed from the pack, YYYY-MM-DD, kept as a date so a past one stays past. */
+  expiryDate: string | null;
   /** How much there is, as typed ("500 g"). */
   quantity: string | null;
   storage: StorageLocation | null;
@@ -73,6 +76,8 @@ export function AddItemModal({ userDiet, trackingAvailable, accuracyAvailable, o
   const trimmed = name.trim();
   const estimate = trimmed ? estimateShelfLife(trimmed) : null;
   const dateDays = packDate ? daysUntilDate(packDate) : null;
+  // dateDays stops at 0, so a pack already past its date is told apart from one due today here.
+  const datePassed = dateDays !== null && packDate < localDateISO();
   const expirySource: ExpirySource = dateDays !== null ? "user" : null;
   const effectiveStorage = storage ?? estimate?.storage ?? null;
   // USDA's "use within N days of opening", when it has one, until the person picks.
@@ -151,12 +156,15 @@ export function AddItemModal({ userDiet, trackingAvailable, accuracyAvailable, o
     if (trackingAvailable && opened && !effectiveOpenedDays) return setError("Pick how soon it should be used once opened.");
     if (dietBlocked || !preview) return;
 
+    // Opening that cuts the pack's date short replaces it: the date then belongs to the use-within limit, not the pack.
+    const packDateHolds = dateDays !== null && preview.daysLeft >= dateDays;
     setSaving(true);
     const ok = await onAdd({
       name: trimmed,
       daysLeft: preview.daysLeft,
-      expirySource,
-      expiryKind: accuracyAvailable && dateDays !== null ? dateKind : null,
+      expirySource: packDateHolds ? expirySource : null,
+      expiryKind: accuracyAvailable && packDateHolds ? dateKind : null,
+      expiryDate: packDateHolds ? packDate : null,
       quantity: accuracyAvailable && quantity.trim() ? quantity.trim().slice(0, 40) : null,
       storage: trackingAvailable ? effectiveStorage : null,
       openedAt: trackingAvailable && opened ? new Date().toISOString() : null,
@@ -321,7 +329,9 @@ export function AddItemModal({ userDiet, trackingAvailable, accuracyAvailable, o
 
           {preview && !dietBlocked && (
             <div className="rounded-2xl bg-foreground/5 border border-border/60 p-3">
-              <p className="text-sm font-semibold text-foreground">Will show {days(preview.daysLeft)} left</p>
+              <p className="text-sm font-semibold text-foreground">
+                {datePassed ? "Its date has already passed" : `Will show ${days(preview.daysLeft)} left`}
+              </p>
               <p className="text-[11px] text-foreground/60 mt-0.5 leading-relaxed">{preview.note}</p>
               {dateDays === null && estimate && (
                 <p className="text-[10px] text-foreground/45 mt-1">{formatProvenance(estimate)}</p>

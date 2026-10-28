@@ -79,8 +79,13 @@ describe("NutritionLabelScanner — reading a label", () => {
 
     await userEvent.setup({ advanceTimers: vi.advanceTimersByTime }).upload(camera(), photo());
     expect(await screen.findByText(/Some values may be inaccurate/)).toBeInTheDocument();
+    // Held long enough to read, not whisked away after the usual 0.8 s.
     await act(async () => {
       vi.advanceTimersByTime(800);
+    });
+    expect(onResult).not.toHaveBeenCalled();
+    await act(async () => {
+      vi.advanceTimersByTime(1800);
     });
     expect(onResult).toHaveBeenCalledWith(nutrition);
   });
@@ -90,6 +95,14 @@ describe("NutritionLabelScanner — reading a label", () => {
     const { onResult } = setup();
     await userEvent.upload(camera(), photo());
     expect(await screen.findByText(/hard to read clearly/)).toBeInTheDocument();
+    expect(onResult).not.toHaveBeenCalled();
+  });
+
+  it("refuses per-serving values it could not convert, rather than scoring them as per 100 g", async () => {
+    respond({ success: true, nutrition: { sugars_g: 4, sodium_mg: 200, per_unit: "serving", confidence: "high" } });
+    const { onResult } = setup();
+    await userEvent.upload(camera(), photo());
+    expect(await screen.findByText(/per serving without the serving weight/)).toBeInTheDocument();
     expect(onResult).not.toHaveBeenCalled();
   });
 

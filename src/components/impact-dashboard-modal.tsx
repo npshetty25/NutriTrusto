@@ -68,13 +68,14 @@ export function ImpactDashboardModal({ onClose }: ImpactDashboardModalProps) {
     })();
 
     (async () => {
+      // Newest first, then back into time order for the chart: ascending with a limit read the oldest scans.
       const { data } = await supabase
         .from("scan_history")
         .select("health_score, scanned_at")
         .not("health_score", "is", null)
-        .order("scanned_at", { ascending: true })
+        .order("scanned_at", { ascending: false })
         .limit(200);
-      if (!cancelled && data) setScoreRows(data as ScoreRow[]);
+      if (!cancelled && data) setScoreRows([...(data as ScoreRow[])].reverse());
     })();
 
     return () => { cancelled = true; };

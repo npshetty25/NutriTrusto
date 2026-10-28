@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 /**
  * Installability and service-worker behaviour, with the worker allowed (the
@@ -54,5 +54,54 @@ test.describe("installable web app", () => {
     await expect(page.getByRole("heading", { name: "You're offline" })).toBeVisible();
     const box = await page.getByRole("button", { name: "Try again" }).boundingBox();
     expect(box!.height).toBeGreaterThanOrEqual(44);
+  });
+});
+
+/** A page the worker already controls, as a returning visitor's is, with a marker that a reload would wipe. */
+async function controlledPage(page: Page) {
+  await page.goto("/login");
+  await page.evaluate(() => navigator.serviceWorker.ready.then(() => true));
+  await page.reload();
+  await expect.poll(() => page.evaluate(() => !!navigator.serviceWorker.controller)).toBe(true);
+  await page.evaluate(() => { (window as unknown as { marker?: number }).marker = 1; });
+}
+// "reloading" while the page is mid-navigation, so a poll waits instead of failing.
+const marker = (page: Page) =>
+  page.evaluate(() => (window as unknown as { marker?: number }).marker).catch(() => "reloading");
+// Fired at once, so an unexpected reload fails the call; `later` defers it a tick for the one expected to reload.
+const setVisibility = (page: Page, state: "hidden" | "visible", later = false) =>
+  page.evaluate(([s, deferred]) => {
+    Object.defineProperty(document, "visibilityState", { configurable: true, get: () => s });
+    const fire = () => document.dispatchEvent(new Event("visibilitychange"));
+    if (deferred) setTimeout(fire, 0);
+    else fire();
+  }, [state, later] as const);
+
+test.describe("a new version", () => {
+  test("waits instead of reloading the page in use, and offers a Reload", async ({ page }) => {
+    await controlledPage(page);
+    await page.evaluate(() => navigator.serviceWorker.dispatchEvent(new Event("controllerchange")));
+
+    await expect(page.getByText("A new version is ready")).toBeVisible();
+    expect(await marker(page)).toBe(1);
+
+    await page.getByRole("button", { name: "Reload" }).click();
+    await expect.poll(() => marker(page)).toBeUndefined();
+  });
+
+  test("reloads when the person comes back after a minute away, not after a quick switch", async ({ page }) => {
+    await page.clock.install();
+    await controlledPage(page);
+    await page.evaluate(() => navigator.serviceWorker.dispatchEvent(new Event("controllerchange")));
+
+    await setVisibility(page, "hidden");
+    await page.clock.fastForward("00:20");
+    await setVisibility(page, "visible");
+    expect(await marker(page)).toBe(1);
+
+    await setVisibility(page, "hidden");
+    await page.clock.fastForward("01:05");
+    await setVisibility(page, "visible", true);
+    await expect.poll(() => marker(page)).toBeUndefined();
   });
 });

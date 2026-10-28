@@ -1,7 +1,8 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from "react";
-import { supabase } from "@/lib/supabase";
+import { useRouter } from "next/navigation";
+import { openedFromPasswordResetLink, supabase } from "@/lib/supabase";
 import { fetchMembers, type HouseholdMember } from "@/lib/household";
 import type { User, Session } from "@supabase/supabase-js";
 
@@ -21,6 +22,8 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   /** Redirects to Google. Only offered when NEXT_PUBLIC_GOOGLE_SIGNIN=1. */
   signInWithGoogle: () => Promise<{ error?: string }>;
+  /** Emails a link that opens /reset-password, signed in, to choose a new password. */
+  sendPasswordReset: (email: string) => Promise<{ error?: string }>;
   household: HouseholdInfo | null;
   householdLoading: boolean;
   refreshHousehold: () => Promise<void>;
@@ -50,9 +53,14 @@ interface AuthContextType {
   // (db/supabase-schema-accuracy.sql). Until true, the quantity field and the
   // recipe feedback buttons stay hidden.
   accuracySchemaReady: boolean | null;
+  /** pantry_items.expiry_date (db/supabase-schema-printed-date.sql); until true, nothing writes it. */
+  printedDateSchemaReady: boolean | null;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
+
+// Supabase re-announces the same session each time the tab becomes visible; an equal user keeps its old object.
+const sameUser = (a: User | null, b: User | null) => a === b || (!!a && !!b && JSON.stringify(a) === JSON.stringify(b));
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -65,6 +73,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [healthScoreSchemaReady, setHealthScoreSchemaReady] = useState<boolean | null>(null);
   const [trackingSchemaReady, setTrackingSchemaReady] = useState<boolean | null>(null);
   const [accuracySchemaReady, setAccuracySchemaReady] = useState<boolean | null>(null);
+  const [printedDateSchemaReady, setPrintedDateSchemaReady] = useState<boolean | null>(null);
   const [householdMembers, setHouseholdMembers] = useState<HouseholdMember[]>([]);
   const [householdV2Ready, setHouseholdV2Ready] = useState<boolean | null>(null);
   const [sharedShoppingReady, setSharedShoppingReady] = useState<boolean | null>(null);
@@ -106,18 +115,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setHouseholdLoading(false);
   }, [user]);
 
+  // Supabase sends a reset link to the site's home page when /reset-password is not in its redirect list.
+  const router = useRouter();
   useEffect(() => {
+    if (openedFromPasswordResetLink && window.location.pathname !== "/reset-password") router.replace("/reset-password");
+  }, [router]);
+
+  useEffect(() => {
+    const applySession = (next: Session | null) => {
+      setSession(next);
+      setUser((prev) => (sameUser(prev, next?.user ?? null) ? prev : next?.user ?? null));
+    };
+
     // Restore session on page load
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
+      applySession(session);
       setLoading(false);
     });
 
     // Listen for auth state changes (sign in, sign out, token refresh)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
+      applySession(session);
     });
 
     return () => subscription.unsubscribe();
@@ -157,6 +175,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       ]).then(([columns, feedback]) => {
         setAccuracySchemaReady(!columns.error && !feedback.error);
       });
+      supabase.from("pantry_items").select("expiry_date").limit(1).then(({ error }) => {
+        setPrintedDateSchemaReady(!error);
+      });
     } else {
       setHousehold(null);
       setHouseholdMembers([]);
@@ -167,6 +188,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setHealthScoreSchemaReady(null);
       setTrackingSchemaReady(null);
       setAccuracySchemaReady(null);
+      setPrintedDateSchemaReady(null);
     }
   }, [user, refreshHousehold]);
 
@@ -195,12 +217,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return error ? { error: error.message } : {};
   };
 
+  const sendPasswordReset = async (email: string): Promise<{ error?: string }> => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    return error ? { error: error.message } : {};
+  };
+
   const signOut = async () => {
     await supabase.auth.signOut();
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, signIn, signUp, signOut, signInWithGoogle, household, householdLoading, refreshHousehold, householdMembers, householdV2Ready, sharedShoppingReady, householdSchemaReady, ingredientsSchemaReady, healthScoreSchemaReady, trackingSchemaReady, accuracySchemaReady }}>
+    <AuthContext.Provider value={{ user, session, loading, signIn, signUp, signOut, signInWithGoogle, sendPasswordReset, household, householdLoading, refreshHousehold, householdMembers, householdV2Ready, sharedShoppingReady, householdSchemaReady, ingredientsSchemaReady, healthScoreSchemaReady, trackingSchemaReady, accuracySchemaReady, printedDateSchemaReady }}>
       {children}
     </AuthContext.Provider>
   );

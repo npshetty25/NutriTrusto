@@ -68,6 +68,13 @@ export default function NutritionLabelScanner({ onResult, onClose }: NutritionLa
         return;
       }
 
+      // The rating's thresholds are per 100 g; unconverted per-serving numbers would be judged as if they were.
+      if (n.per_unit === "serving") {
+        setError("This label gives values per serving without the serving weight, so they can't be compared per 100 g. Try the per 100 g column if the pack has one.");
+        setIsScanning(false);
+        return;
+      }
+
       if (n.confidence === "medium") {
         setWarning("Some values may be inaccurate. Check against the physical label.");
       }
@@ -82,9 +89,10 @@ export default function NutritionLabelScanner({ onResult, onClose }: NutritionLa
       }
 
       setSuccess(true);
+      // Long enough to read the warning before the dialog closes, as the expiry scanner does.
       setTimeout(() => {
         onResult(data.nutrition);
-      }, 800);
+      }, n.confidence === "medium" ? 2600 : 800);
     } catch {
       setError("Something went wrong. Please try again.");
     } finally {
@@ -168,7 +176,7 @@ export default function NutritionLabelScanner({ onResult, onClose }: NutritionLa
               title="Capture nutrition label"
               aria-label="Capture nutrition label"
               className="hidden"
-              onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImage(f); }}
+              onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) handleImage(f); }}
             />
             <input
               ref={galleryRef}
@@ -177,7 +185,7 @@ export default function NutritionLabelScanner({ onResult, onClose }: NutritionLa
               title="Upload nutrition label"
               aria-label="Upload nutrition label"
               className="hidden"
-              onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImage(f); }}
+              onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) handleImage(f); }}
             />
 
             <button

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/auth-context";
@@ -21,17 +21,22 @@ const MS_PER_DAY = 1000 * 60 * 60 * 24;
 
 export function RestockSuggestions({ currentItemNames }: RestockSuggestionsProps) {
   const { user } = useAuth();
-  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const userId = user?.id;
+  const diet = normalizeDietPreference(String(user?.user_metadata?.dietary_preference || "none"));
+  // Everything that looks due, most overdue first, before the pantry and diet are considered.
+  const [candidates, setCandidates] = useState<Suggestion[]>([]);
 
+  // Read once per account: keyed on the names array, which is new on every render, this re-read 500 rows per keystroke.
   useEffect(() => {
-    if (!user) return;
+    if (!userId) return;
     let cancelled = false;
 
     (async () => {
+      // Newest first: the oldest 500 froze the suggestions once history passed that.
       const { data, error } = await supabase
         .from("scan_history")
         .select("product_name, scanned_at")
-        .order("scanned_at", { ascending: true })
+        .order("scanned_at", { ascending: false })
         .limit(500);
 
       if (cancelled || error || !data) return;
@@ -64,18 +69,6 @@ export function RestockSuggestions({ currentItemNames }: RestockSuggestionsProps
 
         const daysSinceLastScan = (now - sorted[sorted.length - 1]) / MS_PER_DAY;
 
-        // Bidirectional, because either name can be the longer one ("Milk" in
-        // the pantry should suppress a "Toned Milk" suggestion and vice
-        // versa) — but through the shared matcher, so it is whole words in
-        // both directions. The old `includes` both ways meant "Milk" in the
-        // pantry silently suppressed a Coconut Milk suggestion, and a
-        // "Buttermilk" suggestion suppressed itself against "Butter".
-        const alreadyInPantry = currentItemNames.some((n) => {
-          const name = n.toLowerCase();
-          return matchesTerm(name, key) || matchesTerm(key, name);
-        });
-        if (alreadyInPantry) continue;
-
         // Surface it a bit before it's strictly "due", so it's a heads-up,
         // not a reminder that's already late.
         if (daysSinceLastScan >= avgInterval * 0.8) {
@@ -88,17 +81,27 @@ export function RestockSuggestions({ currentItemNames }: RestockSuggestionsProps
       }
 
       results.sort((a, b) => (b.daysSinceLastScan - b.avgIntervalDays) - (a.daysSinceLastScan - a.avgIntervalDays));
-      // Scan history is not diet-scoped: a vegetarian who scanned eggs twice
-      // last month (or before switching diet) would be told to restock them.
-      const dietAllowed = filterByDiet(
-        normalizeDietPreference(String(user.user_metadata?.dietary_preference || "none")),
-        results
-      );
-      setSuggestions(dietAllowed.slice(0, 3));
+      setCandidates(results);
     })();
 
     return () => { cancelled = true; };
-  }, [user, currentItemNames]);
+  }, [userId]);
+
+  const suggestions = useMemo(() => {
+    // Bidirectional, because either name can be the longer one ("Milk" in
+    // the pantry should suppress a "Toned Milk" suggestion and vice
+    // versa) — but through the shared matcher, so it is whole words in
+    // both directions. The old `includes` both ways meant "Milk" in the
+    // pantry silently suppressed a Coconut Milk suggestion, and a
+    // "Buttermilk" suggestion suppressed itself against "Butter".
+    const notInPantry = candidates.filter((s) => !currentItemNames.some((n) => {
+      const name = n.toLowerCase();
+      return matchesTerm(name, s.name) || matchesTerm(s.name, name);
+    }));
+    // Scan history is not diet-scoped: a vegetarian who scanned eggs twice
+    // last month (or before switching diet) would be told to restock them.
+    return filterByDiet(diet, notInPantry).slice(0, 3);
+  }, [candidates, currentItemNames, diet]);
 
   if (suggestions.length === 0) return null;
 

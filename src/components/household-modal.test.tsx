@@ -79,6 +79,14 @@ describe("HouseholdModal — joining", () => {
     expect(screen.getByPlaceholderText("Enter invite code")).toHaveValue("");
   });
 
+  it("accepts a code read off another screen in capitals or with a space", async () => {
+    rpc.mockResolvedValue({ data: "h-1", error: null });
+    open();
+    await userEvent.type(screen.getByPlaceholderText("Enter invite code"), "A1B2 C3D4 E5F6");
+    await userEvent.click(screen.getByRole("button", { name: "Join" }));
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith("join_household_by_code", { code: "a1b2c3d4e5f6" }));
+  });
+
   it("fills the code in from an invite link", () => {
     open({ initialJoinCode: "a1b2c3d4e5f6" });
     expect(screen.getByPlaceholderText("Enter invite code")).toHaveValue("a1b2c3d4e5f6");

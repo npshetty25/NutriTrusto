@@ -9,7 +9,7 @@ import {
   lockedDietScope,
 } from "@/lib/diet";
 
-import { calculateCurrentDaysLeft, calculateDaysPastEstimate, localDateISO, parsePurchaseDate } from "@/lib/item-age";
+import { calculateCurrentDaysLeft, calculateDaysPastEstimate, localDateISO, parsePurchaseDate, remainingFor } from "@/lib/item-age";
 import { parseGs1, gs1PrintedDate } from "@/lib/gs1";
 import { asDateKind, type DateKind } from "@/lib/date-kind";
 
@@ -104,6 +104,7 @@ import {
   STORAGE_OPTIONS,
   OPENED_DAYS_OPTIONS,
   afterOpening,
+  dateInDays,
   daysLeftAfterMove,
   daysUntilDate,
   defaultStorageFor,
@@ -153,6 +154,8 @@ interface Item {
   expirySource?: ExpirySource;
   // db/supabase-schema-accuracy.sql — undefined until it has run.
   expiryKind?: DateKind | null;
+  // The pack's or the person's own date, YYYY-MM-DD (db/supabase-schema-printed-date.sql).
+  expiryDate?: string | null;
   quantity?: string | null;
   // Who added it, and whether it is in a household (null = private).
   ownerId?: string | null;
@@ -172,6 +175,7 @@ type PantryRow = {
   opened_at?: string | null;
   expiry_source?: string | null;
   expiry_kind?: string | null;
+  expiry_date?: string | null;
   quantity?: string | null;
 };
 
@@ -181,12 +185,12 @@ const asExpirySource = (v: unknown): ExpirySource => (v === "printed" || v === "
 
 /** One mapping from a stored row to what the page shows, used by every fetch. */
 function rowToItem(row: PantryRow): Item {
-  const daysLeft = calculateCurrentDaysLeft(row.days_left, row.purchase_date);
+  const { daysLeft, daysPast } = remainingFor(row);
   return {
     id: row.id,
     name: row.name,
     daysLeft,
-    daysPastEstimate: calculateDaysPastEstimate(row.days_left, row.purchase_date),
+    daysPastEstimate: daysPast,
     risk: deriveRisk(daysLeft, row.days_left, row.name),
     purchaseDate: row.purchase_date,
     ingredientsText: row.ingredients_text ?? null,
@@ -195,6 +199,7 @@ function rowToItem(row: PantryRow): Item {
     openedAt: row.opened_at ?? null,
     expirySource: asExpirySource(row.expiry_source),
     expiryKind: asDateKind(row.expiry_kind),
+    expiryDate: row.expiry_date ?? null,
     quantity: row.quantity ?? null,
     ownerId: row.user_id ?? null,
     householdId: row.household_id ?? null,
@@ -242,6 +247,9 @@ interface ScannedResultEntry {
   // shelf-life estimate use the product database when the name alone matches
   // nothing in our table (tier 2 in lib/shelf-life.ts).
   categories?: string | null;
+  // Kept so a nutrition-label rescan scores the same product, not a bare name.
+  additivesCount?: number;
+  nutriScoreGrade?: string;
 }
 
 /** A printed date (from a GS1 barcode) as the scan result's expiry entry. */
@@ -277,7 +285,7 @@ const INVENTORY_PAGE_SIZE = 6;
 // No fallback items — real users start with an empty pantry.
 
 export default function Home() {
-  const { user, loading: authLoading, household, householdLoading, householdMembers, sharedShoppingReady, householdSchemaReady, ingredientsSchemaReady, healthScoreSchemaReady, trackingSchemaReady, accuracySchemaReady } = useAuth();
+  const { user, loading: authLoading, household, householdLoading, householdMembers, sharedShoppingReady, householdSchemaReady, ingredientsSchemaReady, healthScoreSchemaReady, trackingSchemaReady, accuracySchemaReady, printedDateSchemaReady } = useAuth();
   // UI-only gate, not a security one — see lib/admin.ts. Hides "Add Demo
   // Data" from everyone but the project owner, so a real user never sees a
   // button that fills their pantry with sample groceries.
@@ -310,6 +318,10 @@ export default function Home() {
     accuracySchemaReady
       ? { quantity: t.quantity?.trim() || null, expiry_kind: t.expiryKind ?? null }
       : {};
+
+  // And for expiry_date (db/supabase-schema-printed-date.sql).
+  const printedDateField = (date: string | null | undefined): { expiry_date?: string | null } =>
+    printedDateSchemaReady ? { expiry_date: date ?? null } : {};
   const router = useRouter();
 
   const [items, setItems] = useState<Item[]>([]);
@@ -378,7 +390,6 @@ export default function Home() {
   const [notificationPage, setNotificationPage] = useState(0);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [hasMoreNotifications, setHasMoreNotifications] = useState(true);
-  const [notificationsInitialized, setNotificationsInitialized] = useState(false);
   const [notificationSeverityFilter, setNotificationSeverityFilter] = useState<"all" | NotificationEntry["severity"]>("all");
   const [notificationSort, setNotificationSort] = useState<"newest" | "urgent">("newest");
   const [isSeedingMockData, setIsSeedingMockData] = useState(false);
@@ -544,8 +555,12 @@ export default function Home() {
     }
   }, [currentPage, totalPages]);
 
+  // A sleeping phone suspends timers and the realtime socket: refetch on a new day, or on return after a minute away.
   useEffect(() => {
     if (!user) return;
+
+    let countedFor = localDateISO();
+    let hiddenAt: number | null = null;
 
     const refreshItemAgingFromDb = async () => {
       const { data, error } = await supabase
@@ -555,27 +570,28 @@ export default function Home() {
 
       if (error || !data) return;
 
+      countedFor = localDateISO();
       setItems(data.map((row) => rowToItem(row as PantryRow)));
     };
 
-    const now = new Date();
-    const nextMidnight = new Date(now);
-    nextMidnight.setHours(24, 0, 0, 0);
-    const firstDelay = Math.max(1000, nextMidnight.getTime() - now.getTime());
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") {
+        hiddenAt = Date.now();
+        return;
+      }
+      const away = hiddenAt === null ? 0 : Date.now() - hiddenAt;
+      hiddenAt = null;
+      if (away > 60_000 || localDateISO() !== countedFor) void refreshItemAgingFromDb();
+    };
 
-    let intervalId: ReturnType<typeof setInterval> | undefined;
-
-    const timeoutId = setTimeout(() => {
-      void refreshItemAgingFromDb();
-
-      intervalId = setInterval(() => {
-        void refreshItemAgingFromDb();
-      }, 24 * 60 * 60 * 1000);
-    }, firstDelay);
+    const dayCheck = setInterval(() => {
+      if (localDateISO() !== countedFor) void refreshItemAgingFromDb();
+    }, 60_000);
+    document.addEventListener("visibilitychange", onVisibility);
 
     return () => {
-      clearTimeout(timeoutId);
-      if (intervalId) clearInterval(intervalId);
+      clearInterval(dayCheck);
+      document.removeEventListener("visibilitychange", onVisibility);
     };
   }, [user]);
 
@@ -618,12 +634,14 @@ export default function Home() {
     days_left: number;
     purchase_date: string;
     created_at?: string | null;
+    expiry_date?: string | null;
   }): NotificationEntry => {
-    const currentDays = calculateCurrentDaysLeft(row.days_left, row.purchase_date);
+    // The same count the card uses, from the item's own date when it has one.
+    const { daysLeft: currentDays, daysPast } = remainingFor(row);
     const createdAt = row.created_at || new Date().toISOString();
     const category = inferItemCategory(String(row.name || ""));
 
-    if (calculateDaysPastEstimate(row.days_left, row.purchase_date) > 0) {
+    if (daysPast > 0) {
       return {
         id: `${row.id}-${createdAt}`,
         // Not "expired" / "has spoiled". Nobody has looked at this food; the
@@ -676,7 +694,7 @@ export default function Home() {
       id: `${row.id}-${createdAt}`,
       title: "Inventory update",
       message: `${row.name} is in good condition with ${days(currentDays)} left.`,
-      severity: "info",
+      severity: "low",
       createdAt,
       category,
     };
@@ -688,9 +706,11 @@ export default function Home() {
     setNotificationsLoading(true);
     // ingredients_text only once the migration that adds it is known to have
     // run — PostgREST rejects a select naming an unknown column outright.
-    const columns = ingredientsSchemaReady
-      ? "id, name, days_left, purchase_date, created_at, ingredients_text"
-      : "id, name, days_left, purchase_date, created_at";
+    const columns = [
+      "id, name, days_left, purchase_date, created_at",
+      ingredientsSchemaReady ? "ingredients_text" : "",
+      printedDateSchemaReady ? "expiry_date" : "",
+    ].filter(Boolean).join(", ");
 
     // Pages are cut from the stored rows, but a vegetarian's notifications
     // must not mention the eggs in them. Filtering after the cut can leave a
@@ -736,10 +756,8 @@ export default function Home() {
     }
 
     setShowNotificationsPanel(true);
-    if (!notificationsInitialized) {
-      setNotificationsInitialized(true);
-      await loadNotifications(true);
-    }
+    // Read again on every opening: the list is built from the pantry as it is now.
+    await loadNotifications(true);
   };
 
   const handleNotificationsScroll = async (e: React.UIEvent<HTMLDivElement>) => {
@@ -752,15 +770,13 @@ export default function Home() {
 
   // Notifications are derived live from current pantry state (not a stored
   // inbox), so "clear" empties what's shown now rather than dismissing
-  // something permanently. Resetting notificationsInitialized means the
-  // next time the panel opens it re-fetches — a genuinely still-critical
-  // item will reappear, which is correct: it isn't done being critical
-  // just because you closed the panel.
+  // something permanently. The panel re-fetches every time it opens — a
+  // genuinely still-critical item will reappear, which is correct: it isn't
+  // done being critical just because you closed the panel.
   const clearAllNotifications = () => {
     setNotifications([]);
     setHasMoreNotifications(false);
     setNotificationPage(0);
-    setNotificationsInitialized(false);
   };
 
   // ─── Guard + redirect ──────────────────────────────────────────
@@ -818,8 +834,10 @@ export default function Home() {
   useEffect(() => {
     if (!user) return;
 
+    // Only the first load shows the spinner; a refetch after a live change swaps the list in place.
+    let firstLoad = true;
     const fetchItems = async () => {
-      setDbLoading(true);
+      if (firstLoad) setDbLoading(true);
       const { data, error } = await supabase
         .from("pantry_items")
         .select("*")
@@ -827,13 +845,13 @@ export default function Home() {
 
       if (error) {
         console.warn("Supabase fetch error:", error.message);
-        setItems([]);
-      } else if (data && data.length > 0) {
-        setItems(data.map((row) => rowToItem(row as PantryRow)));
+        // Keep what is shown: an empty list here would tell the person their pantry is empty.
+        if (firstLoad) setInlineError("Couldn't load your pantry. Check your connection and reload the page.");
       } else {
-        setItems([]);
+        setItems((data ?? []).map((row) => rowToItem(row as PantryRow)));
       }
-      setDbLoading(false);
+      if (firstLoad) setDbLoading(false);
+      firstLoad = false;
     };
 
     fetchItems();
@@ -889,7 +907,8 @@ export default function Home() {
   useEffect(() => {
     if (!user || !notificationsEnabled) return;
     const t = setTimeout(() => {
-      const soonToSpoil = visibleItems.filter(i => i.daysLeft > 0 && i.daysLeft <= notifyDaysBefore);
+      // Includes the last day itself (0 left, not past), the most urgent reminder of all.
+      const soonToSpoil = visibleItems.filter(i => i.daysPastEstimate === 0 && i.daysLeft <= notifyDaysBefore);
       soonToSpoil.forEach((item) => {
         const key = `expiry-notify-${user.id}-${item.id}-${new Date().toDateString()}`;
         if (typeof window !== "undefined" && localStorage.getItem(key)) return;
@@ -899,7 +918,9 @@ export default function Home() {
         // about one specific item, so the action offers the one thing that
         // resolves it.
         toast("Expiry Reminder", {
-          description: `${item.name} may spoil in ${days(item.daysLeft)}. Use it soon.`,
+          description: item.daysLeft === 0
+            ? `Today is the last day for ${item.name}. Use it today.`
+            : `${item.name} may spoil in ${days(item.daysLeft)}. Use it soon.`,
           action: {
             label: "Cook it",
             onClick: () => {
@@ -930,18 +951,25 @@ export default function Home() {
     if (!itemToUndo) return;
 
     setItems(prev => prev.filter(i => i.id !== id));
+    // The outcome row this removal logged, so Undo can take it back out of the stats and the learning.
+    let loggedOutcomeId: PromiseLike<string | null> = Promise.resolve(null);
     if (!id.startsWith("seed-")) {
-      await supabase.from("pantry_items").delete().eq("id", id);
+      const { error: deleteError } = await supabase.from("pantry_items").delete().eq("id", id);
+      if (deleteError) {
+        setItems(prev => (prev.some(i => i.id === id) ? prev : [itemToUndo, ...prev]));
+        toast("Couldn't remove that", { description: `${itemToUndo.name} is still in your pantry. Check your connection and try again.` });
+        return;
+      }
       if (user) {
         // Best-effort impact-dashboard log — never blocks the removal, and
         // silently no-ops if the migration adding this table hasn't run yet.
-        supabase.from("item_outcomes").insert([{
+        loggedOutcomeId = supabase.from("item_outcomes").insert([{
           user_id: user.id,
           name: itemToUndo.name,
           category: inferItemCategory(itemToUndo.name),
           outcome,
           days_left_at_removal: itemToUndo.daysLeft,
-        }]).then(() => {}, () => {});
+        }]).select("id").single().then(({ data }) => (data?.id as string | undefined) ?? null, () => null);
       }
     }
 
@@ -954,18 +982,31 @@ export default function Home() {
         action: {
           label: "Undo",
           onClick: async () => {
-            setItems(prev => [...prev, itemToUndo]);
+            setItems(prev => (prev.some(i => i.id === id) ? prev : [...prev, itemToUndo]));
             if (!id.startsWith("seed-") && user) {
+              // Back as it was: days_left is the full life from purchase, not what remained; a housemate's item stays theirs.
               const rowToInsert = {
-                 id: itemToUndo.id,
-                 user_id: user.id,
-                 ...householdIdField(),
-                 name: itemToUndo.name,
-                 days_left: itemToUndo.daysLeft,
-                 risk: itemToUndo.risk,
-                 purchase_date: itemToUndo.purchaseDate
+                id: itemToUndo.id,
+                user_id: household && itemToUndo.householdId === household.id && itemToUndo.ownerId ? itemToUndo.ownerId : user.id,
+                ...householdIdField(),
+                ...ingredientsTextField(itemToUndo.ingredientsText),
+                ...healthScoreField(itemToUndo.healthScore),
+                ...trackingFields(itemToUndo),
+                ...accuracyFields(itemToUndo),
+                ...printedDateField(itemToUndo.expiryDate),
+                name: itemToUndo.name,
+                days_left: storedDaysLeftFor(itemToUndo.daysLeft - itemToUndo.daysPastEstimate, itemToUndo.purchaseDate),
+                risk: itemToUndo.risk,
+                purchase_date: itemToUndo.purchaseDate,
               };
-              await supabase.from("pantry_items").insert([rowToInsert]);
+              const { error: restoreError } = await supabase.from("pantry_items").insert([rowToInsert]);
+              if (restoreError) {
+                setItems(prev => prev.filter(i => i.id !== id));
+                toast("Couldn't put it back", { description: `Add ${itemToUndo.name} again if you still have it.` });
+                return;
+              }
+              const outcomeId = await loggedOutcomeId;
+              if (outcomeId) await supabase.from("item_outcomes").delete().eq("id", outcomeId);
             }
           }
         }
@@ -1006,8 +1047,11 @@ export default function Home() {
       return;
     }
 
-    let remaining = editingItem.daysLeft;
+    // Signed: negative while past its date, so an edit that leaves the date alone keeps it past.
+    let remaining = editingItem.daysLeft - editingItem.daysPastEstimate;
     let source: ExpirySource = editingItem.expirySource ?? null;
+    // The person's own date as a date; a day count they type becomes one too.
+    let expiryDate: string | null = editingItem.expiryDate ?? null;
     if (editDate) {
       const fromDate = daysUntilDate(editDate);
       if (fromDate === null) {
@@ -1016,6 +1060,7 @@ export default function Home() {
       }
       remaining = fromDate;
       source = "user";
+      expiryDate = editDate;
     } else if (editDaysLeft.trim() !== String(editingItem.daysLeft)) {
       const parsedDaysLeft = Math.round(Number(editDaysLeft));
       if (!editDaysLeft.trim() || !Number.isFinite(parsedDaysLeft) || parsedDaysLeft < 0) {
@@ -1024,11 +1069,12 @@ export default function Home() {
       }
       remaining = Math.min(3650, parsedDaysLeft);
       source = "user";
+      expiryDate = dateInDays(remaining);
     }
 
     let note = "";
     const fromStorage = editingItem.storage ?? defaultStorageFor(editingItem.name);
-    if (trackingSchemaReady && editStorage && editStorage !== fromStorage) {
+    if (trackingSchemaReady && editStorage && editStorage !== fromStorage && remaining > 0) {
       const moved = daysLeftAfterMove(trimmedName, remaining, fromStorage, editStorage, source);
       remaining = moved.daysLeft;
       if (!moved.changed) note = moved.reason;
@@ -1044,6 +1090,7 @@ export default function Home() {
       const opened = afterOpening({ daysLeft: remaining, expirySource: source, expiryKind: editingItem.expiryKind ?? null }, useWithin);
       remaining = opened.daysLeft;
       source = opened.expirySource;
+      if (opened.shortened) expiryDate = null;
     }
     const openedAt = editOpened ? (editingItem.openedAt ?? new Date().toISOString()) : null;
     const storage = editStorage ?? editingItem.storage ?? null;
@@ -1069,6 +1116,7 @@ export default function Home() {
         risk,
         ...trackingFields({ storage, openedAt, expirySource: source }),
         ...accuracyFields({ quantity, expiryKind }),
+        ...printedDateField(expiryDate),
       })
       .eq("id", editingItem.id);
 
@@ -1079,15 +1127,18 @@ export default function Home() {
       return;
     }
 
+    // Counted the way the next fetch will count the saved row, so the card does not change on refresh.
+    const shown = remainingFor({ days_left: storedDays, purchase_date: editingItem.purchaseDate, expiry_date: printedDateSchemaReady ? expiryDate : null });
     setItems(prev => prev.map(i => i.id === editingItem.id
       ? {
           ...i,
           name: trimmedName,
-          daysLeft: remaining,
-          daysPastEstimate: calculateDaysPastEstimate(storedDays, editingItem.purchaseDate),
+          daysLeft: shown.daysLeft,
+          daysPastEstimate: shown.daysPast,
           risk,
           ...(trackingSchemaReady ? { storage, openedAt, expirySource: source } : {}),
           ...(accuracySchemaReady ? { quantity, expiryKind } : {}),
+          ...(printedDateSchemaReady ? { expiryDate } : {}),
         }
       : i));
     toast("Item updated", note ? { description: note } : undefined);
@@ -1108,7 +1159,9 @@ export default function Home() {
       setEditOpened(true);
       return;
     }
-    const opened = afterOpening({ daysLeft: item.daysLeft, expirySource: item.expirySource ?? null, expiryKind: item.expiryKind ?? null }, limit.days);
+    // Signed, as in saveEditItem: opening a pack that is already past its date leaves it past.
+    const remaining = item.daysLeft - item.daysPastEstimate;
+    const opened = afterOpening({ daysLeft: remaining, expirySource: item.expirySource ?? null, expiryKind: item.expiryKind ?? null }, limit.days);
     const openedAt = new Date().toISOString();
     const storedDays = storedDaysLeftFor(opened.daysLeft, item.purchaseDate);
     const risk = deriveRisk(opened.daysLeft, storedDays, item.name);
@@ -1119,27 +1172,36 @@ export default function Home() {
         risk,
         ...trackingFields({ storage: item.storage ?? null, openedAt, expirySource: opened.expirySource }),
         ...(accuracySchemaReady ? { expiry_kind: opened.expiryKind } : {}),
+        // The use-within limit replaced the pack's date, so the pack's date must not be counted from any more.
+        ...(opened.shortened ? printedDateField(null) : {}),
       })
       .eq("id", item.id);
     if (error) {
       toast("Couldn't save that", { description: "Please try again." });
       return;
     }
+    const keptDate = opened.shortened ? null : item.expiryDate ?? null;
+    const shown = remainingFor({ days_left: storedDays, purchase_date: item.purchaseDate, expiry_date: printedDateSchemaReady ? keptDate : null });
     setItems((prev) => prev.map((i) => i.id === item.id
       ? {
           ...i,
-          daysLeft: opened.daysLeft,
-          daysPastEstimate: calculateDaysPastEstimate(storedDays, item.purchaseDate),
+          daysLeft: shown.daysLeft,
+          daysPastEstimate: shown.daysPast,
           risk,
           openedAt,
           expirySource: opened.expirySource,
           ...(accuracySchemaReady ? { expiryKind: opened.expiryKind } : {}),
+          ...(printedDateSchemaReady ? { expiryDate: keptDate } : {}),
         }
       : i));
     toast(`${item.name} opened`, {
       description: opened.shortened
         ? `Use within ${days(limit.days)} of opening, so ${days(opened.daysLeft)} left (${limit.citation}).`
-        : `Its date is still the sooner one: ${days(opened.daysLeft)} left.`,
+        : remaining < 0
+          ? "It was already past its date. Look at it and smell it before you use it."
+          : remaining === 0
+            ? "Its date is still the sooner one: today is its last day."
+            : `Its date is still the sooner one: ${days(opened.daysLeft)} left.`,
     });
   };
 
@@ -1158,12 +1220,16 @@ export default function Home() {
         purchase_date: localDateISO(),
         ...trackingFields(entry),
         ...accuracyFields(entry),
+        ...printedDateField(entry.expiryDate),
       }])
       .select("*")
       .single();
     if (error || !data) return false;
-    setItems((prev) => (prev.some((i) => i.id === data.id) ? prev : [rowToItem(data as PantryRow), ...prev]));
-    toast(`${entry.name} added`, { description: `${days(entry.daysLeft)} left.` });
+    const added = rowToItem(data as PantryRow);
+    setItems((prev) => (prev.some((i) => i.id === data.id) ? prev : [added, ...prev]));
+    toast(`${entry.name} added`, {
+      description: added.daysPastEstimate > 0 ? `Its date passed ${days(added.daysPastEstimate)} ago.` : `${days(entry.daysLeft)} left.`,
+    });
     return true;
   };
 
@@ -1501,43 +1567,29 @@ export default function Home() {
           purchase_date: purchaseDate,
         }));
 
-        const failedLocalItems: Item[] = [];
+        // A row that failed to save is named, not shown as a card that the next refetch would silently remove.
+        const failedNames: string[] = [];
         const successfulInsertedItems: Item[] = [];
-        let insertedCount = 0;
 
         for (const row of rows) {
           const { data: insertedRow, error } = await supabase
             .from("pantry_items")
             .insert([row])
-            .select("id, name, days_left, purchase_date")
+            .select("*")
             .single();
 
-          if (error) {
-            failedLocalItems.push({
-              id: `local-${Math.random().toString(36).slice(2, 10)}`,
-              name: row.name,
-              daysLeft: row.days_left,
-              // Just built from a fresh purchase_date, so it cannot already
-              // be past its own estimate.
-              daysPastEstimate: 0,
-              risk: row.risk as RiskLevel,
-              purchaseDate: row.purchase_date,
-            });
+          if (error || !insertedRow) {
+            failedNames.push(row.name);
           } else {
-            insertedCount += 1;
-            if (insertedRow) {
-              const daysLeft = calculateCurrentDaysLeft(insertedRow.days_left, insertedRow.purchase_date);
-              successfulInsertedItems.push({
-                id: insertedRow.id,
-                name: insertedRow.name,
-                daysLeft,
-                daysPastEstimate: calculateDaysPastEstimate(insertedRow.days_left, insertedRow.purchase_date),
-                risk: deriveRisk(daysLeft, insertedRow.days_left, insertedRow.name),
-                purchaseDate: insertedRow.purchase_date,
-              });
-              logScanHistory(insertedRow.name, "receipt");
-            }
+            successfulInsertedItems.push(rowToItem(insertedRow as PantryRow));
+            logScanHistory(insertedRow.name, "receipt");
           }
+        }
+        const insertedCount = successfulInsertedItems.length;
+
+        if (insertedCount === 0 && rows.length > 0) {
+          setInlineError("Couldn't save the items from this receipt. Check your connection and try again.");
+          return;
         }
 
         if (successfulInsertedItems.length > 0) {
@@ -1546,10 +1598,6 @@ export default function Home() {
             const fresh = successfulInsertedItems.filter((item) => !existingIds.has(item.id));
             return [...fresh, ...prev];
           });
-        }
-
-        if (failedLocalItems.length > 0) {
-          setItems(prev => [...failedLocalItems, ...prev]);
         }
 
         // Say how many day counts are guesses, so a person knows which cards
@@ -1561,10 +1609,11 @@ export default function Home() {
             ? " Every day count is from our shelf-life sources."
             : ` ${guessed} of the day counts are estimates — tap Edit on a card to set the real date.`
           : "";
+        const failedList = `${failedNames.slice(0, 3).join(", ")}${failedNames.length > 3 ? ` and ${failedNames.length - 3} more` : ""}`;
         toast("Receipt Parsed", {
-          description: (insertedCount === rows.length
+          description: (failedNames.length === 0
             ? `Added all ${rows.length} items to your inventory.`
-            : `Added ${insertedCount}/${rows.length} items to cloud inventory. Remaining items were added locally.`) + sourceNote,
+            : `Added ${insertedCount} of ${rows.length} items. Couldn't save ${failedList}; add ${failedNames.length === 1 ? "it" : "them"} again by hand.`) + sourceNote,
         });
       } else {
         setInlineError(data.error || "We couldn't parse this receipt. Try a clearer image in good lighting.");
@@ -1718,7 +1767,7 @@ if (nutritionFieldsFilled < 2) {
       } else {
          // Auto fallback to server-side UPCItemDB proxy (Fixes CORS block)
          try {
-            const fallbackRes = await fetch(`/api/lookup-upc?upc=${decodedText}`);
+            const fallbackRes = await apiFetch(`/api/lookup-upc?upc=${encodeURIComponent(decodedText)}`);
             const fallbackData = await fallbackRes.json();
             if (fallbackData.items && fallbackData.items.length > 0) {
             const upcItem = fallbackData.items[0] as {
@@ -1797,7 +1846,10 @@ if (nutritionFieldsFilled < 2) {
       });
       const analysis = await aiRes.json();
 
-      if (!analysis.is_food) {
+      // A failed or rate-limited analysis has no is_food at all; it is not a verdict on the product.
+      if (!aiRes.ok || typeof analysis?.is_food !== "boolean") {
+        setInlineError(analysis?.error || "Couldn't analyse this product right now. Please try again in a moment.");
+      } else if (!analysis.is_food) {
         setInlineError("This barcode appears to be a non-food item, so it wasn't added.");
       } else {
         logScanHistory(productName, "barcode", analysis.health_score);
@@ -1808,6 +1860,8 @@ if (nutritionFieldsFilled < 2) {
           itemDiet: detectedItemDiet,
           ingredients: productIngredients !== PLACEHOLDER_INGREDIENTS_TEXT ? productIngredients : null,
           categories: productCategories !== "Unknown" ? productCategories : null,
+          additivesCount,
+          nutriScoreGrade: (data?.product?.nutriscore_grade as string | undefined) || undefined,
         });
       }
     } catch (e) {
@@ -1847,7 +1901,9 @@ if (nutritionFieldsFilled < 2) {
 
       const analysis = await aiRes.json();
 
-      if (!analysis.is_food) {
+      if (!aiRes.ok || typeof analysis?.is_food !== "boolean") {
+        setInlineError(analysis?.error || "Couldn't analyse this product right now. Please try again in a moment.");
+      } else if (!analysis.is_food) {
         setInlineError("This barcode appears to be a non-food item, so it wasn't added.");
       } else {
         const detectedItemDiet = getItemDietType(`${typedName} ${manualBarcodeEntry.ingredients} ${manualBarcodeEntry.categories}`);
@@ -1859,6 +1915,8 @@ if (nutritionFieldsFilled < 2) {
           itemDiet: detectedItemDiet,
           ingredients: manualBarcodeEntry.ingredients !== PLACEHOLDER_INGREDIENTS_TEXT ? manualBarcodeEntry.ingredients : null,
           categories: manualBarcodeEntry.categories !== "Unknown" ? manualBarcodeEntry.categories : null,
+          additivesCount: manualBarcodeEntry.additivesCount,
+          nutriScoreGrade: manualBarcodeEntry.nutriScoreGrade,
         });
 
         if (contributeToOFF) {
@@ -1916,6 +1974,8 @@ if (nutritionFieldsFilled < 2) {
       // claim; mark it so later storage changes never recompute it.
       ...trackingFields({ expirySource: shelfLife.source === "scanned" ? "printed" : null }),
       ...accuracyFields({ expiryKind: shelfLife.source === "scanned" ? scannedExpiry?.kind ?? null : null }),
+      // The date itself, so a pack scanned after its date can still say how long ago that was.
+      ...printedDateField(shelfLife.source === "scanned" ? scannedExpiry?.expiryDate : null),
       name: scannedResult.name,
       days_left: initialDaysLeft,
       risk: deriveRisk(initialDaysLeft, initialDaysLeft, scannedResult.name),
@@ -1942,7 +2002,7 @@ if (nutritionFieldsFilled < 2) {
            healthScore: inserted.healthScore ?? scannedResult.analysis?.health_score ?? null,
          }, ...prev];
        });
-       toast(`Added — ${days(initialDaysLeft)} left`, {
+       toast(inserted.daysPastEstimate > 0 ? `Added — its date passed ${days(inserted.daysPastEstimate)} ago` : `Added — ${days(initialDaysLeft)} left`, {
          description: learnedAdjustment.note ? `${shelfLife.explanation} ${learnedAdjustment.note}` : shelfLife.explanation,
          // An estimate the app is unsure about gets a way to correct it
          // right there, rather than a note telling the user to go and find
@@ -1982,18 +2042,24 @@ if (nutritionFieldsFilled < 2) {
       const aiRes = await apiFetch("/api/analyze-food", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        // Only the nutrition numbers are new; the ingredients, additives and grade are the same product's.
         body: JSON.stringify({
           name: scannedResult.name,
-          ingredients: "",
-          categories: "",
+          ingredients: scannedResult.ingredients ?? "",
+          categories: scannedResult.categories ?? "",
           nutritionData,
-          additivesCount: 0,
+          additivesCount: scannedResult.additivesCount ?? 0,
           additiveColors: [],
+          nutriScoreGrade: scannedResult.nutriScoreGrade,
           isEstimated: false,
         }),
       });
 
       const analysis = await aiRes.json();
+      if (!aiRes.ok || typeof analysis?.is_food !== "boolean") {
+        toast("Couldn't update the rating", { description: analysis?.error || "The earlier rating is still shown. Try again in a moment." });
+        return;
+      }
       setScannedResult((prev) => (prev ? { ...prev, analysis } : null));
       toast("Label scanned!", {
         description: "Rating updated with real nutrition data from the label.",
@@ -2039,7 +2105,7 @@ if (nutritionFieldsFilled < 2) {
   // omitting those fields from the very first insert (confirmed
   // reproducible: the probes are still in flight for a beat after a fresh
   // signup, before the dashboard would otherwise already be interactive).
-  const schemaProbesPending = !!user && (householdSchemaReady === null || ingredientsSchemaReady === null || healthScoreSchemaReady === null || trackingSchemaReady === null);
+  const schemaProbesPending = !!user && (householdSchemaReady === null || ingredientsSchemaReady === null || healthScoreSchemaReady === null || trackingSchemaReady === null || accuracySchemaReady === null || printedDateSchemaReady === null);
   if (authLoading || (!user && !authLoading) || schemaProbesPending) {
     return (
       <div className="flex flex-col items-center justify-center gap-5 min-h-screen">
@@ -2171,7 +2237,7 @@ if (nutritionFieldsFilled < 2) {
                   }}
                   className="neu-pressable min-h-11 pl-3 pr-3.5 rounded-xl inline-flex items-center gap-2 text-sm font-semibold"
                 >
-                  <span className="tabular-nums font-extrabold text-danger-strong">{item.daysLeft === 0 ? "!" : `${item.daysLeft}d`}</span>
+                  <span className="tabular-nums font-extrabold text-danger-strong">{item.daysPastEstimate > 0 ? `${item.daysPastEstimate}d past` : item.daysLeft === 0 ? "today" : `${item.daysLeft}d`}</span>
                   <span className="max-w-[10rem] truncate">{item.name}</span>
                 </button>
               ))}
@@ -2417,7 +2483,6 @@ if (nutritionFieldsFilled < 2) {
                   <option value="high">Critical</option>
                   <option value="medium">Expiring soon</option>
                   <option value="low">Still good</option>
-                  <option value="info">Info</option>
                 </select>
                 <select
                   value={notificationSort}
@@ -3055,7 +3120,9 @@ if (nutritionFieldsFilled < 2) {
                   <span className="text-xs font-bold uppercase tracking-widest text-foreground/60 mb-1">Expiry Date</span>
                   {scannedExpiry ? (
                     <>
-                      <span className="text-lg font-black">{days(scannedExpiry.daysLeft)} left</span>
+                      <span className="text-lg font-black">
+                        {scannedExpiry.expiryDate && scannedExpiry.expiryDate < localDateISO() ? "Its date has passed" : `${days(scannedExpiry.daysLeft)} left`}
+                      </span>
                       <span className="text-[11px] text-foreground/60 truncate">
                         {scannedExpiry.expiryDate
                           ? `${scannedExpiry.kind === "best_before" ? "Best before" : scannedExpiry.kind === "use_by" ? "Use by" : "Expires"} ${scannedExpiry.expiryDate}`
@@ -3641,7 +3708,7 @@ if (nutritionFieldsFilled < 2) {
 
       {showPantryChat && (
         <PantryChatModal
-          items={visibleItems.map((i) => ({ name: i.name, daysLeft: i.daysLeft, risk: i.risk, ingredientsText: i.ingredientsText }))}
+          items={visibleItems.map((i) => ({ name: i.name, daysLeft: i.daysLeft, daysPastEstimate: i.daysPastEstimate, risk: i.risk, ingredientsText: i.ingredientsText }))}
           dietaryPreference={String(user?.user_metadata?.dietary_preference || "none")}
           onClose={() => setShowPantryChat(false)}
         />

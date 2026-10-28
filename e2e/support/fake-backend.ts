@@ -1,4 +1,4 @@
-import type { BrowserContext, Page, Route } from "@playwright/test";
+import type { BrowserContext, Page, Route, WebSocketRoute } from "@playwright/test";
 
 /**
  * An in-memory stand-in for the three things the browser talks to:
@@ -22,7 +22,9 @@ export const PROJECT_REF = new URL(SUPABASE_URL).hostname.split(".")[0];
 export const SESSION_KEY = `sb-${PROJECT_REF}-auth-token`;
 
 type Row = Record<string, unknown>;
-export type RecordedRequest = { method: string; path: string; query: string; body: unknown };
+/** A joined realtime channel and the postgres_changes subscriptions it was granted. */
+type LiveChannel = { changes: Array<{ id: number; event: string; schema: string; table: string; filter?: string }> };
+export type RecordedRequest = { method: string; path: string; query: string; body: unknown; authorization?: string | null };
 
 const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString("base64url");
 const uuid = () => crypto.randomUUID();
@@ -196,6 +198,58 @@ export class FakeBackend {
     });
   }
 
+  /** Every channel topic the page has joined, in order, so a test can see a subscription restart. */
+  realtimeJoins: string[] = [];
+  private realtime: { ws: WebSocketRoute; channels: Map<string, LiveChannel> } | null = null;
+
+  /** Supabase Realtime's Phoenix protocol (vsn 2.0.0 frames: [join_ref, ref, topic, event, payload]), enough for postgres_changes. */
+  async liveRealtime(page: Page) {
+    let nextId = 1;
+    await page.routeWebSocket(/realtime/, (ws) => {
+      const channels = new Map<string, LiveChannel>();
+      this.realtime = { ws, channels };
+      ws.onMessage((raw) => {
+        if (typeof raw !== "string") return; // binary frames carry broadcast, which this app does not use
+        const [joinRef, ref, topic, event, payload] = JSON.parse(raw) as [string | null, string | null, string, string, Record<string, unknown>];
+        const reply = (response: unknown) => ws.send(JSON.stringify([joinRef, ref, topic, "phx_reply", { status: "ok", response }]));
+        if (event === "phx_join") {
+          const asked = ((payload?.config as { postgres_changes?: Omit<LiveChannel["changes"][number], "id">[] } | undefined)?.postgres_changes) ?? [];
+          const changes = asked.map((c) => ({ ...c, id: nextId++ }));
+          channels.set(topic, { changes });
+          this.realtimeJoins.push(topic);
+          return reply({ postgres_changes: changes });
+        }
+        if (event === "phx_leave") channels.delete(topic);
+        // Heartbeats, leaves and access_token pushes all just want an ok.
+        if (ref) reply({});
+      });
+    });
+  }
+
+  /** What Supabase Realtime sends when a row changes, to every joined channel subscribed to `table`. */
+  pushChange(table: string, type: "INSERT" | "UPDATE" | "DELETE", record: Row) {
+    if (!this.realtime) throw new Error("pushChange needs liveRealtime() installed");
+    for (const [topic, channel] of this.realtime.channels) {
+      const ids = channel.changes
+        .filter((c) => c.table === table && (c.event === "*" || c.event === type))
+        .map((c) => c.id);
+      if (ids.length === 0) continue;
+      this.realtime.ws.send(JSON.stringify([null, null, topic, "postgres_changes", {
+        ids,
+        data: {
+          schema: "public",
+          table,
+          commit_timestamp: new Date().toISOString(),
+          type,
+          columns: [],
+          record: type === "DELETE" ? null : record,
+          old_record: type === "INSERT" ? null : { id: record.id },
+          errors: null,
+        },
+      }]));
+    }
+  }
+
   // ───────────────────────── handlers ─────────────────────────
 
   private json(route: Route, body: unknown, status = 200, headers: Record<string, string> = {}) {
@@ -217,6 +271,8 @@ export class FakeBackend {
       path: url.pathname,
       query: url.search,
       body: route.request().postData() ?? null,
+      // The real routes answer 401 without it; this fake does not check, so tests assert it was sent.
+      authorization: route.request().headers()["authorization"] ?? null,
     });
     const canned = this.api[name];
     if (!canned) return this.json(route, { error: `no fake for /api/${name}` }, 501);

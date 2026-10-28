@@ -81,7 +81,8 @@ export function HouseholdModal({ onClose, initialJoinCode = "" }: HouseholdModal
   };
 
   const handleJoin = async () => {
-    const code = joinCode.trim();
+    // Codes are lowercase hex compared exactly by the database; one read off another phone often comes back in capitals or spaced.
+    const code = joinCode.replace(/\s+/g, "").toLowerCase();
     if (!code) {
       setError("Enter an invite code.");
       return;

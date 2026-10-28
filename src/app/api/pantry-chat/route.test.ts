@@ -68,6 +68,21 @@ describe("POST /api/pantry-chat", () => {
     expect(prompt).toContain("Dietary preference: vegetarian.");
   });
 
+  it("marks food past its date, so it is never what the model puts first", async () => {
+    await ask({
+      question: "What can I cook tonight?",
+      items: [
+        { name: "Spinach", daysLeft: 0, daysPastEstimate: 4, risk: "high" },
+        { name: "Paneer", daysLeft: 2, daysPastEstimate: 0, risk: "high" },
+      ],
+    });
+    const prompt = promptSent();
+    // daysLeft is clamped at 0, so without this the spinach read as "0 day(s) left" under "fewest days first".
+    expect(prompt).toContain("- Spinach: PAST ITS DATE by 4 day(s), high risk");
+    expect(prompt).toContain("- Paneer: 2 day(s) left, high risk");
+    expect(prompt).toContain("Never suggest cooking or eating an item marked PAST ITS DATE");
+  });
+
   it("never names egg or meat to a vegetarian, whatever the request body carries", async () => {
     await ask({
       question: "What's expiring soon?",
