@@ -58,13 +58,3 @@ test.describe("food preferences", () => {
     expect(sent.foodProfile).toMatchObject({ allergies: ["nuts"] });
   });
 });
-
-test.describe("kitchen temperature", () => {
-  test("is saved to the account from the profile menu", async ({ backend, page }) => {
-    await openDashboard(page);
-    await openProfileMenu(page);
-    await page.getByRole("group", { name: "Kitchen temperature" }).getByRole("button", { name: "Hot" }).click();
-    await expect.poll(() => backend.user.user_metadata.kitchen_temp).toBe("hot");
-    await expect(page.getByRole("group", { name: "Kitchen temperature" }).getByRole("button", { name: "Hot" })).toHaveAttribute("aria-pressed", "true");
-  });
-});

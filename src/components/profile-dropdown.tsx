@@ -7,7 +7,6 @@ import { useAuth } from "@/context/auth-context";
 import { LogOut, Settings, Users, ChevronDown, Bell, Loader2, ShoppingCart, History, Leaf, ShieldCheck, Sparkles } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { DietPreferenceToggle } from "@/components/diet-preference-toggle";
-import { KitchenTempToggle } from "@/components/kitchen-temp-toggle";
 import { FoodProfileModal } from "@/components/food-profile-modal";
 import { HouseholdModal } from "@/components/household-modal";
 import { ScanHistoryModal } from "@/components/scan-history-modal";
@@ -144,8 +143,6 @@ export function ProfileDropdown({ onOpenShoppingList, onReplayTour, onOpenHouseh
       </div>
 
       <DietPreferenceToggle />
-
-      <KitchenTempToggle />
 
       <ThemeToggle />
 
