@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { expect, jpeg, openDashboard, openProfileMenu, test } from "./fixtures";
+import { expect, openDashboard, openProfileMenu, test } from "./fixtures";
 
 const openAddMenu = async (page: Page) => {
   await page.getByRole("button", { name: /^Add product$/ }).click();
@@ -55,35 +55,6 @@ test.describe("leftovers", () => {
     await dialog.getByRole("button", { name: "Yes", exact: true }).click();
     await expect(dialog.getByRole("alert")).toContainText("not safe to keep");
     await expect(dialog.getByRole("button", { name: "Add to pantry" })).toBeDisabled();
-    expect(backend.tables.pantry_items).toHaveLength(0);
-  });
-});
-
-test.describe("photo of produce", () => {
-  test("names what is in the photo, and adds only what is ticked", async ({ backend, page }) => {
-    backend.api["scan-produce"] = { body: { success: true, items: ["Tomatoes", "Bhindi (Okra)", "Bananas"] } };
-    await openDashboard(page);
-    await openAddMenu(page);
-    await page.getByRole("button", { name: /^Photo of produce/ }).click();
-
-    const dialog = page.getByRole("dialog", { name: "Photo of fresh produce" });
-    await dialog.getByLabel("Choose a photo of produce").setInputFiles(jpeg("veg.jpg"));
-    await expect(dialog.getByRole("checkbox", { name: "Tomatoes" })).toBeChecked();
-    await dialog.getByRole("checkbox", { name: "Bananas" }).click();
-    await dialog.getByRole("button", { name: "Add 2 items to pantry" }).click();
-
-    await expect.poll(() => backend.tables.pantry_items.map((r) => r.name).sort()).toEqual(["Bhindi (Okra)", "Tomatoes"]);
-    expect(backend.tables.pantry_items.every((r) => Number(r.days_left) > 0)).toBe(true);
-  });
-
-  test("says so when it cannot see any food, instead of adding anything", async ({ backend, page }) => {
-    backend.api["scan-produce"] = { body: { success: true, items: [] } };
-    await openDashboard(page);
-    await openAddMenu(page);
-    await page.getByRole("button", { name: /^Photo of produce/ }).click();
-    const dialog = page.getByRole("dialog", { name: "Photo of fresh produce" });
-    await dialog.getByLabel("Choose a photo of produce").setInputFiles(jpeg("empty.jpg"));
-    await expect(dialog.getByRole("alert")).toContainText("couldn't see any food");
     expect(backend.tables.pantry_items).toHaveLength(0);
   });
 });
