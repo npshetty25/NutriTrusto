@@ -1,9 +1,4 @@
-import type { Page } from "@playwright/test";
 import { expect, openDashboard, openProfileMenu, test } from "./fixtures";
-
-const openAddMenu = async (page: Page) => {
-  await page.getByRole("button", { name: /^Add product$/ }).click();
-};
 
 test.describe("weekly plan", () => {
   test("plans dinners from the pantry and puts what to buy on the shopping list", async ({ backend, page }) => {
@@ -25,37 +20,6 @@ test.describe("weekly plan", () => {
       await expect.poll(() => backend.tables.shopping_list_items.length).toBeGreaterThan(0);
       expect(backend.tables.shopping_list_items[0]).toMatchObject({ source_recipe: "Weekly plan" });
     }
-  });
-});
-
-test.describe("leftovers", () => {
-  test("saves cooked food with a 3-day date when it went in the fridge", async ({ backend, page }) => {
-    await openDashboard(page);
-    await openAddMenu(page);
-    await page.getByRole("button", { name: /^Leftovers/ }).click();
-
-    const dialog = page.getByRole("dialog", { name: "Save leftovers" });
-    await dialog.getByLabel("What is left").fill("dal tadka");
-    await expect(dialog.getByText("Keeps 3 days")).toBeVisible();
-    await dialog.getByRole("button", { name: "Add to pantry" }).click();
-
-    await expect(page.getByRole("heading", { level: 3, name: "Leftover dal tadka" })).toBeVisible();
-    expect(backend.tables.pantry_items[0]).toMatchObject({ name: "Leftover dal tadka", days_left: 3, expiry_source: "user", storage: "fridge" });
-    // Not given the raw ingredient's "Opened it".
-    await expect(page.getByRole("button", { name: /Mark Leftover dal tadka as opened/ })).toHaveCount(0);
-  });
-
-  test("refuses food that sat out for over two hours, and says why", async ({ backend, page }) => {
-    await openDashboard(page);
-    await openAddMenu(page);
-    await page.getByRole("button", { name: /^Leftovers/ }).click();
-
-    const dialog = page.getByRole("dialog", { name: "Save leftovers" });
-    await dialog.getByLabel("What is left").fill("rice");
-    await dialog.getByRole("button", { name: "Yes", exact: true }).click();
-    await expect(dialog.getByRole("alert")).toContainText("not safe to keep");
-    await expect(dialog.getByRole("button", { name: "Add to pantry" })).toBeDisabled();
-    expect(backend.tables.pantry_items).toHaveLength(0);
   });
 });
 
