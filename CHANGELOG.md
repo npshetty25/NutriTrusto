@@ -6,7 +6,17 @@ reason. Nothing changes silently.
 
 ---
 
-## 2026-10-29 — a kitchen setting, and a date rule for leftovers
+## 2026-11-02 — kitchen setting and leftovers removed
+
+**No row in `shelf-life-data.ts` changed.** The Cool / Normal / Hot kitchen
+setting and the leftover rule below are gone, along with Photo of produce. The
+counter is 29 °C for every account again. An account that had chosen Cool or
+Hot is estimated at 29 °C from now on; items it already added keep the days
+they were given.
+
+---
+
+## 2026-10-29 — a kitchen setting, and a date rule for leftovers (removed 2026-11-02)
 
 **No row in `shelf-life-data.ts` changed, and nobody's numbers move until they choose.**
 

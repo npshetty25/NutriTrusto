@@ -119,9 +119,6 @@ import {
 import ShoppingListModal from "@/components/shopping-list-modal";
 import { HouseholdModal } from "@/components/household-modal";
 import { MealPlanModal } from "@/components/meal-plan-modal";
-import { LeftoverModal } from "@/components/leftover-modal";
-import { ProducePhotoModal } from "@/components/produce-photo-modal";
-import { isLeftover } from "@/lib/leftovers";
 import { readProfile, profileWarnings } from "@/lib/food-profile";
 import { looksLikeInviteCode, PENDING_JOIN_KEY } from "@/lib/household";
 import { OFF_NAME_FIELDS, offProductName, ownLanguageNameFields, suggestNameFromCategories } from "@/lib/off-product";
@@ -428,9 +425,6 @@ export default function Home() {
   const [showShoppingList, setShowShoppingList] = useState(false);
   const [showHousehold, setShowHousehold] = useState(false);
   const [showMealPlan, setShowMealPlan] = useState(false);
-  const [showProducePhoto, setShowProducePhoto] = useState(false);
-  // null = closed; a string (maybe empty) = open with that dish name filled in.
-  const [leftoverDish, setLeftoverDish] = useState<string | null>(null);
   // A code from an invite link (?join=CODE), waiting for the dialog.
   const [inviteJoinCode, setInviteJoinCode] = useState("");
   // In a household: everyone's items, or only the ones I added.
@@ -1216,7 +1210,7 @@ export default function Home() {
   };
 
   // ─── Add by hand ────────────────────────────────────────────────
-  const addManualItem = async (entry: NewItem, quiet = false): Promise<boolean> => {
+  const addManualItem = async (entry: NewItem): Promise<boolean> => {
     if (!user) return false;
     const risk = deriveRisk(entry.daysLeft, entry.daysLeft, entry.name);
     const { data, error } = await supabase
@@ -1237,7 +1231,7 @@ export default function Home() {
     if (error || !data) return false;
     const added = rowToItem(data as PantryRow);
     setItems((prev) => (prev.some((i) => i.id === data.id) ? prev : [added, ...prev]));
-    if (!quiet) toast(`${entry.name} added`, {
+    toast(`${entry.name} added`, {
       description: added.daysPastEstimate > 0 ? `Its date passed ${days(added.daysPastEstimate)} ago.` : `${days(entry.daysLeft)} left.`,
     });
     return true;
@@ -2826,7 +2820,7 @@ if (nutritionFieldsFilled < 2) {
               const openedLimit = item.openedAt ? null : openedDaysFor(item.name, item.storage ?? shelfEstimate.storage);
               // Offered for anything that comes in a pack: a printed date, or a
               // USDA use-within figure. Fresh produce is not "opened".
-              const canMarkOpened = !!trackingSchemaReady && !item.openedAt && !isLeftover(item.name) && (item.expirySource === "printed" || !!openedLimit);
+              const canMarkOpened = !!trackingSchemaReady && !item.openedAt && (item.expirySource === "printed" || !!openedLimit);
               // Once opening has replaced the date, the unopened estimate's
               // source and storage figures no longer describe it.
               const openedOwnsDate = !!item.openedAt && !item.expirySource;
@@ -3039,32 +3033,6 @@ if (nutritionFieldsFilled < 2) {
               <div>
                 <p className="font-semibold text-sm leading-tight">Add product</p>
                 <p className="text-[11px] text-foreground/50 leading-tight mt-0.5">Scan a barcode, or type it in with its use-by date</p>
-              </div>
-            </button>
-            <div className="h-px w-full bg-border" />
-            <button
-              onClick={() => { setShowReceiptMenu(false); setShowProducePhoto(true); }}
-              className="flex items-center gap-3 p-3 rounded-xl hover:bg-foreground/5 text-foreground text-left transition-colors"
-            >
-              <div className="w-9 h-9 rounded-xl neu-raised-sm text-foreground/70 flex items-center justify-center shrink-0">
-                <Carrot size={16} />
-              </div>
-              <div>
-                <p className="font-semibold text-sm leading-tight">Photo of produce</p>
-                <p className="text-[11px] text-foreground/50 leading-tight mt-0.5">Loose vegetables and fruit, no barcode</p>
-              </div>
-            </button>
-            <div className="h-px w-full bg-border" />
-            <button
-              onClick={() => { setShowReceiptMenu(false); setLeftoverDish(""); }}
-              className="flex items-center gap-3 p-3 rounded-xl hover:bg-foreground/5 text-foreground text-left transition-colors"
-            >
-              <div className="w-9 h-9 rounded-xl neu-raised-sm text-foreground/70 flex items-center justify-center shrink-0">
-                <UtensilsCrossed size={16} />
-              </div>
-              <div>
-                <p className="font-semibold text-sm leading-tight">Leftovers</p>
-                <p className="text-[11px] text-foreground/50 leading-tight mt-0.5">Cooked food you want to finish in time</p>
               </div>
             </button>
           </div>
@@ -3732,28 +3700,6 @@ if (nutritionFieldsFilled < 2) {
       {showHousehold && (
         <HouseholdModal initialJoinCode={inviteJoinCode} onClose={() => { setShowHousehold(false); setInviteJoinCode(""); }} />
       )}
-      {showProducePhoto && (
-        <ProducePhotoModal
-          userDiet={userDietPreference}
-          trackingAvailable={!!trackingSchemaReady}
-          adjustEstimate={(name, d) => adjustEstimate(name, d, learned)}
-          onAdd={addManualItem}
-          onDone={(added, failed) =>
-            toast(added > 0 ? `${added} ${added === 1 ? "item" : "items"} added` : "Nothing was added", {
-              description: failed > 0 ? `${failed} couldn't be saved. Add ${failed === 1 ? "it" : "them"} by hand.` : "Check the days on each card; they are estimates.",
-            })
-          }
-          onClose={() => setShowProducePhoto(false)}
-        />
-      )}
-      {leftoverDish !== null && (
-        <LeftoverModal
-          initialName={leftoverDish}
-          userDiet={userDietPreference}
-          onAdd={addManualItem}
-          onClose={() => setLeftoverDish(null)}
-        />
-      )}
       {showMealPlan && (
         <MealPlanModal
           items={displayedItems.map((i) => ({ name: i.name, daysLeft: i.daysLeft, daysPastEstimate: i.daysPastEstimate }))}
@@ -3776,9 +3722,7 @@ if (nutritionFieldsFilled < 2) {
           excludedCount={recipeExcludedCount}
           onAddMissing={() => { void addMissingIngredientsToShoppingList(); }}
           isAddingToShoppingList={isAddingToShoppingList}
-          onFeedback={accuracySchemaReady ? sendRecipeFeedback : undefined}
-          onSaveLeftovers={(dish) => { setShowRecipe(false); setLeftoverDish(dish); }}
-        />
+          onFeedback={accuracySchemaReady ? sendRecipeFeedback : undefined}        />
       )}
 
       {showPantryChat && (
