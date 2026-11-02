@@ -121,6 +121,7 @@ import { HouseholdModal } from "@/components/household-modal";
 import { MealPlanModal } from "@/components/meal-plan-modal";
 import { readProfile, profileWarnings } from "@/lib/food-profile";
 import { looksLikeInviteCode, PENDING_JOIN_KEY } from "@/lib/household";
+import { verifiedPackDate } from "@/lib/verified-packs";
 import { OFF_NAME_FIELDS, offProductName, ownLanguageNameFields, suggestNameFromCategories } from "@/lib/off-product";
 import { CountUp } from "@/components/count-up";
 import { motion, AnimatePresence, MotionConfig } from "framer-motion";
@@ -255,9 +256,9 @@ interface ScannedResultEntry {
 }
 
 /** A printed date (from a GS1 barcode) as the scan result's expiry entry. */
-function expiryFromPrintedDate(printed: { date: Date; kind: DateKind } | null): ScannedExpiryEntry | null {
+function expiryFromPrintedDate(printed: { date: Date; kind: DateKind; note?: string } | null): ScannedExpiryEntry | null {
   if (!printed) return null;
-  const { date, kind } = printed;
+  const { date, kind, note } = printed;
   const today = new Date();
   const todayUtc = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
   const daysLeft = Math.max(0, Math.round((date.getTime() - todayUtc) / (24 * 60 * 60 * 1000)));
@@ -267,6 +268,7 @@ function expiryFromPrintedDate(printed: { date: Date; kind: DateKind } | null): 
     source: "printed_expiry",
     confidence: "high",
     kind,
+    note,
   };
 }
 
@@ -277,6 +279,8 @@ interface ScannedExpiryEntry {
   confidence: "high" | "medium" | "low";
   // Use-by (safety) or best-before (quality), when the pack said which.
   kind?: DateKind | null;
+  /** Shown under the date, e.g. that the team typed it in from a demo pack. */
+  note?: string;
 }
 
 const PLACEHOLDER_INGREDIENTS_TEXT = "None provided, rely purely on AI general knowledge";
@@ -358,7 +362,7 @@ export default function Home() {
   // The printed date read out of a GS1 barcode, held across the lookup (and
   // the "type the name" fallback when the product database has no entry), so
   // it lands on whichever scan result eventually appears.
-  const pendingPrintedDate = useRef<{ date: Date; kind: DateKind } | null>(null);
+  const pendingPrintedDate = useRef<{ date: Date; kind: DateKind; note?: string } | null>(null);
   const [barcodeRetryPrompt, setBarcodeRetryPrompt] = useState<{ code: string } | null>(null);
   const [showBarcodeRetryOptions, setShowBarcodeRetryOptions] = useState(false);
   const [manualRetryBarcode, setManualRetryBarcode] = useState("");
@@ -1674,7 +1678,8 @@ export default function Home() {
     // lookup below needs just the product code.
     const gs1 = parseGs1(rawScan);
     const decodedText = gs1?.lookupCode ?? rawScan;
-    pendingPrintedDate.current = gs1PrintedDate(gs1);
+    // A date on the barcode itself wins; otherwise a pack the team has checked by hand.
+    pendingPrintedDate.current = gs1PrintedDate(gs1) ?? verifiedPackDate(decodedText);
     setInlineError(null);
     setBarcodeRetryPrompt(null);
     setShowBarcodeRetryOptions(false);
@@ -3140,6 +3145,9 @@ if (nutritionFieldsFilled < 2) {
                           : "From printed shelf-life"}
                         {scannedExpiry.confidence !== "high" ? " · double-check label" : ""}
                       </span>
+                      {scannedExpiry.note && (
+                        <span data-testid="scan-date-note" className="text-[10px] text-foreground/50 leading-snug mt-0.5">{scannedExpiry.note}</span>
+                      )}
                     </>
                   ) : (
                     // Shows the estimate it will actually use, and where
