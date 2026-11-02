@@ -108,10 +108,12 @@ export interface ShelfLifeRow {
  * it at export, so a value can always be traced to the revision it came from.
  * See CHANGELOG.md for what moved and why.
  */
-export const DATA_VERSION = "2026-10-27";
+export const DATA_VERSION = "2026-11-02";
 // 2026-10-27 added three sourced rows (chikoo, drumstick, gulab jamun); no
 // existing figure moved.
-export const EFFECTIVE_DATE = "2026-10-27";
+// 2026-11-02 added the Bauli Moonfils row and stopped the chocolate row
+// claiming it (240 days -> 180); no other figure moved.
+export const EFFECTIVE_DATE = "2026-11-02";
 
 const USDA = "USDA FoodKeeper";
 const FSIS = "USDA FSIS";
@@ -349,7 +351,17 @@ const RAW_ROWS: Omit<ShelfLifeRow, "data_version" | "effective_date">[] = [
   { id: "plant-milk-and-powder", keys: ["coconut milk", "milk powder", "condensed milk", "milkmaid", "soy milk", "soya milk", "almond milk", "oat milk"], days: 365, refTempC: 29, storage: "counter", tier: "shelf-stable", lookupOnly: true, source: "Food-science general (UHT/canned, sealed)", confidence: "medium" },
   { id: "frozen", keys: ["frozen", "frozen peas", "ice cream"], days: 90, refTempC: -18, storage: "freezer", tier: "shelf-stable", lookupOnly: true, source: `${USDA} (freezer −18 °C)`, confidence: "medium" },
   { id: "biscuit", keys: ["biscuit", "cookie", "namkeen", "chips", "wafers"], days: 120, refTempC: 29, storage: "counter", tier: "shelf-stable", lookupOnly: true, source: "Food-science general (sealed, rancidity-limited)", confidence: "medium" },
-  { id: "chocolate", keys: ["chocolate"], days: 240, refTempC: 29, storage: "counter", tier: "shelf-stable", lookupOnly: true, source: "Food-science general", confidence: "medium" },
+  { id: "chocolate", keys: ["chocolate"], exclude: ["moonfils", "moonfil"], days: 240, refTempC: 29, storage: "counter", tier: "shelf-stable", lookupOnly: true, source: "Food-science general", confidence: "medium" },
+  {
+    // "Bauli Moonfils Croissant chocolate" used to match the chocolate row above
+    // and read 240 days; the pack prints 6 months. Keyed on the product line, not
+    // on "croissant": a fresh bakery croissant keeps about two days.
+    id: "bauli-moonfils", keys: ["moonfils", "moonfil"],
+    days: 180, refTempC: 29, storage: "counter", tier: "shelf-stable", lookupOnly: true,
+    source: "Manufacturer's printed shelf life: 6 months (Bauli Moonfils pack, made 6 Sep 2026, best before 5 Mar 2027)",
+    source_caveat: "One product line, read from one pack. Use the date printed on the pack.",
+    confidence: "medium",
+  },
   {
     id: "gulab-jamun",
     // Not on FSSAI's sweets list, so it never reached a sourced figure.
