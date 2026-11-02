@@ -57,6 +57,38 @@ test.describe("pantry", () => {
     expect(inserted[0].body).toMatchObject([{ health_score: "3.1" }]);
   });
 
+  test("a pack the team has checked shows its printed date, and says the team entered it", async ({ backend, page }) => {
+    backend.off = {
+      status: 1,
+      code: "8908009419101",
+      product: {
+        product_name: "Bauli Moonfils Croissant chocolate",
+        brands: "Bauli",
+        categories: "Snacks, Croissants",
+        nutriments: { sugars_100g: 30, sodium_100g: 0.3 },
+      },
+    };
+    await openDashboard(page);
+    await page.getByRole("button", { name: /Barcode/ }).first().click();
+    await page.getByPlaceholder("e.g., 8901234567890").fill("8908009419101");
+    await page.getByRole("button", { name: "Use", exact: true }).click();
+
+    const dialog = page.getByRole("dialog");
+    await expect(dialog.getByText("Best before 2027-03-05")).toBeVisible();
+    await expect(dialog.getByTestId("scan-date-note")).toContainText("entered by our team");
+    await expect(dialog.getByTestId("scan-date-note")).toContainText("your own pack");
+  });
+
+  test("an ordinary product shows no team-entered note", async ({ backend, page }) => {
+    void backend;
+    await openDashboard(page);
+    await page.getByRole("button", { name: /Barcode/ }).first().click();
+    await page.getByPlaceholder("e.g., 8901234567890").fill("8901262010023");
+    await page.getByRole("button", { name: "Use", exact: true }).click();
+    await expect(page.getByRole("dialog").getByRole("heading", { name: "Amul Salted Butter 100 g" })).toBeVisible();
+    await expect(page.getByTestId("scan-date-note")).toHaveCount(0);
+  });
+
   test("a product with ingredients but no name asks only for the name, never says Unknown Product", async ({ backend, page }) => {
     backend.off = {
       status: 1,
