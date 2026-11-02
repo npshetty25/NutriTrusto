@@ -6,6 +6,21 @@ reason. Nothing changes silently.
 
 ---
 
+## 2026-11-02 — Bauli Moonfils no longer reads as chocolate
+
+**One row added, one row narrowed; no other figure moved.**
+
+| Item | Old | New | Why |
+|---|---|---|---|
+| "Bauli Moonfils Croissant chocolate" | 240 days (the `chocolate` row) | **180 days** (new `bauli-moonfils` row) | Scanned in a demo, the word "chocolate" in the Open Food Facts name matched the plain chocolate row. The pack prints 6 months (made 6 Sep 2026, best before 5 Mar 2027). 240 was 60 days too long, the unsafe direction. |
+
+The new row is keyed on `moonfils`, not `croissant`, because a fresh bakery
+croissant keeps about two days and must not inherit a packaged snack's six months.
+The `chocolate` row now excludes `moonfils`. Confidence is medium: one product line,
+read from one pack. The date printed on the pack still wins over any estimate.
+
+---
+
 ## 2026-11-02 — kitchen setting and leftovers removed
 
 **No row in `shelf-life-data.ts` changed.** The Cool / Normal / Hot kitchen
