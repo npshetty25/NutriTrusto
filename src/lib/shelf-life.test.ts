@@ -427,3 +427,17 @@ describe("estimateShelfLife — FSSAI's list of Indian sweets", () => {
     expect(estimateShelfLife("Rasgulla").ifStoredDifferently).toMatchObject({ fridge: 2, counter: null });
   });
 });
+
+describe("Bauli Moonfils (packaged croissant snack)", () => {
+  it("reads the pack's 6 months, not the plain chocolate row's 240 days", () => {
+    expect(rowIdFor("Bauli Moonfils Croissant chocolate")).toBe("bauli-moonfils");
+    expect(estimateShelfLife("Bauli Moonfils Croissant chocolate").days).toBe(180);
+  });
+
+  it("leaves chocolate and fresh croissants alone", () => {
+    expect(rowIdFor("Dark Chocolate Bar")).toBe("chocolate");
+    // A fresh bakery croissant must never inherit a packaged snack's six months.
+    expect(rowIdFor("Croissant")).not.toBe("bauli-moonfils");
+    expect(estimateShelfLife("Croissant").days).toBeLessThan(30);
+  });
+});
